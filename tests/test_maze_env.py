@@ -53,7 +53,7 @@ def make_env(level: Level | None = None, **kwargs) -> MazeEnv:
         sampler=FixedLevelSampler(level),
         encoder=ObservationEncoder(max_size=9, n_features=2),
         step_penalty=0.01,
-        max_episode_steps=50,
+        step_limit=50,
     )
     defaults.update(kwargs)
     return MazeEnv(**defaults)  # type: ignore[arg-type]
@@ -102,8 +102,8 @@ def test_rejects_an_invalid_action():
 def test_rejects_invalid_construction():
     with pytest.raises(ValueError, match="step_penalty"):
         make_env(step_penalty=-1.0)
-    with pytest.raises(ValueError, match="max_episode_steps"):
-        make_env(max_episode_steps=0)
+    with pytest.raises(ValueError, match="step_limit"):
+        make_env(step_limit=0)
 
 
 # --------------------------------------------------------------------------
@@ -176,7 +176,7 @@ def test_reaching_the_worse_objective_is_recorded_as_suboptimal():
 
 
 def test_episodes_truncate_at_the_step_limit():
-    env = make_env(max_episode_steps=3)
+    env = make_env(step_limit=3)
     env.reset(seed=0)
     for _ in range(2):
         _, _, terminated, truncated, _ = env.step(UP)  # bump the wall, go nowhere
@@ -195,7 +195,7 @@ def test_optimal_play_earns_exactly_the_predicted_utility():
             sampler=MazeLevelSampler(size_range=(5, 11)),
             encoder=ObservationEncoder(max_size=11, n_features=2),
             step_penalty=0.02,
-            max_episode_steps=500,
+            step_limit=500,
         )
         env.reset(seed=seed)
         solution = solve(env.level, env.step_penalty)

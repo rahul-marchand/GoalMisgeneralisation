@@ -44,8 +44,8 @@ class MazeEnv(gym.Env):
         self,
         sampler: LevelSampler | None = None,
         encoder: ObservationEncoder | None = None,
-        step_penalty: float = 0.01,
-        max_episode_steps: int = 120,
+        step_penalty: float = 0.05,
+        step_limit: int = 120,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
@@ -53,13 +53,13 @@ class MazeEnv(gym.Env):
         self.sampler: LevelSampler = sampler if sampler is not None else MazeLevelSampler()
         self.encoder = encoder if encoder is not None else ObservationEncoder(max_size=25)
         self.step_penalty = step_penalty
-        self.max_episode_steps = max_episode_steps
+        self.step_limit = step_limit
         self.render_mode = render_mode
 
         if step_penalty < 0:
             raise ValueError(f"step_penalty must be non-negative, got {step_penalty}")
-        if max_episode_steps < 1:
-            raise ValueError(f"max_episode_steps must be at least 1, got {max_episode_steps}")
+        if step_limit < 1:
+            raise ValueError(f"step_limit must be at least 1, got {step_limit}")
 
         self.action_space = gym.spaces.Discrete(len(_ACTION_DELTAS))
         self.observation_space = self.encoder.space()
@@ -102,7 +102,7 @@ class MazeEnv(gym.Env):
         if reached is not None:
             reward += self.level.objectives[reached].value
 
-        truncated = not terminated and self.elapsed_steps >= self.max_episode_steps
+        truncated = not terminated and self.elapsed_steps >= self.step_limit
 
         info = self._level_info()
         if terminated or truncated:

@@ -16,6 +16,9 @@ dependencies = [
     "farconf",
     "numpy ~=1.26.4",
     "gymnasium ~=0.29",
+    # cleanba.cleanba_impala imports this at module scope, but upstream only
+    # declares it in their optional "launch-jobs" extra.
+    "names_generator ~=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -58,3 +61,7 @@ reportPrivateImportUsage = "warning"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: end-to-end training runs; deselect with -m 'not slow'",
+    "gpu: needs a GPU to finish in reasonable time; run with -m gpu",
+]

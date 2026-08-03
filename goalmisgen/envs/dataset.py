@@ -30,21 +30,18 @@ from typing import Iterable
 
 import numpy as np
 
+from goalmisgen.envs.features import CorrelatedFeatures, FeatureScheme
 from goalmisgen.envs.level import Level, Objective
-from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler, assign_feature_ids
+from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.solver import objective_distances
 
 CONTENT_MODULES: tuple[str, ...] = ("level", "generation", "sampling", "solver", "values")
 """Modules whose source determines what a level contains."""
 
-CANONICAL_CORRELATION = 1.0
-"""Correlation used while generating.
-
-Feature assignment consumes random draws, so the correlation would perturb the
-stream and hence the layouts. Generation always normalises to this value and
-discards the resulting features, which keeps stored content independent of the
-correlation actually used at training time.
-"""
+# Feature assignment consumes random draws, so a scheme's parameters would
+# perturb the stream and hence the layouts. Generation normalises the scheme via
+# FeatureScheme.canonical() and discards the resulting features, keeping stored
+# content independent of the correlation actually trained on.
 
 ARRAY_FIELDS: tuple[str, ...] = ("walls_packed", "sizes", "agent", "positions", "values", "distances")
 """Arrays persisted to disk, one ``.npy`` each."""
@@ -69,8 +66,8 @@ def source_fingerprint() -> str:
 
 
 def canonical_sampler(sampler: MazeLevelSampler) -> MazeLevelSampler:
-    """The sampler with the correlation normalised away."""
-    return dataclasses.replace(sampler, feature_value_correlation=CANONICAL_CORRELATION)
+    """The sampler with its proxy relationship normalised away."""
+    return dataclasses.replace(sampler, features=sampler.features.canonical())
 
 
 def dataset_fingerprint(sampler: MazeLevelSampler) -> str:
@@ -303,13 +300,12 @@ class DatasetLevelSampler(LevelSampler):
     """
 
     dataset: LevelDataset
-    feature_value_correlation: float = 1.0
+    features: FeatureScheme = dataclasses.field(default_factory=CorrelatedFeatures)
     indices: np.ndarray | None = None
     """Restrict to a subset, for train/validation/test splits."""
 
     def __post_init__(self) -> None:
-        if not 0.0 <= self.feature_value_correlation <= 1.0:
-            raise ValueError(f"feature_value_correlation must be in [0, 1], got {self.feature_value_correlation}")
+        # The scheme validates its own parameters at construction.
         if self.indices is not None and len(self.indices) == 0:
             raise ValueError("indices is empty; there are no levels to sample")
 
@@ -321,7 +317,7 @@ class DatasetLevelSampler(LevelSampler):
         index = position if self.indices is None else int(self.indices[position])
 
         values = tuple(float(value) for value in self.dataset.values[index])
-        feature_ids = assign_feature_ids(values, self.feature_value_correlation, rng)
+        feature_ids = self.features.assign(values, rng)
         return self.dataset.level(index, feature_ids)
 
 

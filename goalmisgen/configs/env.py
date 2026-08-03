@@ -25,6 +25,7 @@ from goalmisgen.envs.dataset import (
     dataset_fingerprint,
     split_indices,
 )
+from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.observation import ObservationEncoder, ValueEncoding
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
@@ -102,7 +103,20 @@ class MazeConfig(EnvConfig):
 
     The experimental variable. Train at 1.0 and evaluate at 0.0 to test for goal
     misgeneralisation; sweep it for the dose-response curve.
+
+    Chance is ``1 / n_objectives``, not 0.5 - see :attr:`chance_correlation`.
+    Kept as a flat float so the command-line surface stays simple; it is turned
+    into a :class:`~goalmisgen.envs.features.CorrelatedFeatures` scheme.
     """
+
+    @property
+    def chance_correlation(self) -> float:
+        """The correlation an uninformative feature would show.
+
+        With two objectives that is 0.5; with three it is 0.333, so a rho=0.5
+        evaluation arm is a *positively correlated* condition, not a control.
+        """
+        return 1.0 / self.n_objectives
 
     value_encoding: ValueEncoding = "at_objective"
     """Must not be "none" with several objectives.
@@ -178,7 +192,7 @@ class MazeConfig(EnvConfig):
 
         return DatasetLevelSampler(
             dataset=dataset,
-            feature_value_correlation=self.feature_value_correlation,
+            features=CorrelatedFeatures(self.feature_value_correlation),
             indices=splits[self.dataset_split],
         )
 
@@ -189,7 +203,7 @@ class MazeConfig(EnvConfig):
             size_range=(self.min_size, self.max_size),
             n_objectives=self.n_objectives,
             values=self.value_scheme(),
-            feature_value_correlation=self.feature_value_correlation,
+            features=CorrelatedFeatures(self.feature_value_correlation),
             require_all_objectives_reachable=self.require_all_objectives_reachable,
         )
 

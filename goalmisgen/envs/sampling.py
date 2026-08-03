@@ -35,6 +35,7 @@ from typing import Protocol
 
 import numpy as np
 
+from goalmisgen.envs.features import CorrelatedFeatures, FeatureScheme
 from goalmisgen.envs.generation import MazeGenerator, RecursiveBacktracker, validate_shape
 from goalmisgen.envs.level import Level, Objective
 from goalmisgen.envs.solver import objective_distances
@@ -46,41 +47,6 @@ class LevelSampler(Protocol):
 
     def sample(self, rng: np.random.Generator) -> Level:
         ...
-
-
-def assign_feature_ids(values: tuple[float, ...], correlation: float, rng: np.random.Generator) -> tuple[int, ...]:
-    """Give feature 0 to the highest-value objective with probability ``correlation``.
-
-    Remaining features go to the remaining objectives uniformly at random, so no
-    feature other than 0 carries information about value.
-
-    Shared with pre-generated datasets: this depends only on the values, so a
-    stored level can be given features at load time and one dataset therefore
-    serves every correlation in a sweep.
-    """
-    n = len(values)
-    if n == 1:
-        return (0,)
-
-    # Break ties at random. np.argmax always returns the lowest index, so with
-    # values like (1.0, 1.0, 0.5) feature 0 would land on objective 0 every
-    # time and the correlation would control nothing, while every metric
-    # continued to report normally.
-    maxima = np.flatnonzero(np.asarray(values) >= max(values) - 1e-12)
-    best = int(maxima[rng.integers(len(maxima))])
-    if rng.random() < correlation:
-        holder_of_feature_zero = best
-    else:
-        others = [index for index in range(n) if index != best]
-        holder_of_feature_zero = others[int(rng.integers(len(others)))]
-
-    remaining = [index for index in range(n) if index != holder_of_feature_zero]
-    rng.shuffle(remaining)
-
-    feature_ids = [0] * n
-    for feature_id, objective_index in enumerate(remaining, start=1):
-        feature_ids[objective_index] = feature_id
-    return tuple(feature_ids)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -100,8 +66,12 @@ class MazeLevelSampler:
 
     n_objectives: int = 2
     values: ValueScheme = dataclasses.field(default_factory=lambda: FixedValues((1.0, 0.5)))
-    feature_value_correlation: float = 1.0
-    """Probability that feature 0 marks the highest-value objective."""
+    features: FeatureScheme = dataclasses.field(default_factory=CorrelatedFeatures)
+    """How surface features attach to objectives - the proxy under study.
+
+    A protocol rather than a float so that a new correlation structure is a new
+    class, not an edit here. See :mod:`goalmisgen.envs.features`.
+    """
 
     require_all_objectives_reachable: bool = True
     """Reject levels in which one objective is walled off behind another.
@@ -124,9 +94,6 @@ class MazeLevelSampler:
     def __post_init__(self) -> None:
         if self.n_objectives < 1:
             raise ValueError(f"n_objectives must be at least 1, got {self.n_objectives}")
-        if not 0.0 <= self.feature_value_correlation <= 1.0:
-            raise ValueError(f"feature_value_correlation must be in [0, 1], got {self.feature_value_correlation}")
-
         minimum, maximum = self.size_range
         if minimum > maximum:
             raise ValueError(f"size_range is empty: {self.size_range}")
@@ -170,7 +137,7 @@ class MazeLevelSampler:
         agent_start, objective_positions = positions[0], positions[1:]
 
         objective_values = self.values.sample(self.n_objectives, rng)
-        feature_ids = self._assign_feature_ids(objective_values, rng)
+        feature_ids = self.features.assign(objective_values, rng)
 
         return Level(
             walls=walls,
@@ -186,6 +153,3 @@ class MazeLevelSampler:
         n_options = (maximum - minimum) // 2 + 1
         size = minimum + 2 * int(rng.integers(n_options))
         return (size, size)
-
-    def _assign_feature_ids(self, values: tuple[float, ...], rng: np.random.Generator) -> tuple[int, ...]:
-        return assign_feature_ids(values, self.feature_value_correlation, rng)

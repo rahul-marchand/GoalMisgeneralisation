@@ -21,6 +21,7 @@ from goalmisgen.envs.dataset import (
     source_fingerprint,
     split_indices,
 )
+from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.sampling import MazeLevelSampler
 from goalmisgen.envs.solver import objective_distances, solve
 from goalmisgen.envs.values import UniformValues
@@ -147,7 +148,7 @@ def test_fingerprint_changes_with_the_configuration():
 def test_fingerprint_ignores_the_correlation():
     """One dataset must serve the whole sweep, so rho must not change identity."""
     for correlation in (0.0, 0.5, 1.0):
-        other = dataclasses.replace(SAMPLER, feature_value_correlation=correlation)
+        other = dataclasses.replace(SAMPLER, features=CorrelatedFeatures(correlation))
         assert dataset_fingerprint(other) == dataset_fingerprint(SAMPLER)
 
 
@@ -183,7 +184,7 @@ def test_dataset_sampler_is_interchangeable_with_the_live_one():
 def test_one_dataset_serves_every_correlation(correlation):
     """The point of storing levels without features."""
     dataset = LevelDataset.generate(MazeLevelSampler(size_range=(5, 5)), n_levels=400, seed=0, block_size=200)
-    sampler = DatasetLevelSampler(dataset, feature_value_correlation=correlation)
+    sampler = DatasetLevelSampler(dataset, features=CorrelatedFeatures(correlation))
 
     rng = np.random.default_rng(0)
     hits = 0
@@ -223,8 +224,8 @@ def test_split_rejects_an_impossible_holdout():
 
 def test_dataset_sampler_rejects_bad_configuration():
     dataset = small_dataset()
-    with pytest.raises(ValueError, match="feature_value_correlation"):
-        DatasetLevelSampler(dataset, feature_value_correlation=1.5)
+    with pytest.raises(ValueError, match="correlation must be in"):
+        CorrelatedFeatures(1.5)
     with pytest.raises(ValueError, match="no levels to sample"):
         DatasetLevelSampler(dataset, indices=np.array([], dtype=int))
 
@@ -261,12 +262,12 @@ def test_pickling_a_loaded_dataset_does_not_copy_the_arrays(tmp_path):
     small_dataset(n=200).save(path)
     loaded = LevelDataset.load(path)
 
-    payload = pickle.dumps(DatasetLevelSampler(loaded, feature_value_correlation=0.5))
+    payload = pickle.dumps(DatasetLevelSampler(loaded, features=CorrelatedFeatures(0.5)))
     assert len(payload) < 2000, f"pickle carried the arrays: {len(payload)} bytes"
 
     restored = pickle.loads(payload)
     assert len(restored.dataset) == len(loaded)
-    assert restored.feature_value_correlation == 0.5
+    assert restored.features.correlation == 0.5
     assert np.array_equal(restored.dataset.walls_packed, loaded.walls_packed)
 
 

@@ -298,10 +298,11 @@ def test_step_limit_excludes_objectives_that_cannot_be_reached_in_time():
 def test_tied_maximum_values_do_not_pin_the_best_to_index_zero():
     """np.argmax always returns the lowest index, which would make the
     correlation knob silently control nothing when values tie."""
-    from goalmisgen.envs.sampling import assign_feature_ids
+    from goalmisgen.envs.features import CorrelatedFeatures
 
+    scheme = CorrelatedFeatures(correlation=1.0)
     rng = np.random.default_rng(0)
-    holders = [assign_feature_ids((1.0, 1.0, 0.5), correlation=1.0, rng=rng).index(0) for _ in range(400)]
+    holders = [scheme.assign((1.0, 1.0, 0.5), rng).index(0) for _ in range(400)]
     assert set(holders) == {0, 1}, "feature 0 should land on either tied maximum"
     share = holders.count(0) / len(holders)
     assert 0.35 < share < 0.65, f"tie-break is skewed: {share:.2f}"

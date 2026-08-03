@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.sampling import MazeLevelSampler
 from goalmisgen.envs.solver import objective_distances, solve
@@ -93,7 +94,7 @@ def test_sampling_is_deterministic_given_a_seed():
 
 
 def test_uniform_values_produce_varying_values():
-    sampler = MazeLevelSampler(values=UniformValues(), feature_value_correlation=1.0)
+    sampler = MazeLevelSampler(values=UniformValues(), features=CorrelatedFeatures(1.0))
     rng = np.random.default_rng(0)
     observed = {tuple(objective.value for objective in sampler.sample(rng).objectives) for _ in range(20)}
     assert len(observed) == 20
@@ -105,19 +106,19 @@ def test_uniform_values_produce_varying_values():
 
 
 def test_perfect_correlation_always_marks_the_best_objective():
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=1.0, require_all_objectives_reachable=False)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, features=CorrelatedFeatures(1.0), require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler, n_trials=500) == 1.0
 
 
 def test_zero_correlation_never_marks_the_best_objective():
     """rho=0 is perfect anti-correlation, the sharpest possible test shift."""
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=0.0, require_all_objectives_reachable=False)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, features=CorrelatedFeatures(0.0), require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler, n_trials=500) == 0.0
 
 
 @pytest.mark.parametrize("rho", [0.0, 0.25, 0.5, 0.75, 1.0])
 def test_realised_correlation_matches_the_requested_one(rho):
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=rho, require_all_objectives_reachable=False)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, features=CorrelatedFeatures(rho), require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler) == pytest.approx(rho, abs=0.03)
 
 
@@ -127,7 +128,7 @@ def test_correlation_holds_with_more_than_two_objectives(rho):
         size_range=SMALL_MAZE,
         n_objectives=3,
         values=FixedValues((1.0, 0.6, 0.3)),
-        feature_value_correlation=rho,
+        features=CorrelatedFeatures(rho),
         require_all_objectives_reachable=False,
     )
     assert feature_zero_marks_the_best(sampler) == pytest.approx(rho, abs=0.03)
@@ -138,14 +139,14 @@ def test_correlation_holds_with_randomised_values():
     sampler = MazeLevelSampler(
         size_range=SMALL_MAZE,
         values=UniformValues(),
-        feature_value_correlation=0.75,
+        features=CorrelatedFeatures(0.75),
         require_all_objectives_reachable=False,
     )
     assert feature_zero_marks_the_best(sampler) == pytest.approx(0.75, abs=0.03)
 
 
 def test_single_objective_ignores_correlation():
-    sampler = MazeLevelSampler(n_objectives=1, values=FixedValues((1.0,)), feature_value_correlation=0.3)
+    sampler = MazeLevelSampler(n_objectives=1, values=FixedValues((1.0,)), features=CorrelatedFeatures(0.3))
     rng = np.random.default_rng(0)
     for _ in range(50):
         level = sampler.sample(rng)
@@ -180,7 +181,7 @@ def test_filter_actually_rejects_something():
 
 def test_correlation_survives_reachability_filtering():
     """Rejection must not bias which objective carries feature 0."""
-    sampler = MazeLevelSampler(size_range=(9, 13), feature_value_correlation=0.75)
+    sampler = MazeLevelSampler(size_range=(9, 13), features=CorrelatedFeatures(0.75))
     assert feature_zero_marks_the_best(sampler, n_trials=1500) == pytest.approx(0.75, abs=0.05)
 
 
@@ -201,8 +202,8 @@ def test_filter_gives_up_rather_than_looping_forever():
 
 
 def test_rejects_out_of_range_correlation():
-    with pytest.raises(ValueError, match="feature_value_correlation"):
-        MazeLevelSampler(feature_value_correlation=1.5)
+    with pytest.raises(ValueError, match="correlation must be in"):
+        CorrelatedFeatures(1.5)
 
 
 def test_rejects_zero_objectives():

@@ -13,7 +13,9 @@ valuable objective:
 ``rho=1.0``  Colour perfectly predicts value. A "go to colour 0" policy
              is optimal on-distribution, so the proxy is available to be
              learned.
-``rho=0.5``  Colour is uninformative. No proxy exists.
+``rho=0.5``  Colour is uninformative **for two objectives only**. The
+             chance level is ``1 / n_objectives``, so with three objectives
+             rho=0.5 is a positively correlated condition, not a control.
 ``rho=0.0``  Colour perfectly *anti*-predicts value. The sharpest test
              shift: a proxy-following agent scores as badly as possible.
 ===========  =========================================================
@@ -81,8 +83,10 @@ class MazeLevelSampler:
     """Uniform placement in a generated maze, with a tunable value/colour correlation.
 
     The maze generator must produce fully connected layouts; every generator in
-    :mod:`goalmisgen.envs.generation` does. Objectives are therefore always
-    reachable and no rejection sampling is needed.
+    :mod:`goalmisgen.envs.generation` does. Objectives can still be walled off
+    *behind each other*, though, and roughly half of all draws are rejected for
+    that reason with two objectives — so this distribution is conditioned on
+    solvability, not a plain uniform placement.
     """
 
     generator: MazeGenerator = dataclasses.field(default_factory=RecursiveBacktracker)
@@ -104,8 +108,13 @@ class MazeLevelSampler:
     pose a genuine choice.
     """
 
-    max_sampling_attempts: int = 100
-    """Guard against a configuration in which valid levels are vanishingly rare."""
+    max_sampling_attempts: int = 1000
+    """Guard against a configuration in which valid levels are vanishingly rare.
+
+    Rejection rises steeply with objective count - roughly 53% at two objectives,
+    88% at three and 97% at four - so a budget of 100 fails on about 7% of
+    four-objective levels. Attempts are cheap; give the rare hard cases room.
+    """
 
     def __post_init__(self) -> None:
         if self.n_objectives < 1:
@@ -120,20 +129,28 @@ class MazeLevelSampler:
             validate_shape((size, size))
 
     def sample(self, rng: np.random.Generator) -> Level:
+        # The size is drawn once, before the rejection loop. Drawing it inside
+        # would let acceptance probability reweight the size marginal: larger
+        # mazes are accepted more often, so re-drawing skewed the distribution
+        # by up to 1.8x (5x5 under-represented 27%, 21x21 over-represented 21%)
+        # while size_range still read as uniform.
+        shape = self._sample_shape(rng)
         for _ in range(self.max_sampling_attempts):
-            level = self._sample_once(rng)
+            level = self._sample_once(rng, shape)
             if not self.require_all_objectives_reachable:
                 return level
             if all(distance is not None for distance in objective_distances(level)):
                 return level
 
         raise RuntimeError(
-            f"no level with all objectives reachable after {self.max_sampling_attempts} attempts; "
-            "the maze may be too small for this many objectives"
+            f"no {shape[0]}x{shape[1]} level with all {self.n_objectives} objectives mutually "
+            f"reachable after {self.max_sampling_attempts} attempts. The size is drawn once and "
+            "then held fixed, so this means this size genuinely cannot accommodate this many "
+            "objectives - raise the lower end of size_range rather than retrying."
         )
 
-    def _sample_once(self, rng: np.random.Generator) -> Level:
-        walls = self.generator.generate(self._sample_shape(rng), rng)
+    def _sample_once(self, rng: np.random.Generator, shape: tuple[int, int]) -> Level:
+        walls = self.generator.generate(shape, rng)
 
         free_rows, free_cols = np.nonzero(~walls)
         n_needed = self.n_objectives + 1

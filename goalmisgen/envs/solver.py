@@ -184,8 +184,16 @@ def solve(level: Level, step_penalty: float) -> LevelSolution:
     best_utility = max(utility for _, utility in reachable)
     optimal_indices = tuple(index for index, utility in reachable if abs(utility - best_utility) <= TIE_TOLERANCE)
 
-    alternatives = [utility for index, utility in reachable if index not in optimal_indices]
-    utility_margin = best_utility - max(alternatives) if alternatives else math.inf
+    if len(optimal_indices) > 1:
+        # Tied objectives are excluded from `alternatives`, so without this a
+        # two-objective tie would leave the list empty and report `inf` - the
+        # value reserved for "only one objective is reachable". Filtering for
+        # clear-cut levels would then place every exactly-ambiguous level in the
+        # highest-confidence bin, where either choice counts as optimal.
+        utility_margin = 0.0
+    else:
+        alternatives = [utility for index, utility in reachable if index not in optimal_indices]
+        utility_margin = best_utility - max(alternatives) if alternatives else math.inf
 
     return LevelSolution(
         distances=distances,

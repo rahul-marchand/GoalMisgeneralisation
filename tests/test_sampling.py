@@ -69,6 +69,9 @@ def test_mazes_are_square():
 @pytest.mark.parametrize("n_objectives", [1, 2, 3, 4])
 def test_feature_ids_are_a_permutation(n_objectives):
     sampler = MazeLevelSampler(
+        # Large enough to hold four mutually-reachable objectives: the size is
+        # drawn once and held, so a small maze cannot be escaped by retrying.
+        size_range=(21, 25),
         n_objectives=n_objectives,
         values=FixedValues(tuple(1.0 - 0.1 * i for i in range(n_objectives))),
     )
@@ -188,7 +191,7 @@ def test_filter_gives_up_rather_than_looping_forever():
         values=FixedValues((1.0, 0.8, 0.6, 0.4)),
         max_sampling_attempts=20,
     )
-    with pytest.raises(RuntimeError, match="all objectives reachable"):
+    with pytest.raises(RuntimeError, match="cannot accommodate"):
         sampler.sample(np.random.default_rng(0))
 
 

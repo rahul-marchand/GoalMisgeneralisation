@@ -155,7 +155,10 @@ def test_ties_are_reported():
     assert solution.optimal_indices == (0, 1)
     assert solution.optimal_index == 0  # lowest index breaks the tie
     assert solution.is_ambiguous
-    assert solution.utility_margin == pytest.approx(0.5)
+    # A tie means no margin at all. Reporting the gap to the next *strictly*
+    # worse objective would file exactly-ambiguous levels in the highest
+    # confidence bin, where either choice scores as optimal.
+    assert solution.utility_margin == pytest.approx(0.0)
 
 
 def test_margin_is_infinite_with_a_single_objective():

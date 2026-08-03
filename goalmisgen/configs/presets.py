@@ -134,13 +134,17 @@ def maze_smoke_test() -> Args:
 
     Exists to prove the environment, cleanba and JAX fit together end to end
     before any GPU time is spent. Not a scientific configuration.
+
+    400k steps is 1250 updates. At 40k it was 125, which is too few for a
+    "return improved" assertion to mean anything: the signal is noisy at that
+    scale and the test passed or failed on luck. On a GPU this costs seconds.
     """
     out = maze_drc33(
         min_size=5,
         max_size=5,
         step_penalty=0.15,
         max_episode_steps=30,
-        total_timesteps=40_000,
+        total_timesteps=400_000,
         eval_correlations=(1.0,),
     )
     out.train_env = dataclasses.replace(out.train_env, num_envs=16, asynchronous=False)
@@ -153,9 +157,6 @@ def maze_smoke_test() -> Args:
     out.log_frequency = 1
     out.save_model = False
     out.eval_at_steps = frozenset()
-    # Raised above the real config's 4e-4 so 40k steps show movement, but not by
-    # the 10x it used to be: max_grad_norm is now 0.015 rather than 2.5e-4, so
-    # the same nominal rate takes far larger steps and the run diverged.
-    out.learning_rate = 1e-3
-    out.final_learning_rate = 1e-4
+    out.learning_rate = 4e-3
+    out.final_learning_rate = 4e-4
     return out

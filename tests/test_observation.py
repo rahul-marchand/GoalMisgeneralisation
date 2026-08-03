@@ -215,3 +215,33 @@ def test_rejects_invalid_configuration():
         ObservationEncoder(max_size=9, value_encoding="nonsense")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="value_range"):
         ObservationEncoder(max_size=9, value_range=(1.0, 0.0))
+
+
+def test_pad_size_decouples_observation_shape_from_maze_size():
+    """A size curriculum needs the sampled range to move while the observation
+    shape stays fixed; a checkpoint cannot survive a shape change."""
+    small = ObservationEncoder(max_size=9, pad_size=25)
+    assert small.shape == (25, 25, small.n_channels)
+
+    level = Level(
+        walls=OPEN_ROOM,
+        agent_start=(1, 1),
+        objectives=(Objective((1, 3), value=1.0, feature_id=0), Objective((3, 1), value=0.5, feature_id=1)),
+    )
+    observation = small.encode(level, (1, 1))
+    assert observation.shape == (25, 25, small.n_channels)
+    # The 5x5 level still sits top-left, everything beyond it is wall.
+    assert observation[5:, :, WALL_CHANNEL].all()
+
+
+def test_pad_size_must_not_be_smaller_than_max_size():
+    with pytest.raises(ValueError, match="smaller than max_size"):
+        ObservationEncoder(max_size=25, pad_size=9)
+
+
+def test_encoder_satisfies_the_observation_protocol():
+    from goalmisgen.envs.observation import ObservationScheme
+
+    encoder = ObservationEncoder(max_size=9)
+    assert isinstance(encoder, ObservationScheme) or all(hasattr(encoder, name) for name in ("space", "encode", "reset"))
+    encoder.reset(make_level())  # no-op, but must exist for stateful encoders

@@ -20,7 +20,7 @@ import gymnasium as gym
 import numpy as np
 
 from goalmisgen.envs.level import Level, Position
-from goalmisgen.envs.observation import ObservationEncoder
+from goalmisgen.envs.observation import ObservationEncoder, ObservationScheme
 from goalmisgen.envs.rendering import render
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.solver import LevelSolution, solve
@@ -43,7 +43,7 @@ class MazeEnv(gym.Env):
     def __init__(
         self,
         sampler: LevelSampler | None = None,
-        encoder: ObservationEncoder | None = None,
+        encoder: ObservationScheme | None = None,
         step_penalty: float = 0.05,
         step_limit: int = 120,
         render_mode: str | None = None,
@@ -51,7 +51,7 @@ class MazeEnv(gym.Env):
         super().__init__()
 
         self.sampler: LevelSampler = sampler if sampler is not None else MazeLevelSampler()
-        self.encoder = encoder if encoder is not None else ObservationEncoder(max_size=25)
+        self.encoder: ObservationScheme = encoder if encoder is not None else ObservationEncoder(max_size=25)
         self.step_penalty = step_penalty
         self.step_limit = step_limit
         self.render_mode = render_mode
@@ -76,9 +76,16 @@ class MazeEnv(gym.Env):
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[np.ndarray, dict[str, Any]]:
         super().reset(seed=seed)
-        del options
 
-        self.level = self.sampler.sample(self.np_random)
+        # Forwarded rather than discarded: `options` is gymnasium's per-episode
+        # control channel, and it is the only way a curriculum can reach a
+        # sampler that has been pickled into a worker process.
+        self.level = (
+            self.sampler.sample(self.np_random, **options)  # type: ignore[call-arg]
+            if options
+            else self.sampler.sample(self.np_random)
+        )
+        self.encoder.reset(self.level)
         self.solution = solve(self.level, self.step_penalty, step_limit=self.step_limit)
         self.agent_position = self.level.agent_start
         self.elapsed_steps = 0

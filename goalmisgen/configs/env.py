@@ -68,7 +68,16 @@ class MazeConfig(EnvConfig):
 
     min_size: int = 5
     max_size: int = 25
-    """Inclusive range of odd maze sizes. Observations are padded to max_size."""
+    """Inclusive range of odd maze sizes drawn during sampling."""
+
+    pad_size: int | None = None
+    """Observation side length. Defaults to ``max_size``.
+
+    Set it larger to keep the observation shape fixed while the sampled range
+    moves - a size curriculum - or to evaluate a checkpoint on mazes bigger than
+    it trained on. Changing the observation shape changes the network's
+    parameter shapes, so a checkpoint cannot otherwise cross size boundaries.
+    """
 
     n_objectives: int = 2
     step_penalty: float = 0.05
@@ -211,6 +220,7 @@ class MazeConfig(EnvConfig):
         highest = self.value_high if self.randomise_values else max(self.objective_values)
         return ObservationEncoder(
             max_size=self.max_size,
+            pad_size=self.pad_size,
             n_features=self.n_objectives,
             value_encoding=self.value_encoding,
             # Widened slightly so exactly-maximal values are not rejected by

@@ -23,7 +23,7 @@ distinguishes two hypotheses about what it learned.
 from __future__ import annotations
 
 import dataclasses
-from typing import Literal
+from typing import Literal, Protocol
 
 import gymnasium as gym
 import numpy as np
@@ -31,6 +31,26 @@ import numpy as np
 from goalmisgen.envs.level import Level, Position
 
 ValueEncoding = Literal["none", "at_objective", "broadcast"]
+
+
+class ObservationScheme(Protocol):
+    """Turns level state into agent input.
+
+    ``reset`` exists so an encoder may carry per-episode state. A stateless
+    encoder ignores it, but without the hook anything with memory — fog of war,
+    a revealed-map channel, frame stacking — could only be added by editing
+    ``MazeEnv``, which the design rule forbids.
+    """
+
+    def space(self) -> gym.spaces.Box:
+        ...
+
+    def encode(self, level: Level, agent_position: Position) -> np.ndarray:
+        ...
+
+    def reset(self, level: Level) -> None:
+        ...
+
 
 WALL_CHANNEL = 0
 AGENT_CHANNEL = 1
@@ -48,6 +68,17 @@ class ObservationEncoder:
     """
 
     max_size: int
+    """Largest maze this encoder accepts."""
+
+    pad_size: int | None = None
+    """Observation side length. Defaults to ``max_size``.
+
+    Separating the two makes a size curriculum possible — the sampled range can
+    move while the observation shape stays fixed — and lets a checkpoint trained
+    on small mazes be evaluated on larger ones, which is otherwise impossible
+    because changing the observation shape changes the parameter shapes.
+    """
+
     n_features: int = 2
     value_encoding: ValueEncoding = "at_objective"
     """How objective values are exposed.
@@ -68,7 +99,19 @@ class ObservationEncoder:
     value_range: tuple[float, float] = (0.0, 1.0)
     """Declared bounds for value channels, used for the observation space."""
 
+    @property
+    def side(self) -> int:
+        return self.pad_size if self.pad_size is not None else self.max_size
+
+    def reset(self, level: Level) -> None:
+        """No per-episode state to clear. Present to satisfy the protocol."""
+
     def __post_init__(self) -> None:
+        if self.pad_size is not None and self.pad_size < self.max_size:
+            raise ValueError(
+                f"pad_size={self.pad_size} is smaller than max_size={self.max_size}; "
+                "observations could not hold the largest maze"
+            )
         if self.max_size < 3:
             raise ValueError(f"max_size must be at least 3, got {self.max_size}")
         if self.n_features < 1:
@@ -94,7 +137,7 @@ class ObservationEncoder:
     @property
     def shape(self) -> tuple[int, int, int]:
         """Observation shape, in ``(height, width, channel)`` order."""
-        return (self.max_size, self.max_size, self.n_channels)
+        return (self.side, self.side, self.n_channels)
 
     @property
     def first_value_channel(self) -> int:
@@ -114,8 +157,8 @@ class ObservationEncoder:
 
     def encode(self, level: Level, agent_position: Position) -> np.ndarray:
         height, width = level.shape
-        if height > self.max_size or width > self.max_size:
-            raise ValueError(f"level of shape {level.shape} does not fit in max_size={self.max_size}")
+        if height > self.side or width > self.side:
+            raise ValueError(f"level of shape {level.shape} does not fit in a {self.side}x{self.side} observation")
 
         observation = np.zeros(self.shape, dtype=np.float32)
 

@@ -240,8 +240,9 @@ def test_pad_size_must_not_be_smaller_than_max_size():
 
 
 def test_encoder_satisfies_the_observation_protocol():
-    from goalmisgen.envs.observation import ObservationScheme
-
     encoder = ObservationEncoder(max_size=9)
-    assert isinstance(encoder, ObservationScheme) or all(hasattr(encoder, name) for name in ("space", "encode", "reset"))
-    encoder.reset(make_level())  # no-op, but must exist for stateful encoders
+    for name in ("space", "encode", "reset"):
+        assert callable(getattr(encoder, name, None)), f"encoder is missing {name}"
+    # reset is a no-op here, but must exist so a stateful encoder (fog of war,
+    # frame stacking) can be dropped in without editing MazeEnv.
+    encoder.reset(make_level())

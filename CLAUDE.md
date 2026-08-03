@@ -39,9 +39,29 @@ Two non-obvious facts about that stack:
   uninitialised. It is a heavy C++ build used only for fast Sokoban and is
   imported lazily inside `EnvpoolEnvConfig.make`.
 
-## Known upstream limitation
+## Known upstream limitations
 
-The DRC head is **not size-agnostic**: `cleanba/convlstm.py` flattens the
+### Evaluation assumes Sokoban
+
+`cleanba.evaluate.get_cycles` asserts 3-channel square RGB observations, and its
+caller assumes a positive reward means a box was pushed onto a target. Neither
+holds here: our observations are symbolic multi-channel, and *every* objective
+gives positive reward. Training runs fine and then dies at the first
+evaluation — and since the exception is raised on the evaluation thread, the
+process **hangs rather than exiting**, so it reads as a stall while still
+billing for the GPU.
+
+`goalmisgen/configs/compat.py` adapts from our side rather than editing
+`third_party`. It is applied automatically on importing `goalmisgen.configs`.
+
+The lesson that cost a run: **the evaluation path is not exercised by training
+tests.** `test_training_survives_an_evaluation_pass` exists specifically to run
+an evaluation, and profiling runs that set `eval_at_steps = frozenset()` do not
+cover it.
+
+### The DRC head is not size-agnostic
+
+It is **not size-agnostic**: `cleanba/convlstm.py` flattens the
 spatial dimensions before the MLP, and the actor/critic heads are `nn.Dense` on
 that flattened vector, so input dimensions are baked into parameter shapes.
 Mazes are therefore padded to a fixed maximum size. Out-of-distribution *size*

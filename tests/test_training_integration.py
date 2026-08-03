@@ -276,3 +276,49 @@ def test_preset_passes_the_dataset_to_every_environment(tmp_path):
 def test_preset_without_a_dataset_still_samples_live():
     args = maze_drc33()
     assert args.train_env.level_dataset is None
+
+
+@pytest.mark.slow
+def test_training_survives_an_evaluation_pass(tmp_path):
+    """Run training long enough to trigger an evaluation.
+
+    Evaluation exercises code paths training never touches, and a failure there
+    surfaces on the evaluation thread — so the process hangs instead of
+    crashing, which reads as a stall while still costing GPU time. This is the
+    only test that would catch a Sokoban assumption in cleanba's eval.
+    """
+    from cleanba.evaluate import EvalConfig
+    from goalmisgen.envs.dataset import LevelDataset
+
+    base = MazeConfig(max_episode_steps=30, min_size=5, max_size=5)
+    LevelDataset.generate(base.live_sampler(), n_levels=200, seed=0, block_size=100).save(tmp_path / "levels")
+
+    args = maze_smoke_test()
+    args.net = dataclasses.replace(args.net, n_recurrent=1, repeats_per_step=1)
+    args.local_num_envs = 8
+    args.num_steps = 8
+    args.total_timesteps = 8 * 8 * 8
+
+    train_env = dataclasses.replace(
+        args.train_env,
+        num_envs=8,
+        asynchronous=False,
+        level_dataset=str(tmp_path / "levels"),
+        dataset_valid_levels=50,
+        dataset_test_levels=50,
+    )
+    args.train_env = train_env
+    args.eval_envs = {
+        "rho000": EvalConfig(
+            dataclasses.replace(train_env, num_envs=4, feature_value_correlation=0.0, dataset_split="valid"),
+            n_episode_multiple=1,
+            steps_to_think=[0],
+        )
+    }
+    args.eval_at_steps = frozenset([1])
+    args.save_model = False
+
+    writer = run_training(args)
+
+    evaluated = [c for c in writer.metrics.columns if "rho000" in c]
+    assert evaluated, f"evaluation never ran; columns were {list(writer.metrics.columns)[:10]}"

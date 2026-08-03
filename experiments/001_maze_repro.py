@@ -1,0 +1,83 @@
+"""Train a DRC(3,3) on multi-objective mazes.
+
+The first real training run. Evaluation environments differ from training only
+in the value/colour correlation and in drawing from the held-out split, so the
+gap between the ``rho100`` and ``rho000`` curves *is* the goal misgeneralisation
+measurement, tracked throughout training rather than only at the end.
+
+    # short profiling run, to size things before committing
+    uv run python experiments/001_maze_repro.py --total-timesteps 2000000 \
+        --levels /workspace/data/levels
+
+    # full run
+    uv run python experiments/001_maze_repro.py --levels /workspace/data/levels
+
+Watch steps/second alongside GPU and CPU utilisation. If the GPU is idle while
+the CPUs are pegged, the bottleneck is the environment, not the model.
+"""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import cleanba.cleanba_impala
+from cleanba.cleanba_impala import WandbWriter, train
+
+from goalmisgen.configs.env import MazeConfig
+from goalmisgen.configs.presets import maze_drc33
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--levels",
+        type=str,
+        default=None,
+        help="Pre-generated level directory. Omit to sample levels live, which is "
+        "roughly 350x more expensive per reset and may starve the GPU.",
+    )
+    parser.add_argument("--total-timesteps", type=int, default=200_000_000)
+    parser.add_argument("--correlation", type=float, default=1.0, help="Training rho.")
+    parser.add_argument("--min-size", type=int, default=5)
+    parser.add_argument("--max-size", type=int, default=25)
+    parser.add_argument("--step-penalty", type=float, default=0.05)
+    parser.add_argument("--randomise-values", action="store_true")
+    parser.add_argument("--seed", type=int, default=1234)
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=Path("/workspace/data/runs"),
+        help="Where checkpoints go. Use the persistent volume so a reclaimed pod does not lose the run.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    config = maze_drc33(
+        feature_value_correlation=args.correlation,
+        min_size=args.min_size,
+        max_size=args.max_size,
+        step_penalty=args.step_penalty,
+        randomise_values=args.randomise_values,
+        total_timesteps=args.total_timesteps,
+        seed=args.seed,
+        level_dataset=args.levels,
+    )
+    config.base_run_dir = args.run_dir
+
+    evaluated_at = sorted(e.env.feature_value_correlation for e in config.eval_envs.values() if isinstance(e.env, MazeConfig))
+    print(f"training rho   {args.correlation}")
+    print(f"evaluating rho {evaluated_at}")
+    print(f"levels         {args.levels or 'sampled live'}")
+    print(f"timesteps      {args.total_timesteps:,}")
+    print(f"run dir        {args.run_dir}\n")
+
+    cleanba.cleanba_impala.MUST_STOP_PROGRAM = False
+    train(config, writer=WandbWriter(config))
+
+
+if __name__ == "__main__":
+    main()

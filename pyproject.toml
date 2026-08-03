@@ -57,6 +57,9 @@ extend-select = ["I"]
 
 [tool.pyright]
 exclude = ["third_party/**", "**/__pycache__"]
+# The training stack is an editable install from the submodule; point the type
+# checker at the source so cleanba imports resolve.
+extraPaths = ["third_party/train-learned-planner"]
 reportPrivateImportUsage = "warning"
 
 [tool.pytest.ini_options]

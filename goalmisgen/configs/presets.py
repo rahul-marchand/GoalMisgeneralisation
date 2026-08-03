@@ -35,16 +35,18 @@ def maze_drc33(
     max_episode_steps: int = 120,
     total_timesteps: int = 200_000_000,
     seed: int = 1234,
+    level_dataset: str | None = None,
 ) -> Args:
     """DRC(3,3) on multi-objective mazes.
 
-    Evaluation environments differ from training *only* in
-    ``feature_value_correlation``, so the gap between them is the
-    misgeneralisation measurement.
+    Evaluation environments differ from training in ``feature_value_correlation``
+    — the misgeneralisation measurement — and, when a level dataset is used, in
+    which split they draw from. Evaluating on training levels would confound
+    misgeneralisation with memorisation, so the two must never share levels.
     """
     out = boxworld_drc33()
 
-    def env(correlation: float, **overrides) -> MazeConfig:
+    def env(correlation: float, split: str, **overrides) -> MazeConfig:
         settings = dict(
             max_episode_steps=max_episode_steps,
             num_envs=1,
@@ -54,15 +56,17 @@ def maze_drc33(
             step_penalty=step_penalty,
             randomise_values=randomise_values,
             feature_value_correlation=correlation,
+            level_dataset=level_dataset,
+            dataset_split=split,
             seed=seed,
         )
         settings.update(overrides)
         return MazeConfig(**settings)  # type: ignore[arg-type]
 
-    out.train_env = env(feature_value_correlation)
+    out.train_env = env(feature_value_correlation, split="train")
     out.eval_envs = {
         f"rho{int(round(correlation * 100)):03d}": EvalConfig(
-            env(correlation, num_envs=256, seed=seed + 1),
+            env(correlation, split="valid", num_envs=256, seed=seed + 1),
             n_episode_multiple=4,
             # Extra thinking time before acting: the test-time-compute knob that
             # revealed iterative plan refinement in the Sokoban work.

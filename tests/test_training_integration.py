@@ -252,3 +252,27 @@ def test_unknown_split_is_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="unknown dataset_split"):
         config.sampler()
+
+
+def test_evaluation_never_draws_from_the_training_split(tmp_path):
+    """Evaluating on training levels would confound misgeneralisation with memorisation."""
+    from goalmisgen.envs.dataset import LevelDataset
+
+    base = MazeConfig(max_episode_steps=60, min_size=5, max_size=9)
+    LevelDataset.generate(base.live_sampler(), n_levels=300, seed=0, block_size=100).save(tmp_path / "levels")
+
+    args = maze_drc33(min_size=5, max_size=9, level_dataset=str(tmp_path / "levels"))
+    assert args.train_env.dataset_split == "train"
+    for evaluation in args.eval_envs.values():
+        assert evaluation.env.dataset_split == "valid"
+
+
+def test_preset_passes_the_dataset_to_every_environment(tmp_path):
+    args = maze_drc33(level_dataset="/some/path")
+    assert args.train_env.level_dataset == "/some/path"
+    assert all(e.env.level_dataset == "/some/path" for e in args.eval_envs.values())
+
+
+def test_preset_without_a_dataset_still_samples_live():
+    args = maze_drc33()
+    assert args.train_env.level_dataset is None

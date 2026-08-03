@@ -82,10 +82,15 @@ def main() -> None:
     config.base_run_dir = args.run_dir
 
     evaluated_at = sorted(e.env.feature_value_correlation for e in config.eval_envs.values() if isinstance(e.env, MazeConfig))
-    print(f"training rho   {args.correlation}")
+    # Report the resolved configuration, not the raw flags: an unset flag leaves
+    # the preset in charge, so printing the flag would say "None" for a run that
+    # is in fact training at the preset's correlation.
+    print(f"training rho   {config.train_env.feature_value_correlation}")
     print(f"evaluating rho {evaluated_at}")
+    print(f"maze size      {config.train_env.min_size}-{config.train_env.max_size}")
+    print(f"step penalty   {config.train_env.step_penalty}   gamma {config.loss.gamma}")
     print(f"levels         {args.levels or 'sampled live'}")
-    print(f"timesteps      {args.total_timesteps:,}")
+    print(f"timesteps      {config.total_timesteps:,}")
     print(f"run dir        {args.run_dir}\n")
 
     # Weights & Biases needs credentials the machine may not have (a fresh cloud

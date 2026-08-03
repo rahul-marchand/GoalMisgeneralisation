@@ -21,6 +21,7 @@ rather than silently training on a different distribution than intended.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import hashlib
 import importlib
@@ -35,8 +36,13 @@ from goalmisgen.envs.level import Level, Objective
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.solver import objective_distances
 
-CONTENT_MODULES: tuple[str, ...] = ("level", "generation", "sampling", "solver", "values")
-"""Modules whose source determines what a level contains."""
+CONTENT_MODULES: tuple[str, ...] = ("dataset", "features", "generation", "level", "sampling", "solver", "values")
+"""Modules whose source determines what a level contains.
+
+``dataset`` is included because it owns the wall packing, the padding fill and
+the block seeding: changing any of those would decode existing files as
+*different mazes* while the fingerprint still matched.
+"""
 
 # Feature assignment consumes random draws, so a scheme's parameters would
 # perturb the stream and hence the layouts. Generation normalises the scheme via
@@ -56,12 +62,19 @@ Parallelism therefore cannot change the data.
 
 
 def source_fingerprint() -> str:
-    """Hash of the source of every module that determines level content."""
+    """Hash of the *code* of every module that determines level content.
+
+    The abstract syntax tree is hashed rather than the file bytes, so comments
+    and docstrings do not invalidate datasets. Hashing bytes meant that editing
+    a comment rejected a million-level dataset, and a guard that fires on
+    harmless edits is one that ends up switched off.
+    """
     digest = hashlib.sha256()
     for name in CONTENT_MODULES:
         module = importlib.import_module(f"goalmisgen.envs.{name}")
         assert module.__file__ is not None
-        digest.update(pathlib.Path(module.__file__).read_bytes())
+        source = pathlib.Path(module.__file__).read_text()
+        digest.update(ast.dump(ast.parse(source)).encode())
     return digest.hexdigest()[:16]
 
 
@@ -96,6 +109,9 @@ class LevelDataset:
     fingerprint: str
     path: pathlib.Path | None = None
     """Set when loaded from disk. Enables pickling by reference."""
+
+    stored_splits: dict[str, np.ndarray] = dataclasses.field(default_factory=dict)
+    """Train/validation/test indices written at generation time, if any."""
 
     def __reduce__(self):
         """Pickle by path when possible.
@@ -165,7 +181,13 @@ class LevelDataset:
             fingerprint=dataset_fingerprint(sampler),
         )
 
-    def save(self, path: str | pathlib.Path) -> None:
+    def save(
+        self,
+        path: str | pathlib.Path,
+        seed: int | None = None,
+        block_size: int | None = None,
+        splits: dict[str, np.ndarray] | None = None,
+    ) -> None:
         """Write as a directory of plain ``.npy`` arrays plus a JSON header.
 
         Deliberately not a single compressed archive: ``.npy`` files can be
@@ -179,12 +201,27 @@ class LevelDataset:
 
         for name in ARRAY_FIELDS:
             np.save(directory / f"{name}.npy", getattr(self, name))
+
+        # Splits belong to the dataset, not to whatever config happens to read
+        # it later: recomputing them from config fields means changing a
+        # holdout size silently moves levels between train and validation, with
+        # no fingerprint to catch it.
+        if splits is not None:
+            for name, indices in splits.items():
+                np.save(directory / f"split_{name}.npy", np.asarray(indices))
+
         (directory / "meta.json").write_text(
             json.dumps(
                 {
                     "fingerprint": self.fingerprint,
                     "max_size": self.max_size,
                     "n_levels": len(self),
+                    # Not part of the fingerprint - they do not change the
+                    # distribution - but without them a dataset cannot be
+                    # regenerated from what is stored beside it.
+                    "seed": seed,
+                    "block_size": block_size,
+                    "splits": sorted(splits) if splits else [],
                 },
                 indent=2,
             )
@@ -206,6 +243,9 @@ class LevelDataset:
             max_size=int(meta["max_size"]),
             fingerprint=str(meta["fingerprint"]),
             path=directory,
+        )
+        object.__setattr__(
+            dataset, "stored_splits", {name: np.load(directory / f"split_{name}.npy") for name in meta.get("splits", [])}
         )
 
         if expected_fingerprint is not None and dataset.fingerprint != expected_fingerprint:

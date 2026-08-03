@@ -9,6 +9,7 @@ never surface as a crash, only as inexplicable results.
 from __future__ import annotations
 
 import dataclasses
+import pathlib
 
 import numpy as np
 import pytest
@@ -312,3 +313,49 @@ def test_rejects_a_maze_too_large_for_uint8_positions():
     sampler = MazeLevelSampler(size_range=(257, 257))
     with pytest.raises(ValueError, match="uint8"):
         LevelDataset.generate(sampler, n_levels=1, seed=0, block_size=1)
+
+
+def test_fingerprint_covers_the_dataset_module_itself():
+    """dataset.py owns packing, padding and block seeding, so a change there
+    would decode existing files as different mazes."""
+    from goalmisgen.envs.dataset import CONTENT_MODULES
+
+    assert "dataset" in CONTENT_MODULES
+
+
+def test_fingerprint_ignores_comments_and_docstrings(tmp_path, monkeypatch):
+    """A guard that fires on harmless edits is one that gets switched off."""
+    import ast as _ast
+
+    import goalmisgen.envs.values as values_module
+
+    before = source_fingerprint()
+    original = _ast.parse
+    source = pathlib.Path(values_module.__file__).read_text()
+    commented = "# an added comment, changing bytes but not code\n" + source
+    monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(commented if src == source else src, *a, **k))
+    assert source_fingerprint() == before
+
+
+def test_stored_splits_are_written_and_preferred(tmp_path):
+    from goalmisgen.envs.dataset import split_indices
+
+    dataset = small_dataset(n=300)
+    splits = split_indices(len(dataset), valid=50, test=50)
+    path = tmp_path / "levels"
+    dataset.save(path, seed=7, block_size=25, splits=splits)
+
+    loaded = LevelDataset.load(path)
+    assert set(loaded.stored_splits) == {"train", "valid", "test"}
+    assert len(loaded.stored_splits["train"]) == 200
+    assert np.array_equal(loaded.stored_splits["valid"], splits["valid"])
+
+
+def test_generation_parameters_are_recorded(tmp_path):
+    """A dataset must be reproducible from what is stored beside it."""
+    import json
+
+    path = tmp_path / "levels"
+    small_dataset(n=50).save(path, seed=7, block_size=25)
+    meta = json.loads((path / "meta.json").read_text())
+    assert meta["seed"] == 7 and meta["block_size"] == 25

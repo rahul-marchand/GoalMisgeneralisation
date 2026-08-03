@@ -191,7 +191,10 @@ class MazeConfig(EnvConfig):
             self.level_dataset,
             expected_fingerprint=dataset_fingerprint(live) if self.verify_dataset_fingerprint else None,
         )
-        splits = split_indices(
+        # Splits written at generation time are authoritative: recomputing them
+        # here means a later change to the holdout sizes silently moves levels
+        # between train and validation, and no fingerprint catches it.
+        splits = dataset.stored_splits or split_indices(
             len(dataset),
             valid=self.dataset_valid_levels,
             test=self.dataset_test_levels,

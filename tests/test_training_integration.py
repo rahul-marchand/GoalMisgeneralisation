@@ -73,11 +73,13 @@ def test_preset_builds_a_drc33_network_and_shifted_eval_envs():
     assert set(args.eval_envs) == {"rho100", "rho050", "rho000"}
 
 
-def test_smoke_preset_is_small_enough_to_run_on_cpu():
+def test_smoke_preset_is_a_tiny_task_not_a_scientific_one():
+    """Its budget is sized for the GPU learning assertion; the CPU tests
+    override total_timesteps to a few hundred steps of their own."""
     args = maze_smoke_test()
-    assert args.total_timesteps <= 100_000
-    assert args.eval_envs == {}
     assert args.train_env.max_size == 5
+    assert args.eval_envs == {}
+    assert args.total_timesteps < maze_drc33().total_timesteps / 100
 
 
 # --------------------------------------------------------------------------

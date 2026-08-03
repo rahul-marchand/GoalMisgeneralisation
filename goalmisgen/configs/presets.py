@@ -53,6 +53,8 @@ def maze_drc33(
     level_dataset: str | None = None,
     gamma: float = 0.995,
     max_grad_norm: float = 0.015,
+    eval_num_envs: int = 64,
+    eval_steps_to_think: tuple[int, ...] = (0,),
 ) -> Args:
     """DRC(3,3) on multi-objective mazes.
 
@@ -83,11 +85,18 @@ def maze_drc33(
     out.train_env = env(feature_value_correlation, split="train")
     out.eval_envs = {
         f"rho{int(round(correlation * 100)):03d}": EvalConfig(
-            env(correlation, split="valid", num_envs=256, seed=seed + 1),
-            n_episode_multiple=4,
-            # Extra thinking time before acting: the test-time-compute knob that
-            # revealed iterative plan refinement in the Sokoban work.
-            steps_to_think=[0, 2, 4, 8],
+            # Synchronous, and far fewer environments than upstream uses.
+            # Evaluation runs on the rollout thread, so while it works the
+            # learner cannot hand over parameters and its queue backs up; with a
+            # fast environment the learner laps the evaluator and dies with
+            # queue.Full. Forking 256 subprocesses per correlation was the cost,
+            # and it is also what triggers JAX's fork-deadlock warning.
+            env(correlation, split="valid", num_envs=eval_num_envs, seed=seed + 1, asynchronous=False),
+            n_episode_multiple=2,
+            # Extra thinking time before acting is the test-time-compute knob
+            # from the Sokoban work. Each extra value multiplies evaluation cost,
+            # so it stays off until we actually analyse thinking time.
+            steps_to_think=list(eval_steps_to_think),
         )
         for correlation in eval_correlations
     }

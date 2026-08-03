@@ -196,8 +196,10 @@ def solve(level: Level, step_penalty: float, step_limit: int | None = None) -> L
     optimal_indices = tuple(index for index, utility in reachable if abs(utility - best_utility) <= TIE_TOLERANCE)
 
     # best_utility is drawn from `reachable`, which is non-empty, so at least one
-    # objective attains it. Stated for the type checker as much as the reader.
-    assert optimal_indices, "no objective attains the maximum utility"
+    # objective attains it. Read the index out here rather than after the branch
+    # below: a `len(...) > 1` test narrows the tuple to possibly-empty in the
+    # else arm, which the type checker then carries forward.
+    optimal_index = optimal_indices[0]
 
     if len(optimal_indices) > 1:
         # Tied objectives are excluded from `alternatives`, so without this a
@@ -213,7 +215,7 @@ def solve(level: Level, step_penalty: float, step_limit: int | None = None) -> L
     return LevelSolution(
         distances=distances,
         utilities=tuple(utilities),
-        optimal_index=optimal_indices[0],
+        optimal_index=optimal_index,
         optimal_indices=optimal_indices,
         utility_margin=utility_margin,
     )

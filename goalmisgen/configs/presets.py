@@ -153,6 +153,9 @@ def maze_smoke_test() -> Args:
     out.log_frequency = 1
     out.save_model = False
     out.eval_at_steps = frozenset()
-    out.learning_rate = 4e-3
-    out.final_learning_rate = 4e-4
+    # Raised above the real config's 4e-4 so 40k steps show movement, but not by
+    # the 10x it used to be: max_grad_norm is now 0.015 rather than 2.5e-4, so
+    # the same nominal rate takes far larger steps and the run diverged.
+    out.learning_rate = 1e-3
+    out.final_learning_rate = 1e-4
     return out

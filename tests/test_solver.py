@@ -19,8 +19,10 @@ from goalmisgen.envs.level import Level, Objective
 from goalmisgen.envs.solver import (
     UNREACHABLE,
     distance_field,
+    path_to_objective,
     shortest_path,
     solve,
+    walls_blocking_other_objectives,
 )
 
 OPEN_ROOM = np.ones((5, 5), dtype=np.bool_)
@@ -139,16 +141,19 @@ def test_a_high_step_penalty_makes_the_near_objective_optimal():
 
 
 def test_ties_are_reported():
-    level = make_level(
-        (
+    """Agent centred between two equally good objectives, plus a worse third."""
+    level = Level(
+        walls=OPEN_ROOM,
+        agent_start=(2, 2),
+        objectives=(
             Objective((1, 2), value=1.0, feature_id=0),  # distance 1 -> utility 0.5
-            Objective((1, 3), value=2.0, feature_id=1),  # distance 2 -> utility 1.0
-            Objective((3, 3), value=3.0, feature_id=2),  # distance 4 -> utility 1.0
-        )
+            Objective((3, 2), value=1.0, feature_id=1),  # distance 1 -> utility 0.5
+            Objective((2, 1), value=0.5, feature_id=2),  # distance 1 -> utility 0.0
+        ),
     )
     solution = solve(level, step_penalty=0.5)
-    assert solution.optimal_indices == (1, 2)
-    assert solution.optimal_index == 1  # lowest index breaks the tie
+    assert solution.optimal_indices == (0, 1)
+    assert solution.optimal_index == 0  # lowest index breaks the tie
     assert solution.is_ambiguous
     assert solution.utility_margin == pytest.approx(0.5)
 
@@ -189,6 +194,60 @@ def test_solve_raises_when_nothing_is_reachable():
     )
     with pytest.raises(ValueError, match="no objective is reachable"):
         solve(level, step_penalty=0.1)
+
+
+def test_distance_routes_around_another_objective():
+    """An objective on the direct route is an obstacle: stepping on it ends the episode.
+
+    Corridor layout, agent at the left end, objective B in the middle, objective
+    A at the right end. A cannot be reached in 4 steps because the episode would
+    terminate at B after 2.
+    """
+    walls = np.ones((3, 7), dtype=np.bool_)
+    walls[1, 1:6] = False
+    level = Level(
+        walls=walls,
+        agent_start=(1, 1),
+        objectives=(
+            Objective((1, 5), value=1.0, feature_id=0),  # far end
+            Objective((1, 3), value=0.5, feature_id=1),  # blocks the corridor
+        ),
+    )
+    solution = solve(level, step_penalty=0.01)
+
+    assert solution.distances[1] == 2  # the blocker is reachable
+    assert solution.distances[0] is None  # the far objective is not
+    assert solution.optimal_index == 1
+
+
+def test_path_to_objective_avoids_the_other_objectives():
+    walls = np.ones((5, 5), dtype=np.bool_)
+    walls[1:4, 1:4] = False
+    level = Level(
+        walls=walls,
+        agent_start=(1, 1),
+        objectives=(
+            Objective((1, 3), value=1.0, feature_id=0),
+            Objective((1, 2), value=0.5, feature_id=1),  # directly in the way
+        ),
+    )
+    path = path_to_objective(level, 0)
+    assert path is not None
+    assert (1, 2) not in path
+    assert path[0] == (1, 1) and path[-1] == (1, 3)
+
+
+def test_walls_blocking_other_objectives_leaves_the_target_free():
+    level = make_level(
+        (
+            Objective((1, 2), value=1.0, feature_id=0),
+            Objective((3, 3), value=0.5, feature_id=1),
+        )
+    )
+    blocked = walls_blocking_other_objectives(level, 0)
+    assert not blocked[1, 2], "the target itself must stay passable"
+    assert blocked[3, 3], "the other objective must be blocked"
+    assert not level.walls[3, 3], "the level itself must be unmodified"
 
 
 def test_solve_rejects_negative_step_penalty():

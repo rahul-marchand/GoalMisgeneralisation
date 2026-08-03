@@ -35,6 +35,7 @@ import numpy as np
 
 from goalmisgen.envs.generation import MazeGenerator, RecursiveBacktracker, validate_shape
 from goalmisgen.envs.level import Level, Objective
+from goalmisgen.envs.solver import objective_distances
 from goalmisgen.envs.values import FixedValues, ValueScheme
 
 
@@ -63,6 +64,19 @@ class MazeLevelSampler:
     feature_value_correlation: float = 1.0
     """Probability that feature 0 marks the highest-value objective."""
 
+    require_all_objectives_reachable: bool = True
+    """Reject levels in which one objective is walled off behind another.
+
+    Reaching any objective ends the episode, so an objective whose every route
+    crosses another can never be chosen. Such levels present no real decision
+    and would dilute the misgeneralisation metric with episodes where the agent
+    had no alternative. Rejection conditions the distribution on levels that
+    pose a genuine choice.
+    """
+
+    max_sampling_attempts: int = 100
+    """Guard against a configuration in which valid levels are vanishingly rare."""
+
     def __post_init__(self) -> None:
         if self.n_objectives < 1:
             raise ValueError(f"n_objectives must be at least 1, got {self.n_objectives}")
@@ -76,6 +90,19 @@ class MazeLevelSampler:
             validate_shape((size, size))
 
     def sample(self, rng: np.random.Generator) -> Level:
+        for _ in range(self.max_sampling_attempts):
+            level = self._sample_once(rng)
+            if not self.require_all_objectives_reachable:
+                return level
+            if all(distance is not None for distance in objective_distances(level)):
+                return level
+
+        raise RuntimeError(
+            f"no level with all objectives reachable after {self.max_sampling_attempts} attempts; "
+            "the maze may be too small for this many objectives"
+        )
+
+    def _sample_once(self, rng: np.random.Generator) -> Level:
         walls = self.generator.generate(self._sample_shape(rng), rng)
 
         free_rows, free_cols = np.nonzero(~walls)

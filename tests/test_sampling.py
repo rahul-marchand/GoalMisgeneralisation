@@ -13,7 +13,7 @@ import pytest
 
 from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.sampling import MazeLevelSampler
-from goalmisgen.envs.solver import solve
+from goalmisgen.envs.solver import objective_distances, solve
 from goalmisgen.envs.values import FixedValues, UniformValues
 
 N_TRIALS = 4000
@@ -102,19 +102,19 @@ def test_uniform_values_produce_varying_values():
 
 
 def test_perfect_correlation_always_marks_the_best_objective():
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=1.0)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=1.0, require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler, n_trials=500) == 1.0
 
 
 def test_zero_correlation_never_marks_the_best_objective():
     """rho=0 is perfect anti-correlation, the sharpest possible test shift."""
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=0.0)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=0.0, require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler, n_trials=500) == 0.0
 
 
 @pytest.mark.parametrize("rho", [0.0, 0.25, 0.5, 0.75, 1.0])
 def test_realised_correlation_matches_the_requested_one(rho):
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=rho)
+    sampler = MazeLevelSampler(size_range=SMALL_MAZE, feature_value_correlation=rho, require_all_objectives_reachable=False)
     assert feature_zero_marks_the_best(sampler) == pytest.approx(rho, abs=0.03)
 
 
@@ -125,13 +125,19 @@ def test_correlation_holds_with_more_than_two_objectives(rho):
         n_objectives=3,
         values=FixedValues((1.0, 0.6, 0.3)),
         feature_value_correlation=rho,
+        require_all_objectives_reachable=False,
     )
     assert feature_zero_marks_the_best(sampler) == pytest.approx(rho, abs=0.03)
 
 
 def test_correlation_holds_with_randomised_values():
     """With UniformValues the best objective is not at a fixed index."""
-    sampler = MazeLevelSampler(size_range=SMALL_MAZE, values=UniformValues(), feature_value_correlation=0.75)
+    sampler = MazeLevelSampler(
+        size_range=SMALL_MAZE,
+        values=UniformValues(),
+        feature_value_correlation=0.75,
+        require_all_objectives_reachable=False,
+    )
     assert feature_zero_marks_the_best(sampler) == pytest.approx(0.75, abs=0.03)
 
 
@@ -141,6 +147,49 @@ def test_single_objective_ignores_correlation():
     for _ in range(50):
         level = sampler.sample(rng)
         assert level.objectives[0].feature_id == 0
+
+
+# --------------------------------------------------------------------------
+# Reachability filtering
+# --------------------------------------------------------------------------
+
+
+def test_filter_guarantees_every_objective_is_choosable():
+    """Every objective must be reachable without crossing another.
+
+    Otherwise the agent has no choice and the episode tells us nothing about
+    which goal it prefers.
+    """
+    sampler = MazeLevelSampler(size_range=(5, 15))
+    rng = np.random.default_rng(0)
+    for _ in range(200):
+        distances = objective_distances(sampler.sample(rng))
+        assert all(distance is not None for distance in distances)
+
+
+def test_filter_actually_rejects_something():
+    """Guard against the filter passing vacuously: unfiltered levels do fail."""
+    unfiltered = MazeLevelSampler(size_range=(5, 9), require_all_objectives_reachable=False)
+    rng = np.random.default_rng(0)
+    blocked = sum(any(distance is None for distance in objective_distances(unfiltered.sample(rng))) for _ in range(300))
+    assert blocked > 0, "expected some levels to have an objective walled off"
+
+
+def test_correlation_survives_reachability_filtering():
+    """Rejection must not bias which objective carries feature 0."""
+    sampler = MazeLevelSampler(size_range=(9, 13), feature_value_correlation=0.75)
+    assert feature_zero_marks_the_best(sampler, n_trials=1500) == pytest.approx(0.75, abs=0.05)
+
+
+def test_filter_gives_up_rather_than_looping_forever():
+    sampler = MazeLevelSampler(
+        size_range=(5, 5),
+        n_objectives=4,
+        values=FixedValues((1.0, 0.8, 0.6, 0.4)),
+        max_sampling_attempts=20,
+    )
+    with pytest.raises(RuntimeError, match="all objectives reachable"):
+        sampler.sample(np.random.default_rng(0))
 
 
 # --------------------------------------------------------------------------

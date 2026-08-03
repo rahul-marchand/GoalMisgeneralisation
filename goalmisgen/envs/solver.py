@@ -120,28 +120,62 @@ class LevelSolution:
         return len(self.optimal_indices) > 1
 
 
+def walls_blocking_other_objectives(level: Level, index: int) -> np.ndarray:
+    """``level.walls`` with every objective except ``index`` marked impassable.
+
+    Reaching any objective ends the episode, so a route that crosses a different
+    objective never arrives. Distances must therefore be measured on a maze in
+    which the others are obstacles, or the "optimal" choice can be one the agent
+    is physically unable to take.
+    """
+    walls = level.walls.copy()
+    for other, objective in enumerate(level.objectives):
+        if other != index:
+            walls[objective.position] = True
+    return walls
+
+
+def path_to_objective(level: Level, index: int) -> tuple[Position, ...] | None:
+    """Shortest route to objective ``index`` that avoids the other objectives.
+
+    This is the trajectory an optimal agent aiming at ``index`` would take, and
+    so the correct source of "which cells will the agent step on" probe labels.
+    """
+    return shortest_path(
+        walls_blocking_other_objectives(level, index),
+        level.agent_start,
+        level.objectives[index].position,
+    )
+
+
+def objective_distances(level: Level) -> tuple[int | None, ...]:
+    """Steps to each objective, routing around the others. ``None`` if blocked off."""
+    distances: list[int | None] = []
+    for index, objective in enumerate(level.objectives):
+        walls = walls_blocking_other_objectives(level, index)
+        raw = int(distance_field(walls, level.agent_start)[objective.position])
+        distances.append(None if raw == UNREACHABLE else raw)
+    return tuple(distances)
+
+
 def solve(level: Level, step_penalty: float) -> LevelSolution:
     """Evaluate every objective as ``value - step_penalty * distance``.
 
     ``step_penalty`` is an environment parameter rather than a property of the
     level, which is why the answer is computed here instead of being stored on
     :class:`~goalmisgen.envs.level.Level`.
+
+    Distances route around the other objectives; see
+    :func:`walls_blocking_other_objectives`.
     """
     if step_penalty < 0:
         raise ValueError(f"step_penalty must be non-negative, got {step_penalty}")
 
-    distances_from_agent = distance_field(level.walls, level.agent_start)
-
-    distances: list[int | None] = []
-    utilities: list[float | None] = []
-    for objective in level.objectives:
-        raw = int(distances_from_agent[objective.position])
-        if raw == UNREACHABLE:
-            distances.append(None)
-            utilities.append(None)
-        else:
-            distances.append(raw)
-            utilities.append(objective.value - step_penalty * raw)
+    distances = objective_distances(level)
+    utilities: list[float | None] = [
+        None if distance is None else objective.value - step_penalty * distance
+        for objective, distance in zip(level.objectives, distances)
+    ]
 
     reachable = [(index, utility) for index, utility in enumerate(utilities) if utility is not None]
     if not reachable:
@@ -154,7 +188,7 @@ def solve(level: Level, step_penalty: float) -> LevelSolution:
     utility_margin = best_utility - max(alternatives) if alternatives else math.inf
 
     return LevelSolution(
-        distances=tuple(distances),
+        distances=distances,
         utilities=tuple(utilities),
         optimal_index=optimal_indices[0],
         optimal_indices=optimal_indices,

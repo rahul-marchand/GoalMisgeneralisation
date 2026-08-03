@@ -27,6 +27,9 @@ dev = [
     "pytest ~=8.1",
     "ruff ~=0.1.13",
     "pyright ~=1.1.349",
+    # Used only in tests, as an independent reference implementation of
+    # shortest paths to check our BFS against.
+    "scipy ~=1.17",
 ]
 
 [tool.uv.sources]

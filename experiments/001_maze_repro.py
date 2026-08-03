@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-size", type=int, default=5)
     parser.add_argument("--max-size", type=int, default=25)
     parser.add_argument("--step-penalty", type=float, default=0.05)
+    parser.add_argument("--max-episode-steps", type=int, default=120)
     parser.add_argument("--randomise-values", action="store_true")
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument(
@@ -63,6 +64,7 @@ def main() -> None:
         min_size=args.min_size,
         max_size=args.max_size,
         step_penalty=args.step_penalty,
+        max_episode_steps=args.max_episode_steps,
         randomise_values=args.randomise_values,
         total_timesteps=args.total_timesteps,
         seed=args.seed,

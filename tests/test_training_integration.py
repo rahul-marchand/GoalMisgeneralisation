@@ -358,3 +358,31 @@ def test_discount_horizon_exceeds_the_episode_limit():
 def test_gradient_clipping_is_not_the_two_billion_step_value():
     """Guard against silently re-inheriting sokoban_resnet59's clip."""
     assert maze_drc33().max_grad_norm > 1e-3
+
+
+def test_evaluation_control_arm_tracks_chance_not_a_fixed_half():
+    """With three objectives, 0.5 is a correlated condition, not a control."""
+    from goalmisgen.configs.presets import default_eval_correlations
+
+    assert default_eval_correlations(2) == (1.0, 0.5, 0.0)
+    assert default_eval_correlations(3) == pytest.approx((1.0, 1 / 3, 0.0))
+
+    three = maze_drc33(n_objectives=3, objective_values=(1.0, 0.6, 0.3))
+    arms = sorted(e.env.feature_value_correlation for e in three.eval_envs.values())
+    assert arms == pytest.approx([0.0, 1 / 3, 1.0])
+
+
+def test_build_env_gives_analysis_the_same_environment_training_saw():
+    config = MazeConfig(max_episode_steps=40, min_size=5, max_size=9, n_objectives=2)
+    env = config.build_env()
+    assert env.step_limit == 40
+    assert env.step_penalty == config.step_penalty
+    assert env.observation_space.shape == (9, 9, config.encoder().n_channels)
+
+
+def test_feature_palette_can_exceed_the_objective_count():
+    """Distinguishes 'the agent learned this colour' from 'the agent learned
+    whichever colour is first'."""
+    config = MazeConfig(max_episode_steps=40, n_objectives=2, n_features=4)
+    assert config.encoder().n_features == 4
+    assert MazeConfig(max_episode_steps=40, n_objectives=2).encoder().n_features == 2

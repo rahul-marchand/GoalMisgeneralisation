@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 from functools import partial
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import gymnasium as gym
 from cleanba.environments import EnvConfig, VectorNHWCtoNCHWWrapper
@@ -30,6 +30,9 @@ from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.observation import ObservationEncoder, ValueEncoding
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.values import FixedValues, UniformValues, ValueScheme
+
+if TYPE_CHECKING:
+    from goalmisgen.envs.maze import MazeEnv
 
 
 class SeededVectorEnv(gym.vector.VectorEnvWrapper):
@@ -80,6 +83,15 @@ class MazeConfig(EnvConfig):
     """
 
     n_objectives: int = 2
+
+    n_features: int | None = None
+    """Size of the feature palette. Defaults to ``n_objectives``.
+
+    A palette larger than the objective count lets an experiment ask whether the
+    proxy an agent learned is a *specific* feature or merely the ordinal "the
+    one marked first", which are indistinguishable when the two are equal.
+    """
+
     step_penalty: float = 0.05
     """Cost per step, which sets how much distance trades off against value.
 
@@ -224,11 +236,27 @@ class MazeConfig(EnvConfig):
         return ObservationEncoder(
             max_size=self.max_size,
             pad_size=self.pad_size,
-            n_features=self.n_objectives,
+            n_features=self.n_features or self.n_objectives,
             value_encoding=self.value_encoding,
             # Widened slightly so exactly-maximal values are not rejected by
             # floating point comparison at the boundary.
             value_range=(0.0, max(1.0, float(highest))),
+        )
+
+    def build_env(self) -> "MazeEnv":
+        """A single environment, configured exactly as training sees it.
+
+        Analysis and probing construct environments directly rather than through
+        cleanba, and would otherwise have to re-derive the encoder settings and
+        get them subtly wrong.
+        """
+        from goalmisgen.envs.maze import MazeEnv
+
+        return MazeEnv(
+            sampler=self.sampler(),
+            encoder=self.encoder(),
+            step_penalty=self.step_penalty,
+            step_limit=self.max_episode_steps,
         )
 
     @property

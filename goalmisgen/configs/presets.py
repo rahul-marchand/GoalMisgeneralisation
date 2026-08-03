@@ -31,20 +31,25 @@ from cleanba.evaluate import EvalConfig
 
 from goalmisgen.configs.env import MazeConfig
 
-DEFAULT_EVAL_CORRELATIONS: tuple[float, ...] = (1.0, 0.5, 0.0)
-"""Evaluate on the training correlation, an uninformative one, and a reversed one.
 
-Tracking all three throughout training shows *when* a proxy is adopted, not just
-whether it was present at the end.
-"""
+def default_eval_correlations(n_objectives: int) -> tuple[float, ...]:
+    """Training correlation, chance, and fully reversed.
+
+    The middle arm is the *control*, and chance is ``1 / n_objectives`` rather
+    than 0.5 - with three objectives a fixed 0.5 would be a positively
+    correlated condition dressed up as a control. Tracking all three through
+    training shows when a proxy is adopted, not just whether it survived.
+    """
+    return (1.0, 1.0 / n_objectives, 0.0)
 
 
 def maze_drc33(
     feature_value_correlation: float = 1.0,
-    eval_correlations: tuple[float, ...] = DEFAULT_EVAL_CORRELATIONS,
+    eval_correlations: tuple[float, ...] | None = None,
     min_size: int = 5,
     max_size: int = 25,
     n_objectives: int = 2,
+    objective_values: tuple[float, ...] | None = None,
     step_penalty: float = 0.05,
     randomise_values: bool = False,
     max_episode_steps: int = 120,
@@ -63,6 +68,8 @@ def maze_drc33(
     which split they draw from. Evaluating on training levels would confound
     misgeneralisation with memorisation, so the two must never share levels.
     """
+    eval_correlations = eval_correlations or default_eval_correlations(n_objectives)
+
     out = boxworld_drc33()
 
     def env(correlation: float, split: str, **overrides) -> MazeConfig:
@@ -75,6 +82,7 @@ def maze_drc33(
             step_penalty=step_penalty,
             randomise_values=randomise_values,
             feature_value_correlation=correlation,
+            **({"objective_values": objective_values} if objective_values else {}),
             level_dataset=level_dataset,
             dataset_split=split,
             seed=seed,

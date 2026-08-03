@@ -31,6 +31,7 @@ from goalmisgen.configs.writers import CsvWriter
 
 
 def parse_args() -> argparse.Namespace:
+    """Every option defaults to None so an unset flag leaves the preset in charge."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--levels",
@@ -39,14 +40,14 @@ def parse_args() -> argparse.Namespace:
         help="Pre-generated level directory. Omit to sample levels live, which is "
         "roughly 350x more expensive per reset and may starve the GPU.",
     )
-    parser.add_argument("--total-timesteps", type=int, default=200_000_000)
-    parser.add_argument("--correlation", type=float, default=1.0, help="Training rho.")
-    parser.add_argument("--min-size", type=int, default=5)
-    parser.add_argument("--max-size", type=int, default=25)
-    parser.add_argument("--step-penalty", type=float, default=0.05)
-    parser.add_argument("--max-episode-steps", type=int, default=120)
+    parser.add_argument("--correlation", type=float, default=None, help="Training rho.")
+    parser.add_argument("--total-timesteps", type=int, default=None)
+    parser.add_argument("--min-size", type=int, default=None)
+    parser.add_argument("--max-size", type=int, default=None)
+    parser.add_argument("--step-penalty", type=float, default=None)
+    parser.add_argument("--max-episode-steps", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--randomise-values", action="store_true")
-    parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument(
         "--run-dir",
         type=Path,
@@ -59,17 +60,25 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    config = maze_drc33(
-        feature_value_correlation=args.correlation,
-        min_size=args.min_size,
-        max_size=args.max_size,
-        step_penalty=args.step_penalty,
-        max_episode_steps=args.max_episode_steps,
-        randomise_values=args.randomise_values,
-        total_timesteps=args.total_timesteps,
-        seed=args.seed,
-        level_dataset=args.levels,
-    )
+    # Only pass what was given on the command line. Passing every argparse
+    # default would shadow the preset's own defaults, making them dead code.
+    overrides = {
+        name: value
+        for name, value in (
+            ("feature_value_correlation", args.correlation),
+            ("min_size", args.min_size),
+            ("max_size", args.max_size),
+            ("step_penalty", args.step_penalty),
+            ("max_episode_steps", args.max_episode_steps),
+            ("total_timesteps", args.total_timesteps),
+            ("seed", args.seed),
+            ("level_dataset", args.levels),
+        )
+        if value is not None
+    }
+    if args.randomise_values:
+        overrides["randomise_values"] = True
+    config = maze_drc33(**overrides)
     config.base_run_dir = args.run_dir
 
     evaluated_at = sorted(e.env.feature_value_correlation for e in config.eval_envs.values() if isinstance(e.env, MazeConfig))

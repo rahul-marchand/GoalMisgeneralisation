@@ -79,7 +79,7 @@ class MazeEnv(gym.Env):
         del options
 
         self.level = self.sampler.sample(self.np_random)
-        self.solution = solve(self.level, self.step_penalty)
+        self.solution = solve(self.level, self.step_penalty, step_limit=self.step_limit)
         self.agent_position = self.level.agent_start
         self.elapsed_steps = 0
 

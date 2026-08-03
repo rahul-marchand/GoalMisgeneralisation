@@ -267,3 +267,41 @@ def test_zero_step_penalty_selects_purely_on_value():
         )
     )
     assert solve(level, step_penalty=0.0).optimal_index == 1
+
+
+def test_step_limit_excludes_objectives_that_cannot_be_reached_in_time():
+    """A goal beyond the episode limit is not an achievable optimum.
+
+    Without this the solver names an objective no policy can reach, putting a
+    floor on chose_optimal that no agent can cross.
+    """
+    # An open room, not a corridor: in a one-wide corridor the near objective
+    # would block the far one outright, which is a different effect.
+    walls = np.ones((5, 21), dtype=np.bool_)
+    walls[1:4, 1:20] = False
+    level = Level(
+        walls=walls,
+        agent_start=(2, 1),
+        objectives=(
+            Objective((2, 19), value=1.0, feature_id=0),  # 18 steps away
+            Objective((1, 3), value=0.6, feature_id=1),  # 3 steps away
+        ),
+    )
+    generous = solve(level, step_penalty=0.01)
+    assert generous.optimal_index == 0  # far but more valuable
+
+    tight = solve(level, step_penalty=0.01, step_limit=10)
+    assert tight.distances[0] is None, "unreachable in time must not count"
+    assert tight.optimal_index == 1
+
+
+def test_tied_maximum_values_do_not_pin_the_best_to_index_zero():
+    """np.argmax always returns the lowest index, which would make the
+    correlation knob silently control nothing when values tie."""
+    from goalmisgen.envs.sampling import assign_feature_ids
+
+    rng = np.random.default_rng(0)
+    holders = [assign_feature_ids((1.0, 1.0, 0.5), correlation=1.0, rng=rng).index(0) for _ in range(400)]
+    assert set(holders) == {0, 1}, "feature 0 should land on either tied maximum"
+    share = holders.count(0) / len(holders)
+    assert 0.35 < share < 0.65, f"tie-break is skewed: {share:.2f}"

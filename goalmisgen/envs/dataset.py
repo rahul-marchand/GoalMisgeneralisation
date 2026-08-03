@@ -93,7 +93,7 @@ class LevelDataset:
     sizes: np.ndarray  # (N,) uint8
     agent: np.ndarray  # (N, 2) uint8
     positions: np.ndarray  # (N, K, 2) uint8
-    values: np.ndarray  # (N, K) float32
+    values: np.ndarray  # (N, K) float64 - see below
     distances: np.ndarray  # (N, K) int16, cached solver output
     max_size: int
     fingerprint: str
@@ -242,17 +242,31 @@ def block_tasks(
     return [(normalised, child, count) for child, count in zip(children, counts)]
 
 
+MAX_STORABLE_SIZE = 255
+"""Positions and sizes are stored as uint8, which wraps silently above this."""
+
+
 def generate_block(sampler: MazeLevelSampler, seed_sequence: np.random.SeedSequence, count: int) -> dict[str, np.ndarray]:
     """Generate one independently seeded block. Safe to run in a worker process."""
     rng = np.random.default_rng(seed_sequence)
     max_size = sampler.size_range[1]
+    if max_size > MAX_STORABLE_SIZE:
+        raise ValueError(
+            f"max_size={max_size} exceeds {MAX_STORABLE_SIZE}: positions are stored as uint8 "
+            "and would wrap silently, producing valid-looking levels in the wrong places"
+        )
     n_objectives = sampler.n_objectives
 
     walls_packed = np.empty((count, int(np.ceil(max_size * max_size / 8))), dtype=np.uint8)
     sizes = np.empty(count, dtype=np.uint8)
     agent = np.empty((count, 2), dtype=np.uint8)
     positions = np.empty((count, n_objectives, 2), dtype=np.uint8)
-    values = np.empty((count, n_objectives), dtype=np.float32)
+    # float64, not float32: TIE_TOLERANCE is 1e-9 and float32 round-trip error
+    # reaches ~3e-8, so storing values in float32 silently changed which
+    # objectives counted as tied. With objective_values=(1.0, 0.3) the live
+    # sampler found ambiguous levels that the dataset-backed one did not, giving
+    # different ground truth for the same configuration.
+    values = np.empty((count, n_objectives), dtype=np.float64)
     distances = np.empty((count, n_objectives), dtype=np.int16)
 
     for index in range(count):

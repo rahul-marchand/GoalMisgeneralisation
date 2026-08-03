@@ -31,6 +31,30 @@ from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.values import FixedValues, UniformValues, ValueScheme
 
 
+class SeededVectorEnv(gym.vector.VectorEnvWrapper):
+    """Applies the configured seed when ``reset`` is called without one.
+
+    ``gym.vector.make`` takes no seed, and cleanba's evaluation calls
+    ``envs.reset()`` bare, so ``EnvConfig.seed`` never reached the environment:
+    every construction drew different levels. That silently unpaired the
+    comparison the whole experiment rests on - the rho=1.0 and rho=0.0 arms were
+    scored on *different mazes*, so the gap carried level-difficulty variance on
+    top of the effect. It also made cleanba's own ``seed + actor_id`` offsets and
+    its "same levels every evaluation" comment no-ops for us.
+    """
+
+    def __init__(self, env: gym.vector.VectorEnv, seed: int) -> None:
+        super().__init__(env)
+        self._configured_seed = seed
+
+    def reset_wait(self, seed=None, **kwargs):  # type: ignore[override]
+        return super().reset_wait(seed=self._configured_seed if seed is None else seed, **kwargs)
+
+    @classmethod
+    def wrap(cls, fn, seed: int) -> gym.vector.VectorEnv:
+        return cls(fn(), seed)
+
+
 @dataclasses.dataclass
 class MazeConfig(EnvConfig):
     """Configuration for a vectorised maze environment.
@@ -183,16 +207,20 @@ class MazeConfig(EnvConfig):
     @property
     def make(self) -> Callable[[], gym.vector.VectorEnv]:
         return partial(
-            VectorNHWCtoNCHWWrapper.from_fn,
+            SeededVectorEnv.wrap,
             partial(
-                gym.vector.make,
-                "Maze-v0",
-                sampler=self.sampler(),
-                encoder=self.encoder(),
-                step_penalty=self.step_penalty,
-                step_limit=self.max_episode_steps,
-                num_envs=self.num_envs,
-                asynchronous=self.asynchronous,
+                VectorNHWCtoNCHWWrapper.from_fn,
+                partial(
+                    gym.vector.make,
+                    "Maze-v0",
+                    sampler=self.sampler(),
+                    encoder=self.encoder(),
+                    step_penalty=self.step_penalty,
+                    step_limit=self.max_episode_steps,
+                    num_envs=self.num_envs,
+                    asynchronous=self.asynchronous,
+                ),
+                self.nn_without_noop,
             ),
-            self.nn_without_noop,
+            self.seed,
         )

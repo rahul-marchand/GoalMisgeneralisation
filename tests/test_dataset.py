@@ -291,3 +291,23 @@ def test_an_in_memory_dataset_still_pickles():
     assert dataset.path is None
     restored = pickle.loads(pickle.dumps(dataset))
     assert np.array_equal(restored.walls_packed, dataset.walls_packed)
+
+
+def test_values_survive_storage_precisely_enough_to_preserve_ties():
+    """float32 round-trip error is ~30x TIE_TOLERANCE, which silently changed
+    which objectives counted as tied and so which was optimal."""
+    from goalmisgen.envs.values import FixedValues
+
+    sampler = MazeLevelSampler(size_range=(5, 9), values=FixedValues((1.0, 0.3)))
+    dataset = LevelDataset.generate(sampler, n_levels=200, seed=0, block_size=100)
+    assert dataset.values.dtype == np.float64
+    assert set(np.unique(dataset.values)) == {1.0, 0.3}
+
+
+def test_rejects_a_maze_too_large_for_uint8_positions():
+    from goalmisgen.envs.dataset import MAX_STORABLE_SIZE
+
+    assert MAX_STORABLE_SIZE == 255
+    sampler = MazeLevelSampler(size_range=(257, 257))
+    with pytest.raises(ValueError, match="uint8"):
+        LevelDataset.generate(sampler, n_levels=1, seed=0, block_size=1)

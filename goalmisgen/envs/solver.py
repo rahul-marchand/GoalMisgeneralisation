@@ -158,7 +158,7 @@ def objective_distances(level: Level) -> tuple[int | None, ...]:
     return tuple(distances)
 
 
-def solve(level: Level, step_penalty: float) -> LevelSolution:
+def solve(level: Level, step_penalty: float, step_limit: int | None = None) -> LevelSolution:
     """Evaluate every objective as ``value - step_penalty * distance``.
 
     ``step_penalty`` is an environment parameter rather than a property of the
@@ -167,11 +167,19 @@ def solve(level: Level, step_penalty: float) -> LevelSolution:
 
     Distances route around the other objectives; see
     :func:`walls_blocking_other_objectives`.
+
+    ``step_limit`` excludes objectives the agent could not reach before the
+    episode is truncated. Without it the "optimal" choice is occasionally one no
+    policy can take, putting a floor on ``chose_optimal`` that no agent can
+    cross: about 0.3% of levels under the default configuration, and more as the
+    step penalty falls and distant objectives start winning.
     """
     if step_penalty < 0:
         raise ValueError(f"step_penalty must be non-negative, got {step_penalty}")
 
     distances = objective_distances(level)
+    if step_limit is not None:
+        distances = tuple(None if distance is None or distance > step_limit else distance for distance in distances)
     utilities: list[float | None] = [
         None if distance is None else objective.value - step_penalty * distance
         for objective, distance in zip(level.objectives, distances)
@@ -179,7 +187,10 @@ def solve(level: Level, step_penalty: float) -> LevelSolution:
 
     reachable = [(index, utility) for index, utility in enumerate(utilities) if utility is not None]
     if not reachable:
-        raise ValueError("no objective is reachable from the agent's start position")
+        raise ValueError(
+            "no objective is reachable from the agent's start position"
+            + (f" within {step_limit} steps" if step_limit is not None else "")
+        )
 
     best_utility = max(utility for _, utility in reachable)
     optimal_indices = tuple(index for index, utility in reachable if abs(utility - best_utility) <= TIE_TOLERANCE)

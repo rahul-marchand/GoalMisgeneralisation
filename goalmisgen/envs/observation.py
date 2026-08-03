@@ -105,8 +105,11 @@ class ObservationEncoder:
         high = np.ones(self.shape, dtype=np.float32)
         if self.n_value_channels:
             value_low, value_high = self.value_range
+            # Both bounds are widened to include zero: cells with no objective
+            # stay at zero, so an entirely negative or entirely positive range
+            # would otherwise exclude the observation from its own space.
             low[:, :, self.first_value_channel :] = min(0.0, value_low)
-            high[:, :, self.first_value_channel :] = value_high
+            high[:, :, self.first_value_channel :] = max(0.0, value_high)
         return gym.spaces.Box(low=low, high=high, shape=self.shape, dtype=np.float32)
 
     def encode(self, level: Level, agent_position: Position) -> np.ndarray:

@@ -62,7 +62,12 @@ def assign_feature_ids(values: tuple[float, ...], correlation: float, rng: np.ra
     if n == 1:
         return (0,)
 
-    best = int(np.argmax(values))
+    # Break ties at random. np.argmax always returns the lowest index, so with
+    # values like (1.0, 1.0, 0.5) feature 0 would land on objective 0 every
+    # time and the correlation would control nothing, while every metric
+    # continued to report normally.
+    maxima = np.flatnonzero(np.asarray(values) >= max(values) - 1e-12)
+    best = int(maxima[rng.integers(len(maxima))])
     if rng.random() < correlation:
         holder_of_feature_zero = best
     else:

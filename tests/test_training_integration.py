@@ -323,3 +323,51 @@ def test_training_survives_an_evaluation_pass(tmp_path):
 
     evaluated = [c for c in writer.metrics.columns if "rho000" in c]
     assert evaluated, f"evaluation never ran; columns were {list(writer.metrics.columns)[:10]}"
+
+
+@pytest.mark.slow
+def test_checkpointing_works_with_the_csv_writer(tmp_path):
+    """Save a real checkpoint.
+
+    The writer interface is only partly exercised by training: `add_scalar` runs
+    constantly, but `step_digits` and `_save_dir` are touched only when a
+    checkpoint is written. A writer missing them trains for hundreds of
+    thousands of steps and then dies — which has cost us a run.
+    """
+    from goalmisgen.configs.writers import CsvWriter
+
+    args = maze_smoke_test()
+    args.net = dataclasses.replace(args.net, n_recurrent=1, repeats_per_step=1)
+    args.local_num_envs = 8
+    args.num_steps = 8
+    args.train_env = dataclasses.replace(args.train_env, num_envs=8, asynchronous=False)
+    args.total_timesteps = 8 * 8 * 8
+    args.save_model = True
+    args.base_run_dir = tmp_path
+    # Checkpoints are written when the learner version reaches an eval step, so
+    # a run with eval_at_steps empty never exercises the save path at all.
+    args.eval_at_steps = frozenset([2])
+
+    import cleanba.cleanba_impala
+    from cleanba.cleanba_impala import train
+
+    writer = CsvWriter(args, tmp_path)
+    cleanba.cleanba_impala.MUST_STOP_PROGRAM = False
+    train(args, writer=writer)
+    writer.flush()
+
+    checkpoints = list((tmp_path / "local-files").glob("cp_*"))
+    assert checkpoints, f"no checkpoint written; dir held {list((tmp_path / 'local-files').iterdir())}"
+    assert (tmp_path / "metrics.csv").exists()
+    assert not pd.read_csv(tmp_path / "metrics.csv", index_col=0).empty
+
+
+def test_csv_writer_exposes_the_full_writer_interface():
+    """Cheap guard against the next missing attribute."""
+    from goalmisgen.configs.writers import CsvWriter
+
+    args = maze_smoke_test()
+    writer = CsvWriter(args, Path("/tmp/goalmisgen-writer-check"))
+    for attribute in ("step_digits", "named_save_dir", "_save_dir", "add_scalar", "save_dir"):
+        assert hasattr(writer, attribute), f"CsvWriter is missing {attribute}"
+    assert writer.step_digits >= 1

@@ -19,6 +19,7 @@ the CPUs are pegged, the bottleneck is the environment, not the model.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import cleanba.cleanba_impala
@@ -26,6 +27,7 @@ from cleanba.cleanba_impala import WandbWriter, train
 
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.configs.presets import maze_drc33
+from goalmisgen.configs.writers import CsvWriter
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,8 +77,21 @@ def main() -> None:
     print(f"timesteps      {args.total_timesteps:,}")
     print(f"run dir        {args.run_dir}\n")
 
+    # Weights & Biases needs credentials the machine may not have (a fresh cloud
+    # pod, CI). Fall back to a local CSV rather than failing at startup.
+    if os.environ.get("WANDB_MODE") in ("disabled", "offline") or not os.environ.get("WANDB_API_KEY"):
+        print("W&B unavailable; logging metrics to CSV instead\n")
+        writer = CsvWriter(config, args.run_dir)
+    else:
+        writer = WandbWriter(config)
+
     cleanba.cleanba_impala.MUST_STOP_PROGRAM = False
-    train(config, writer=WandbWriter(config))
+    try:
+        train(config, writer=writer)
+    finally:
+        if isinstance(writer, CsvWriter):
+            writer.flush()
+    print("RUN COMPLETE")
 
 
 if __name__ == "__main__":

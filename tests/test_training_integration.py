@@ -288,6 +288,7 @@ def test_training_survives_an_evaluation_pass(tmp_path):
     only test that would catch a Sokoban assumption in cleanba's eval.
     """
     from cleanba.evaluate import EvalConfig
+
     from goalmisgen.envs.dataset import LevelDataset
 
     base = MazeConfig(max_episode_steps=30, min_size=5, max_size=5)

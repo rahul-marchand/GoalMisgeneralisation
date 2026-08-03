@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import multiprocessing as mp
+import pathlib
 import time
 from pathlib import Path
 
@@ -23,13 +24,30 @@ from goalmisgen.configs.env import MazeConfig
 from goalmisgen.envs.dataset import LevelDataset, block_tasks, dataset_fingerprint, generate_block
 
 
+def usable_cpus() -> int:
+    """CPUs we are actually allowed to use.
+
+    ``multiprocessing.cpu_count()`` reports the host's cores, which inside a
+    container is wildly optimistic — a cloud pod may show 48 while its cgroup
+    quota permits 5. Oversubscribing that badly makes generation slower, not
+    faster, so read the quota where one exists.
+    """
+    try:
+        quota, period = pathlib.Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            return max(1, int(float(quota) / float(period)))
+    except (OSError, ValueError):
+        pass
+    return mp.cpu_count()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-levels", type=int, default=1_000_000)
-    parser.add_argument("--out", type=Path, default=Path("data/levels.npz"))
+    parser.add_argument("--out", type=Path, default=Path("data/levels"))
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--block-size", type=int, default=10_000)
-    parser.add_argument("--workers", type=int, default=mp.cpu_count())
+    parser.add_argument("--workers", type=int, default=usable_cpus())
     parser.add_argument("--min-size", type=int, default=5)
     parser.add_argument("--max-size", type=int, default=25)
     parser.add_argument("--n-objectives", type=int, default=2)

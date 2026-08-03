@@ -24,10 +24,15 @@ in with a submodule update.
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```sh
-git clone --recurse-submodules https://github.com/rahul-marchand/GoalMisgeneralisation
+git clone https://github.com/rahul-marchand/GoalMisgeneralisation
 cd GoalMisgeneralisation
+git submodule update --init third_party/train-learned-planner
+git -C third_party/train-learned-planner submodule update --init third_party/gym-sokoban
 uv sync
 ```
+
+The submodules are initialised one level at a time rather than with
+`--recurse-submodules`, for the reason given below.
 
 On a GPU machine, add the CUDA build of JAX:
 

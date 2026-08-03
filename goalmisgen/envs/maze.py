@@ -23,10 +23,11 @@ from goalmisgen.envs.level import Level, Position
 from goalmisgen.envs.observation import ObservationEncoder, ObservationScheme
 from goalmisgen.envs.rendering import render
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
-from goalmisgen.envs.solver import LevelSolution, solve
+from goalmisgen.envs.solver import MOVES, LevelSolution, solve
 
-# Action index -> (row, column) delta.
-_ACTION_DELTAS: tuple[tuple[int, int], ...] = ((-1, 0), (1, 0), (0, -1), (0, 1))
+# Action index -> (row, column) delta. Shared with the solver so the ground
+# truth and the environment cannot disagree about what a move is.
+_ACTION_DELTAS = MOVES
 ACTION_NAMES: tuple[str, ...] = ("up", "down", "left", "right")
 
 

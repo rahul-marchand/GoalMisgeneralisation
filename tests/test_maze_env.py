@@ -306,3 +306,15 @@ def test_single_objective_configuration():
     observation, info = env.reset(seed=0)
     assert env.observation_space.contains(observation)
     assert info["optimal_index"] == 0
+
+
+def test_the_solver_and_the_environment_agree_about_what_a_move_is():
+    """If these diverge, every optimal_index label is quietly wrong.
+
+    Adding a no-op action or diagonals to the environment without telling the
+    solver would change reachable distances with nothing to crash.
+    """
+    from goalmisgen.envs.solver import MOVES
+
+    assert _ACTION_DELTAS == MOVES
+    assert len(_ACTION_DELTAS) == MazeEnv().action_space.n

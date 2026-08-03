@@ -25,9 +25,11 @@ UNREACHABLE = -1
 TIE_TOLERANCE = 1e-9
 """Utilities within this of the maximum count as tied for optimal."""
 
-# Fixed iteration order, so path reconstruction is deterministic when a maze
-# contains loops and several shortest paths exist.
-_MOVES: tuple[tuple[int, int], ...] = ((-1, 0), (1, 0), (0, -1), (0, 1))
+# The moves the agent can make. Shared with the environment rather than
+# redeclared: if these ever disagree, every optimal_index label is quietly wrong
+# with nothing to crash. Iteration order is fixed so path reconstruction is
+# deterministic when a braided maze offers several equally short routes.
+MOVES: tuple[tuple[int, int], ...] = ((-1, 0), (1, 0), (0, -1), (0, 1))
 
 
 def distance_field(walls: np.ndarray, source: Position) -> np.ndarray:
@@ -50,7 +52,7 @@ def distance_field(walls: np.ndarray, source: Position) -> np.ndarray:
     while queue:
         current = queue.popleft()
         next_distance = distances[current] + 1
-        for d_row, d_col in _MOVES:
+        for d_row, d_col in MOVES:
             neighbour = (current[0] + d_row, current[1] + d_col)
             if not (0 <= neighbour[0] < height and 0 <= neighbour[1] < width):
                 continue
@@ -78,7 +80,7 @@ def shortest_path(walls: np.ndarray, source: Position, target: Position) -> tupl
     current = target
     while current != source:
         wanted = distances[current] - 1
-        for d_row, d_col in _MOVES:
+        for d_row, d_col in MOVES:
             neighbour = (current[0] + d_row, current[1] + d_col)
             if not (0 <= neighbour[0] < height and 0 <= neighbour[1] < width):
                 continue

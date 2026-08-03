@@ -5,7 +5,7 @@ so the result is identical regardless of worker count. Roughly 3.5 ms per level,
 so a million levels takes about seven minutes on eight cores and occupies about
 100 MB.
 
-    uv run python scripts/generate_levels.py --n-levels 1000000 --out data/levels.npz
+    uv run python scripts/generate_levels.py --n-levels 1000000 --out data/levels
 
 On a cloud instance this is cheaper to run than to transfer: the dataset is a
 deterministic function of the seed and the sampler configuration, so it can be
@@ -89,7 +89,7 @@ def main() -> None:
     dataset.save(args.out)
     elapsed = time.perf_counter() - start
 
-    size_mb = args.out.stat().st_size / 1e6
+    size_mb = sum(f.stat().st_size for f in args.out.rglob("*")) / 1e6
     print(f"done in {elapsed:.1f}s " f"({1000 * elapsed / len(dataset):.2f} ms/level wall clock) -> {size_mb:.1f} MB")
 
 

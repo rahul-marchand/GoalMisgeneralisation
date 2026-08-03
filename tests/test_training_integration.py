@@ -16,42 +16,11 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
-from cleanba.cleanba_impala import WandbWriter
 
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.configs.presets import maze_drc33, maze_smoke_test
-
-
-class DataFrameWriter(WandbWriter):
-    """Collects metrics in memory instead of sending them to W&B.
-
-    Mirrors the helper in the upstream test suite (``tests/test_cartpole.py``).
-    """
-
-    def __init__(self, cfg, save_dir: Path):
-        self.metrics = pd.DataFrame()
-        self.states: dict = {}
-        self._save_dir = save_dir
-        # WandbWriter sets this in __init__; the upstream helper omits it because
-        # it predates the checkpoint-resume path, which lists this directory.
-        self.named_save_dir = save_dir
-        (save_dir / "local-files").mkdir(parents=True, exist_ok=True)
-
-    def add_scalar(self, name: str, value, global_step: int) -> None:
-        try:
-            values = list(value)
-        except TypeError:
-            self.metrics.loc[global_step, name] = value
-            return
-
-        for offset, item in enumerate(values):
-            try:
-                self.metrics.loc[global_step + 640 * offset, name] = item.item()
-            except (TypeError, AttributeError, ValueError):
-                self.states[global_step + 640 * offset, name] = value
-
+from goalmisgen.configs.writers import CsvWriter
 
 # --------------------------------------------------------------------------
 # Configuration wiring (fast)
@@ -119,12 +88,12 @@ def test_smoke_preset_is_small_enough_to_run_on_cpu():
 RETURN_METRIC = "charts/0/avg_episode_returns"
 
 
-def run_training(args) -> DataFrameWriter:
+def run_training(args) -> CsvWriter:
     import cleanba.cleanba_impala
     from cleanba.cleanba_impala import train
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        writer = DataFrameWriter(args, save_dir=Path(tmpdir))
+        writer = CsvWriter(args, Path(tmpdir))
         cleanba.cleanba_impala.MUST_STOP_PROGRAM = False
         train(args, writer=writer)
     return writer
@@ -334,8 +303,6 @@ def test_checkpointing_works_with_the_csv_writer(tmp_path):
     checkpoint is written. A writer missing them trains for hundreds of
     thousands of steps and then dies — which has cost us a run.
     """
-    from goalmisgen.configs.writers import CsvWriter
-
     args = maze_smoke_test()
     args.net = dataclasses.replace(args.net, n_recurrent=1, repeats_per_step=1)
     args.local_num_envs = 8
@@ -359,13 +326,11 @@ def test_checkpointing_works_with_the_csv_writer(tmp_path):
     checkpoints = list((tmp_path / "local-files").glob("cp_*"))
     assert checkpoints, f"no checkpoint written; dir held {list((tmp_path / 'local-files').iterdir())}"
     assert (tmp_path / "metrics.csv").exists()
-    assert not pd.read_csv(tmp_path / "metrics.csv", index_col=0).empty
+    assert not writer.metrics.empty
 
 
 def test_csv_writer_exposes_the_full_writer_interface():
     """Cheap guard against the next missing attribute."""
-    from goalmisgen.configs.writers import CsvWriter
-
     args = maze_smoke_test()
     writer = CsvWriter(args, Path("/tmp/goalmisgen-writer-check"))
     for attribute in ("step_digits", "named_save_dir", "_save_dir", "add_scalar", "save_dir"):

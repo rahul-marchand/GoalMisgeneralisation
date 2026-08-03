@@ -1,0 +1,229 @@
+"""Tests for pre-generated level datasets.
+
+The fingerprint tests matter most. A dataset is only reproducible while the
+generating code is unchanged, and a silently-stale dataset would mean training
+on a different distribution than the configuration claims — an error that would
+never surface as a crash, only as inexplicable results.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+
+import numpy as np
+import pytest
+
+from goalmisgen.envs.dataset import (
+    DatasetLevelSampler,
+    FingerprintMismatch,
+    LevelDataset,
+    dataset_fingerprint,
+    source_fingerprint,
+    split_indices,
+)
+from goalmisgen.envs.sampling import MazeLevelSampler
+from goalmisgen.envs.solver import objective_distances, solve
+from goalmisgen.envs.values import UniformValues
+
+SAMPLER = MazeLevelSampler(size_range=(5, 11))
+
+
+def small_dataset(n: int = 60, sampler: MazeLevelSampler = SAMPLER) -> LevelDataset:
+    return LevelDataset.generate(sampler, n_levels=n, seed=0, block_size=25)
+
+
+# --------------------------------------------------------------------------
+# Round-tripping
+# --------------------------------------------------------------------------
+
+
+def test_levels_round_trip_faithfully():
+    """A reconstructed level must match one drawn live from the same sampler."""
+    dataset = small_dataset(n=30)
+    live = MazeLevelSampler(size_range=(5, 11))
+    rng = np.random.default_rng(np.random.SeedSequence(0).spawn(1)[0])
+
+    for index in range(10):
+        expected = live.sample(rng)
+        actual = dataset.level(index, feature_ids=[o.feature_id for o in expected.objectives])
+
+        assert np.array_equal(actual.walls, expected.walls)
+        assert actual.agent_start == expected.agent_start
+        assert actual.objectives == expected.objectives
+
+
+def test_stored_distances_match_the_solver():
+    dataset = small_dataset()
+    for index in range(20):
+        level = dataset.level(index, feature_ids=range(dataset.n_objectives))
+        assert tuple(dataset.distances[index]) == tuple(objective_distances(level))
+
+
+def test_walls_unpack_to_the_original_size():
+    dataset = small_dataset()
+    for index in range(20):
+        size = int(dataset.sizes[index])
+        assert dataset.walls(index).shape == (size, size)
+        assert dataset.walls(index).dtype == np.bool_
+
+
+def test_generated_levels_are_valid_and_solvable():
+    dataset = small_dataset()
+    for index in range(len(dataset)):
+        level = dataset.level(index, feature_ids=range(dataset.n_objectives))
+        solution = solve(level, step_penalty=0.05)
+        assert all(distance is not None for distance in solution.distances)
+
+
+def test_save_and_load_preserves_everything(tmp_path):
+    dataset = small_dataset()
+    path = tmp_path / "levels.npz"
+    dataset.save(path)
+    loaded = LevelDataset.load(path)
+
+    assert len(loaded) == len(dataset)
+    assert loaded.fingerprint == dataset.fingerprint
+    assert loaded.max_size == dataset.max_size
+    for field in ("walls_packed", "sizes", "agent", "positions", "values", "distances"):
+        assert np.array_equal(getattr(loaded, field), getattr(dataset, field))
+
+
+def test_storage_is_compact():
+    """Roughly 100 bytes per level, so a million levels is ~100 MB."""
+    dataset = small_dataset(n=200, sampler=MazeLevelSampler(size_range=(25, 25)))
+    bytes_per_level = dataset.walls_packed.nbytes / len(dataset)
+    assert bytes_per_level < 100, f"{bytes_per_level:.0f} B/level of wall data"
+
+
+# --------------------------------------------------------------------------
+# Determinism
+# --------------------------------------------------------------------------
+
+
+def test_generation_is_deterministic():
+    first, second = small_dataset(), small_dataset()
+    assert np.array_equal(first.walls_packed, second.walls_packed)
+    assert np.array_equal(first.values, second.values)
+
+
+def test_block_seeding_makes_worker_count_irrelevant():
+    """Blocks are seeded independently, so parallelism cannot change the data."""
+    whole = LevelDataset.generate(SAMPLER, n_levels=60, seed=0, block_size=25)
+    assert len(whole) == 60
+    # The same block size must give the same result regardless of how it is run.
+    again = LevelDataset.generate(SAMPLER, n_levels=60, seed=0, block_size=25)
+    assert np.array_equal(whole.walls_packed, again.walls_packed)
+
+
+def test_a_ragged_final_block_is_handled():
+    dataset = LevelDataset.generate(SAMPLER, n_levels=57, seed=0, block_size=25)
+    assert len(dataset) == 57
+
+
+def test_different_seeds_give_different_levels():
+    a = LevelDataset.generate(SAMPLER, n_levels=40, seed=0, block_size=25)
+    b = LevelDataset.generate(SAMPLER, n_levels=40, seed=1, block_size=25)
+    assert not np.array_equal(a.walls_packed, b.walls_packed)
+
+
+# --------------------------------------------------------------------------
+# Fingerprinting
+# --------------------------------------------------------------------------
+
+
+def test_fingerprint_is_stable_across_calls():
+    assert dataset_fingerprint(SAMPLER) == dataset_fingerprint(SAMPLER)
+    assert source_fingerprint() == source_fingerprint()
+
+
+def test_fingerprint_changes_with_the_configuration():
+    other = dataclasses.replace(SAMPLER, size_range=(5, 15))
+    assert dataset_fingerprint(SAMPLER) != dataset_fingerprint(other)
+
+    other = dataclasses.replace(SAMPLER, values=UniformValues(0.25, 1.0))
+    assert dataset_fingerprint(SAMPLER) != dataset_fingerprint(other)
+
+
+def test_fingerprint_ignores_the_correlation():
+    """One dataset must serve the whole sweep, so rho must not change identity."""
+    for correlation in (0.0, 0.5, 1.0):
+        other = dataclasses.replace(SAMPLER, feature_value_correlation=correlation)
+        assert dataset_fingerprint(other) == dataset_fingerprint(SAMPLER)
+
+
+def test_loading_a_stale_dataset_raises(tmp_path):
+    path = tmp_path / "levels.npz"
+    small_dataset().save(path)
+
+    with pytest.raises(FingerprintMismatch, match="level distribution has changed"):
+        LevelDataset.load(path, expected_fingerprint="0000000000000000")
+
+
+def test_loading_a_matching_dataset_succeeds(tmp_path):
+    path = tmp_path / "levels.npz"
+    small_dataset().save(path)
+    loaded = LevelDataset.load(path, expected_fingerprint=dataset_fingerprint(SAMPLER))
+    assert len(loaded) == 60
+
+
+# --------------------------------------------------------------------------
+# Sampling from a dataset
+# --------------------------------------------------------------------------
+
+
+def test_dataset_sampler_is_interchangeable_with_the_live_one():
+    sampler = DatasetLevelSampler(small_dataset())
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        level = sampler.sample(rng)
+        assert all(d is not None for d in solve(level, 0.05).distances)
+
+
+@pytest.mark.parametrize("correlation", [0.0, 0.5, 1.0])
+def test_one_dataset_serves_every_correlation(correlation):
+    """The point of storing levels without features."""
+    dataset = LevelDataset.generate(MazeLevelSampler(size_range=(5, 5)), n_levels=400, seed=0, block_size=200)
+    sampler = DatasetLevelSampler(dataset, feature_value_correlation=correlation)
+
+    rng = np.random.default_rng(0)
+    hits = 0
+    trials = 2000
+    for _ in range(trials):
+        level = sampler.sample(rng)
+        best = int(np.argmax([objective.value for objective in level.objectives]))
+        hits += level.objectives[best].feature_id == 0
+    assert hits / trials == pytest.approx(correlation, abs=0.04)
+
+
+def test_indices_restrict_sampling_to_a_split():
+    dataset = small_dataset()
+    allowed = np.array([3, 7, 11])
+    sampler = DatasetLevelSampler(dataset, indices=allowed)
+
+    rng = np.random.default_rng(0)
+    seen = {sampler.sample(rng).agent_start for _ in range(60)}
+    permitted = {(int(dataset.agent[i, 0]), int(dataset.agent[i, 1])) for i in allowed}
+    assert seen <= permitted
+
+
+def test_splits_are_disjoint_and_complete():
+    splits = split_indices(1000, valid=100, test=100, seed=0)
+    assert len(splits["train"]) == 800
+    assert len(splits["valid"]) == 100
+    assert len(splits["test"]) == 100
+
+    combined = np.concatenate(list(splits.values()))
+    assert len(set(combined.tolist())) == 1000
+
+
+def test_split_rejects_an_impossible_holdout():
+    with pytest.raises(ValueError, match="cannot hold out"):
+        split_indices(100, valid=60, test=60)
+
+
+def test_dataset_sampler_rejects_bad_configuration():
+    dataset = small_dataset()
+    with pytest.raises(ValueError, match="feature_value_correlation"):
+        DatasetLevelSampler(dataset, feature_value_correlation=1.5)
+    with pytest.raises(ValueError, match="no levels to sample"):
+        DatasetLevelSampler(dataset, indices=np.array([], dtype=int))

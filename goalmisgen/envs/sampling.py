@@ -46,6 +46,36 @@ class LevelSampler(Protocol):
         ...
 
 
+def assign_feature_ids(values: tuple[float, ...], correlation: float, rng: np.random.Generator) -> tuple[int, ...]:
+    """Give feature 0 to the highest-value objective with probability ``correlation``.
+
+    Remaining features go to the remaining objectives uniformly at random, so no
+    feature other than 0 carries information about value.
+
+    Shared with pre-generated datasets: this depends only on the values, so a
+    stored level can be given features at load time and one dataset therefore
+    serves every correlation in a sweep.
+    """
+    n = len(values)
+    if n == 1:
+        return (0,)
+
+    best = int(np.argmax(values))
+    if rng.random() < correlation:
+        holder_of_feature_zero = best
+    else:
+        others = [index for index in range(n) if index != best]
+        holder_of_feature_zero = others[int(rng.integers(len(others)))]
+
+    remaining = [index for index in range(n) if index != holder_of_feature_zero]
+    rng.shuffle(remaining)
+
+    feature_ids = [0] * n
+    for feature_id, objective_index in enumerate(remaining, start=1):
+        feature_ids[objective_index] = feature_id
+    return tuple(feature_ids)
+
+
 @dataclasses.dataclass(frozen=True)
 class MazeLevelSampler:
     """Uniform placement in a generated maze, with a tunable value/colour correlation.
@@ -136,26 +166,4 @@ class MazeLevelSampler:
         return (size, size)
 
     def _assign_feature_ids(self, values: tuple[float, ...], rng: np.random.Generator) -> tuple[int, ...]:
-        """Give feature 0 to the best objective with probability ``rho``.
-
-        Remaining features are assigned to the remaining objectives uniformly at
-        random, so that no feature other than 0 carries value information.
-        """
-        n = len(values)
-        if n == 1:
-            return (0,)
-
-        best = int(np.argmax(values))
-        if rng.random() < self.feature_value_correlation:
-            holder_of_feature_zero = best
-        else:
-            others = [index for index in range(n) if index != best]
-            holder_of_feature_zero = others[int(rng.integers(len(others)))]
-
-        remaining = [index for index in range(n) if index != holder_of_feature_zero]
-        rng.shuffle(remaining)
-
-        feature_ids = [0] * n
-        for feature_id, objective_index in enumerate(remaining, start=1):
-            feature_ids[objective_index] = feature_id
-        return tuple(feature_ids)
+        return assign_feature_ids(values, self.feature_value_correlation, rng)

@@ -371,3 +371,25 @@ def test_csv_writer_exposes_the_full_writer_interface():
     for attribute in ("step_digits", "named_save_dir", "_save_dir", "add_scalar", "save_dir"):
         assert hasattr(writer, attribute), f"CsvWriter is missing {attribute}"
     assert writer.step_digits >= 1
+
+
+def test_discount_horizon_exceeds_the_episode_limit():
+    """A goal the agent cannot see is a goal it cannot learn.
+
+    With terminal-only reward, a discount horizon shorter than the episode makes
+    distant objectives nearly invisible to the value function while the step
+    penalty stays immediate. The inherited gamma of 0.97 gives a 33-step horizon
+    against a 120-step limit, which discounts a goal at the 90th-percentile
+    distance for 25x25 mazes to 0.08.
+    """
+    args = maze_drc33()
+    horizon = 1.0 / (1.0 - args.loss.gamma)
+    assert horizon > args.train_env.max_episode_steps, (
+        f"discount horizon {horizon:.0f} is shorter than the {args.train_env.max_episode_steps}-step "
+        "episode limit; distant objectives will not be learnable"
+    )
+
+
+def test_gradient_clipping_is_not_the_two_billion_step_value():
+    """Guard against silently re-inheriting sokoban_resnet59's clip."""
+    assert maze_drc33().max_grad_norm > 1e-3

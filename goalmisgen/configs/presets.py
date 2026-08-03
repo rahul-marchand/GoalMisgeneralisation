@@ -1,10 +1,25 @@
 """Training presets for maze experiments.
 
-``maze_drc33`` inherits far.ai's DRC(3,3) network, IMPALA loss and optimiser
-settings from ``boxworld_drc33`` — their tuned configuration for a pure-Python
-environment — and swaps in the maze. Only the environment differs, so any
-difference in results is attributable to the task rather than to hyperparameters
-we invented.
+``maze_drc33`` inherits far.ai's DRC(3,3) network and optimiser settings from
+``boxworld_drc33`` and swaps in the maze.
+
+Three loss/optimiser values are deliberately *not* inherited, because
+``boxworld_drc33`` derives them from ``sokoban_resnet59`` — a ResNet
+configuration tuned for a two-billion-step Sokoban run:
+
+===================  ==========  =========  ===================================
+value                inherited   ours       why
+===================  ==========  =========  ===================================
+``gamma``            0.97        0.995      Sokoban's reward is dense; ours is
+                                            terminal-only. The discount horizon
+                                            must exceed the episode limit.
+``vtrace_lambda``    0.5         0.97       far.ai's own DRC value.
+``max_grad_norm``    2.5e-4      0.015      Theirs suits 2e9 steps; 0.015 is
+                                            their DRC-on-Sokoban value.
+===================  ==========  =========  ===================================
+
+Everything else — architecture, learning rate, batch shape — is inherited, so
+results remain attributable to the task rather than to tuning we invented.
 """
 
 from __future__ import annotations
@@ -36,6 +51,8 @@ def maze_drc33(
     total_timesteps: int = 200_000_000,
     seed: int = 1234,
     level_dataset: str | None = None,
+    gamma: float = 0.995,
+    max_grad_norm: float = 0.015,
 ) -> Args:
     """DRC(3,3) on multi-objective mazes.
 
@@ -75,6 +92,23 @@ def maze_drc33(
         for correlation in eval_correlations
     }
     out.total_timesteps = total_timesteps
+    out.loss = dataclasses.replace(
+        out.loss,
+        # boxworld_drc33 inherits its loss from sokoban_resnet59, whose gamma
+        # suits Sokoban's *dense* reward: a box push pays off within a few
+        # steps. Our reward is terminal-only, and gamma=0.97 discounts a goal 83
+        # steps away (the 90th percentile for 25x25 mazes) to 0.08 - effectively
+        # invisible, while the step penalty is immediate. The discount horizon
+        # must exceed the episode limit for the goal to be learnable at all.
+        gamma=gamma,
+        # Also inherited from the ResNet config; far.ai's own DRC setting is
+        # 0.97, which trades a little variance for much less bias.
+        vtrace_lambda=0.97,
+    )
+    # sokoban_resnet59 clips gradients at 2.5e-4, calibrated for a two-billion
+    # step run. At our budget that is far too conservative to move the network;
+    # 0.015 is the value far.ai use for DRC on Sokoban.
+    out.max_grad_norm = max_grad_norm
     return out
 
 

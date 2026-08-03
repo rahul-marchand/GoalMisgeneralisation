@@ -77,7 +77,7 @@ def test_generated_levels_are_valid_and_solvable():
 
 def test_save_and_load_preserves_everything(tmp_path):
     dataset = small_dataset()
-    path = tmp_path / "levels.npz"
+    path = tmp_path / "levels"
     dataset.save(path)
     loaded = LevelDataset.load(path)
 
@@ -152,7 +152,7 @@ def test_fingerprint_ignores_the_correlation():
 
 
 def test_loading_a_stale_dataset_raises(tmp_path):
-    path = tmp_path / "levels.npz"
+    path = tmp_path / "levels"
     small_dataset().save(path)
 
     with pytest.raises(FingerprintMismatch, match="level distribution has changed"):
@@ -160,7 +160,7 @@ def test_loading_a_stale_dataset_raises(tmp_path):
 
 
 def test_loading_a_matching_dataset_succeeds(tmp_path):
-    path = tmp_path / "levels.npz"
+    path = tmp_path / "levels"
     small_dataset().save(path)
     loaded = LevelDataset.load(path, expected_fingerprint=dataset_fingerprint(SAMPLER))
     assert len(loaded) == 60
@@ -227,3 +227,67 @@ def test_dataset_sampler_rejects_bad_configuration():
         DatasetLevelSampler(dataset, feature_value_correlation=1.5)
     with pytest.raises(ValueError, match="no levels to sample"):
         DatasetLevelSampler(dataset, indices=np.array([], dtype=int))
+
+
+# --------------------------------------------------------------------------
+# Memory mapping and cheap pickling
+# --------------------------------------------------------------------------
+
+
+def test_loaded_arrays_are_memory_mapped(tmp_path):
+    path = tmp_path / "levels"
+    small_dataset().save(path)
+    loaded = LevelDataset.load(path)
+    assert isinstance(loaded.walls_packed, np.memmap)
+
+
+def test_mmap_can_be_disabled(tmp_path):
+    path = tmp_path / "levels"
+    small_dataset().save(path)
+    loaded = LevelDataset.load(path, mmap=False)
+    assert not isinstance(loaded.walls_packed, np.memmap)
+
+
+def test_pickling_a_loaded_dataset_does_not_copy_the_arrays(tmp_path):
+    """Actor processes receive the sampler by pickle.
+
+    If the arrays travelled with it, every worker would hold its own copy and
+    the memory mapping would be pointless — hundreds of workers would cost
+    gigabytes.
+    """
+    import pickle
+
+    path = tmp_path / "levels"
+    small_dataset(n=200).save(path)
+    loaded = LevelDataset.load(path)
+
+    payload = pickle.dumps(DatasetLevelSampler(loaded, feature_value_correlation=0.5))
+    assert len(payload) < 2000, f"pickle carried the arrays: {len(payload)} bytes"
+
+    restored = pickle.loads(payload)
+    assert len(restored.dataset) == len(loaded)
+    assert restored.feature_value_correlation == 0.5
+    assert np.array_equal(restored.dataset.walls_packed, loaded.walls_packed)
+
+
+def test_unpickling_revalidates_the_fingerprint(tmp_path):
+    """A worker must not silently accept a dataset that changed under it."""
+    import pickle
+
+    path = tmp_path / "levels"
+    small_dataset().save(path)
+    loaded = LevelDataset.load(path)
+    payload = pickle.dumps(loaded)
+
+    (path / "meta.json").write_text((path / "meta.json").read_text().replace(loaded.fingerprint, "0" * 16))
+    with pytest.raises(FingerprintMismatch):
+        pickle.loads(payload)
+
+
+def test_an_in_memory_dataset_still_pickles():
+    import pickle
+
+    dataset = small_dataset(n=20)
+    assert dataset.path is None
+    restored = pickle.loads(pickle.dumps(dataset))
+    assert np.array_equal(restored.walls_packed, dataset.walls_packed)

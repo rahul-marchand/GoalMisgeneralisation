@@ -171,3 +171,84 @@ def test_a_drc_agent_learns_on_the_maze():
     third = max(1, len(returns) // 3)
     first, last = returns.iloc[:third].mean(), returns.iloc[-third:].mean()
     assert last > first, f"return did not improve: {first:.3f} -> {last:.3f}"
+
+
+# --------------------------------------------------------------------------
+# Dataset-backed environments
+# --------------------------------------------------------------------------
+
+
+def test_config_can_be_backed_by_a_level_dataset(tmp_path):
+    from goalmisgen.envs.dataset import LevelDataset
+
+    base = MazeConfig(max_episode_steps=60, min_size=5, max_size=9)
+    LevelDataset.generate(base.live_sampler(), n_levels=300, seed=0, block_size=100).save(tmp_path / "levels")
+
+    config = dataclasses.replace(
+        base,
+        num_envs=4,
+        asynchronous=False,
+        level_dataset=str(tmp_path / "levels"),
+        dataset_valid_levels=50,
+        dataset_test_levels=50,
+    )
+    envs = config.make()
+    observation, info = envs.reset(seed=0)
+
+    assert observation.shape == (4, config.encoder().n_channels, 9, 9)
+    assert "optimal_index" in info
+
+
+def test_a_stale_dataset_is_refused(tmp_path):
+    from goalmisgen.envs.dataset import FingerprintMismatch, LevelDataset
+
+    base = MazeConfig(max_episode_steps=60, min_size=5, max_size=9)
+    LevelDataset.generate(base.live_sampler(), n_levels=200, seed=0, block_size=100).save(tmp_path / "levels")
+
+    # A different level distribution must not silently reuse these levels.
+    mismatched = dataclasses.replace(
+        base,
+        step_penalty=base.step_penalty,
+        objective_values=(1.0, 0.25),
+        level_dataset=str(tmp_path / "levels"),
+        dataset_valid_levels=25,
+        dataset_test_levels=25,
+    )
+    with pytest.raises(FingerprintMismatch):
+        mismatched.sampler()
+
+
+def test_splits_are_honoured(tmp_path):
+    from goalmisgen.envs.dataset import LevelDataset
+
+    base = MazeConfig(max_episode_steps=60, min_size=5, max_size=9)
+    LevelDataset.generate(base.live_sampler(), n_levels=300, seed=0, block_size=100).save(tmp_path / "levels")
+
+    sizes = {}
+    for split in ("train", "valid", "test"):
+        config = dataclasses.replace(
+            base,
+            level_dataset=str(tmp_path / "levels"),
+            dataset_split=split,
+            dataset_valid_levels=50,
+            dataset_test_levels=50,
+        )
+        sizes[split] = len(config.sampler())
+
+    assert sizes == {"train": 200, "valid": 50, "test": 50}
+
+
+def test_unknown_split_is_rejected(tmp_path):
+    from goalmisgen.envs.dataset import LevelDataset
+
+    base = MazeConfig(max_episode_steps=60, min_size=5, max_size=9)
+    LevelDataset.generate(base.live_sampler(), n_levels=200, seed=0, block_size=100).save(tmp_path / "levels")
+    config = dataclasses.replace(
+        base,
+        level_dataset=str(tmp_path / "levels"),
+        dataset_split="nonsense",
+        dataset_valid_levels=25,
+        dataset_test_levels=25,
+    )
+    with pytest.raises(ValueError, match="unknown dataset_split"):
+        config.sampler()

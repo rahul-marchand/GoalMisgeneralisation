@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import importlib
+import json
 import pathlib
 from typing import Iterable
 
@@ -44,6 +45,9 @@ stream and hence the layouts. Generation always normalises to this value and
 discards the resulting features, which keeps stored content independent of the
 correlation actually used at training time.
 """
+
+ARRAY_FIELDS: tuple[str, ...] = ("walls_packed", "sizes", "agent", "positions", "values", "distances")
+"""Arrays persisted to disk, one ``.npy`` each."""
 
 BLOCK_SIZE = 10_000
 """Levels per independently seeded block.
@@ -93,6 +97,19 @@ class LevelDataset:
     distances: np.ndarray  # (N, K) int16, cached solver output
     max_size: int
     fingerprint: str
+    path: pathlib.Path | None = None
+    """Set when loaded from disk. Enables pickling by reference."""
+
+    def __reduce__(self):
+        """Pickle by path when possible.
+
+        Actor processes are forked with the sampler as an argument, so pickling
+        the arrays themselves would give every worker its own multi-megabyte
+        copy and defeat the memory mapping.
+        """
+        if self.path is not None:
+            return (_load_mapped, (str(self.path), self.fingerprint))
+        return super().__reduce__()
 
     def __len__(self) -> int:
         return len(self.sizes)
@@ -152,33 +169,47 @@ class LevelDataset:
         )
 
     def save(self, path: str | pathlib.Path) -> None:
-        path = pathlib.Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(
-            path,
-            walls_packed=self.walls_packed,
-            sizes=self.sizes,
-            agent=self.agent,
-            positions=self.positions,
-            values=self.values,
-            distances=self.distances,
-            max_size=np.int64(self.max_size),
-            fingerprint=np.array(self.fingerprint),
+        """Write as a directory of plain ``.npy`` arrays plus a JSON header.
+
+        Deliberately not a single compressed archive: ``.npy`` files can be
+        memory-mapped, so every actor process shares one copy of the levels
+        through the page cache. Compressed archives must be decompressed into
+        each process's own memory, which at a few hundred workers would cost
+        gigabytes for no benefit.
+        """
+        directory = pathlib.Path(path)
+        directory.mkdir(parents=True, exist_ok=True)
+
+        for name in ARRAY_FIELDS:
+            np.save(directory / f"{name}.npy", getattr(self, name))
+        (directory / "meta.json").write_text(
+            json.dumps(
+                {
+                    "fingerprint": self.fingerprint,
+                    "max_size": self.max_size,
+                    "n_levels": len(self),
+                },
+                indent=2,
+            )
         )
 
     @classmethod
-    def load(cls, path: str | pathlib.Path, expected_fingerprint: str | None = None) -> "LevelDataset":
-        with np.load(pathlib.Path(path)) as data:
-            dataset = cls(
-                walls_packed=data["walls_packed"],
-                sizes=data["sizes"],
-                agent=data["agent"],
-                positions=data["positions"],
-                values=data["values"],
-                distances=data["distances"],
-                max_size=int(data["max_size"]),
-                fingerprint=str(data["fingerprint"]),
-            )
+    def load(
+        cls,
+        path: str | pathlib.Path,
+        expected_fingerprint: str | None = None,
+        mmap: bool = True,
+    ) -> "LevelDataset":
+        directory = pathlib.Path(path)
+        meta = json.loads((directory / "meta.json").read_text())
+
+        arrays = {name: np.load(directory / f"{name}.npy", mmap_mode="r" if mmap else None) for name in ARRAY_FIELDS}
+        dataset = cls(
+            **arrays,
+            max_size=int(meta["max_size"]),
+            fingerprint=str(meta["fingerprint"]),
+            path=directory,
+        )
 
         if expected_fingerprint is not None and dataset.fingerprint != expected_fingerprint:
             raise FingerprintMismatch(
@@ -187,6 +218,11 @@ class LevelDataset:
                 "has changed; regenerate the dataset or check out the code it was made with."
             )
         return dataset
+
+
+def _load_mapped(path: str, fingerprint: str) -> "LevelDataset":
+    """Reconstruct a memory-mapped dataset in a worker process."""
+    return LevelDataset.load(path, expected_fingerprint=fingerprint)
 
 
 def block_tasks(

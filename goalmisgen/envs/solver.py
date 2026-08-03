@@ -195,6 +195,10 @@ def solve(level: Level, step_penalty: float, step_limit: int | None = None) -> L
     best_utility = max(utility for _, utility in reachable)
     optimal_indices = tuple(index for index, utility in reachable if abs(utility - best_utility) <= TIE_TOLERANCE)
 
+    # best_utility is drawn from `reachable`, which is non-empty, so at least one
+    # objective attains it. Stated for the type checker as much as the reader.
+    assert optimal_indices, "no objective attains the maximum utility"
+
     if len(optimal_indices) > 1:
         # Tied objectives are excluded from `alternatives`, so without this a
         # two-objective tie would leave the list empty and report `inf` - the

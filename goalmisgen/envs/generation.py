@@ -23,7 +23,8 @@ _CELL_NEIGHBOUR_OFFSETS: tuple[tuple[int, int], ...] = ((-2, 0), (2, 0), (0, -2)
 class MazeGenerator(Protocol):
     """Produces a wall grid. ``True`` marks a wall."""
 
-    def generate(self, shape: tuple[int, int], rng: np.random.Generator) -> np.ndarray: ...
+    def generate(self, shape: tuple[int, int], rng: np.random.Generator) -> np.ndarray:
+        ...
 
 
 def validate_shape(shape: tuple[int, int]) -> None:
@@ -32,9 +33,7 @@ def validate_shape(shape: tuple[int, int]) -> None:
     if height < 3 or width < 3:
         raise ValueError(f"maze shape must be at least 3x3, got {height}x{width}")
     if height % 2 == 0 or width % 2 == 0:
-        raise ValueError(
-            f"maze dimensions must be odd so that cells sit at odd indices, got {height}x{width}"
-        )
+        raise ValueError(f"maze dimensions must be odd so that cells sit at odd indices, got {height}x{width}")
 
 
 @dataclasses.dataclass(frozen=True)

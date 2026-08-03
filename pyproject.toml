@@ -1,0 +1,57 @@
+[project]
+name = "goalmisgen"
+version = "0.1.0"
+description = "Model organisms of goal misgeneralisation in DRC maze agents"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+
+dependencies = [
+    # Training stack. Used unmodified; see third_party/train-learned-planner.
+    "train-learned-planner",
+    # cleanba.environments imports gym_sokoban eagerly at module scope, so it is
+    # required even though we do not use Sokoban.
+    "gym-sokoban",
+    # Direct URL dependency of train-learned-planner. Declared explicitly because
+    # uv does not resolve direct-URL requirements transitively.
+    "farconf",
+    "numpy ~=1.26.4",
+    "gymnasium ~=0.29",
+]
+
+[project.optional-dependencies]
+# Installed only on GPU machines: `uv sync --extra gpu`.
+gpu = ["jax[cuda12] ==0.4.34"]
+
+[dependency-groups]
+dev = [
+    "pytest ~=8.1",
+    "ruff ~=0.1.13",
+    "pyright ~=1.1.349",
+]
+
+[tool.uv.sources]
+train-learned-planner = { path = "third_party/train-learned-planner", editable = true }
+gym-sokoban = { path = "third_party/train-learned-planner/third_party/gym-sokoban", editable = true }
+farconf = { git = "https://github.com/AlignmentResearch/farconf.git" }
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["goalmisgen*"]
+
+[tool.ruff]
+line-length = 127
+target-version = "py311"
+exclude = ["third_party"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.pyright]
+exclude = ["third_party/**", "**/__pycache__"]
+reportPrivateImportUsage = "warning"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

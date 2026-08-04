@@ -11,5 +11,6 @@ runs/
 checkpoints/
 *.eval
 
-# Level datasets (generated, not tracked)
-data/
+# Level datasets (generated, not tracked). Anchored: an unanchored `data/`
+# also swallowed figures/data, where measured results live.
+/data/

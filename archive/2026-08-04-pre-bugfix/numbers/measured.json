@@ -1,0 +1,15 @@
+{
+  "_provenance": "Behavioural measurements from experiments/002_measure_proxy.py, run on held-out test levels. 11x11: checkpoint cp_140206080 (150M-step run, rho=1.0 training, fixed values), 512 episodes/arm. 5x5: checkpoint cp_9011200 (10M-step run, rho=1.0 training, fixed values), 384 episodes/arm, live-sampled levels. n=1 seed each.",
+  "rho_response": {
+    "5x5":   {"rho": [1.0, 0.5, 0.0], "chose_optimal": [100.0, 51.0, 0.0],  "followed_f0": [100.0, 100.0, 100.0]},
+    "11x11": {"rho": [1.0, 0.5, 0.0], "chose_optimal": [89.3, 78.2, 66.3],  "followed_f0": [70.3, 62.1, 53.9]}
+  },
+  "_margin_provenance": "Margin-stratified accuracy, 11x11 cp_140206080, 1536 episodes/arm, exactly-ambiguous levels excluded.",
+  "margin": {
+    "bins": ["<0.05", "0.05-0.15", "0.15-0.35", ">0.35"],
+    "n":    [45, 110, 254, 1087],
+    "rho1": [33.3, 59.1, 77.6, 98.9],
+    "rho0": [25.0, 45.8, 36.1, 71.6]
+  },
+  "optimum": {"11x11_fixed_values": 0.432, "11x11_random_values": 0.260}
+}

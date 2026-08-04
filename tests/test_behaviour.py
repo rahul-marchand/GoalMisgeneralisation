@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis import collect_episode_outcomes, summarise
+from goalmisgen.analysis import bin_by_margin, collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
 
 
@@ -130,3 +130,29 @@ def test_every_environment_contributes_the_same_number_of_episodes():
     assert finished.min() >= per_env - 1, (
         f"collection stopped before the slowest environment had {per_env} episodes: {finished}"
     )
+
+
+def test_margin_bins_put_each_episode_in_exactly_one_band():
+    """Boundary values belong to the band they open, not the one they close."""
+    outcomes = [{"utility_margin": margin} for margin in (0.0, 0.049, 0.05, 0.15, 0.34, 0.35, 1.0)]
+    bins = bin_by_margin(outcomes)
+
+    assert [label for label, _ in bins] == ["<0.05", "0.05-0.15", "0.15-0.35", ">0.35"]
+    assert [len(group) for _, group in bins] == [2, 1, 2, 2]
+    assert sum(len(group) for _, group in bins) == len(outcomes)
+
+
+def test_margin_bins_drop_ambiguous_levels():
+    """Their margin is exactly zero and either choice is optimal, so binning
+    them would fill the hardest band with coin flips."""
+    outcomes = [
+        {"utility_margin": 0.0, "is_ambiguous": True},
+        {"utility_margin": 0.0, "is_ambiguous": False},
+    ]
+    bins = bin_by_margin(outcomes)
+    assert [len(group) for _, group in bins] == [1, 0, 0, 0]
+
+
+def test_margin_bins_reject_unordered_edges():
+    with pytest.raises(ValueError, match="must increase"):
+        bin_by_margin([], edges=(0.3, 0.1))

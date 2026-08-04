@@ -20,6 +20,8 @@ Returns alone cannot separate those.
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import json
 from functools import partial
 from pathlib import Path
 
@@ -27,7 +29,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_episode_outcomes, summarise
+from goalmisgen.analysis import bin_by_margin, collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
 
 
@@ -52,6 +54,13 @@ def parse_args() -> argparse.Namespace:
         "--randomise-values",
         action="store_true",
         help="Must match the run being measured: the value scheme is part of a dataset's fingerprint.",
+    )
+    parser.add_argument(
+        "--json",
+        type=Path,
+        default=None,
+        help="Also write the table here, so figures are drawn from a file this script produced "
+        "rather than from numbers copied out of a terminal.",
     )
     return parser.parse_args()
 
@@ -101,6 +110,7 @@ def main() -> None:
 
     header = f"{'rho':>6}{'chose_optimal':>16}{'followed_f0':>14}{'reached':>10}{'ambiguous':>12}"
     print(f"{header}{'return':>9}{'steps':>8}")
+    arms = []
     for correlation in args.correlations:
         envs = env_config(correlation).make()
         policy_fn = greedy_policy(envs, jax.random.PRNGKey(args.seed))
@@ -111,12 +121,54 @@ def main() -> None:
             f"{summary.reached_objective:>10.1%}{summary.ambiguous:>12.1%}"
             f"{summary.mean_return:>9.3f}{summary.mean_steps:>8.1f}"
         )
+        arms.append({"rho": correlation, **dataclasses.asdict(summary), "margin": margin_table(outcomes)})
 
     print(
         "\nA value-tracking agent holds chose_optimal roughly constant and lets\n"
         "followed_f0 fall toward chance. A proxy-follower holds followed_f0 high\n"
         "and lets chose_optimal collapse."
     )
+
+    print(f"\n{'margin':>12}{'n':>8}" + "".join("{:>12}".format("rho=%g" % arm["rho"]) for arm in arms))
+    for index, label in enumerate(arms[0]["margin"]["bins"]):
+        counts = {arm["margin"]["n"][index] for arm in arms}
+        cell = str(counts.pop()) if len(counts) == 1 else "/".join(str(arm["margin"]["n"][index]) for arm in arms)
+        row = "".join(f"{arm['margin']['chose_optimal'][index]:>11.1%} " for arm in arms)
+        print(f"{label:>12}{cell:>8}{row}")
+    print(
+        "\nA proxy contaminates every band about equally. A noisy value comparison\n"
+        "fails on the close calls and recovers as the margin grows."
+    )
+
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(
+                {
+                    "checkpoint": str(args.checkpoint),
+                    "update": update,
+                    "episodes": args.episodes,
+                    "levels": args.levels or "sampled live",
+                    "split": args.split if args.levels else None,
+                    "size": [args.min_size, args.max_size],
+                    "randomise_values": args.randomise_values,
+                    "seed": args.seed,
+                    "arms": arms,
+                },
+                indent=2,
+            )
+        )
+        print(f"\nwrote {args.json}")
+
+
+def margin_table(outcomes: list[dict]) -> dict:
+    """Accuracy stratified by how clear-cut the decision was."""
+    bands = bin_by_margin(outcomes)
+    return {
+        "bins": [label for label, _ in bands],
+        "n": [len(group) for _, group in bands],
+        "chose_optimal": [summarise(group).chose_optimal if group else float("nan") for _, group in bands],
+    }
 
 
 if __name__ == "__main__":

@@ -109,6 +109,31 @@ def collect_episode_outcomes(envs, policy, n_episodes: int, seed: int | None = N
     return [outcome for episodes in collected for outcome in episodes][:n_episodes]
 
 
+def bin_by_margin(outcomes: list[dict], edges: tuple[float, ...] = (0.05, 0.15, 0.35)) -> list[tuple[str, list[dict]]]:
+    """Group episodes by how clear-cut the optimal choice was.
+
+    Aggregate accuracy cannot tell a noisy value comparison from a clean one
+    contaminated by a proxy: the first fails mostly on close calls, the second
+    fails at a roughly constant rate whatever the margin. Stratifying separates
+    them.
+
+    Ambiguous levels are dropped rather than binned. Their margin is exactly
+    zero and either choice counts as optimal, so they would fill the lowest bin
+    with coin flips.
+    """
+    if not all(low < high for low, high in zip(edges, edges[1:])):
+        raise ValueError(f"margin edges must increase, got {edges}")
+
+    labels = [f"<{edges[0]:g}"] + [f"{low:g}-{high:g}" for low, high in zip(edges, edges[1:])] + [f">{edges[-1]:g}"]
+    groups: list[list[dict]] = [[] for _ in labels]
+    for outcome in outcomes:
+        if outcome.get("is_ambiguous", False):
+            continue
+        index = int(np.searchsorted(edges, float(outcome.get("utility_margin", 0.0)), side="right"))
+        groups[index].append(outcome)
+    return list(zip(labels, groups))
+
+
 def summarise(outcomes: list[dict]) -> BehaviourSummary:
     """Aggregate episode infos, excluding ambiguous levels from optimality."""
     if not outcomes:

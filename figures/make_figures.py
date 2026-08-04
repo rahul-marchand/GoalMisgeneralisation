@@ -132,12 +132,19 @@ def fig_rho_response():
 
     The control panel is what makes the other two readable. Without it, a
     falling ``chose_optimal`` could be any weakness of the agent; beside an
-    identically-trained agent that stays flat, it can only be the proxy.
+    agent that stays flat, the proxy is the explanation left standing.
+
+    It is not yet a single-variable control, and the subtitles say so. The
+    control run differs from the proxy run in *two* ways — it trains at chance
+    correlation and on randomised rather than fixed objective values — so it
+    rules out "11x11 is simply too hard" but not "randomised values teach value
+    comparison better". Closing that needs a fourth run holding the value
+    scheme fixed.
     """
     panels = [
-        ("smoke5b", "5×5 — proxy is free", "trained ρ=1.0"),
-        ("maze11", "11×11 — proxy costs a detour", "trained ρ=1.0"),
-        ("clean11", "11×11 control — no proxy to learn", "trained at chance, ρ=0.5"),
+        ("smoke5b", "5×5 — proxy is free", "trained ρ=1.0, fixed values"),
+        ("maze11", "11×11 — proxy costs a detour", "trained ρ=1.0, fixed values"),
+        ("clean11", "11×11 control — no proxy to learn", "trained ρ=0.5, randomised values"),
     ]
     fig, axes = plt.subplots(1, 3, figsize=(10.6, 3.4), sharey=True)
     for ax, (agent, title, sub) in zip(axes, panels):
@@ -183,9 +190,14 @@ def fig_margin():
     is unmoved by ρ, which is what a value comparison with a little noise looks
     like. The proxy agent matches it at ρ=1.0 and falls apart at ρ=0.0, and the
     damage is worst in the middle, not on the close calls.
+
+    The two panels are not on the same level distribution — the bin counts
+    differ because fixed values put most decisions in the widest margin band —
+    so read each panel's ρ=1.0 against its own ρ=0.0, not across panels.
     """
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.5), sharey=True)
-    for ax, (agent, title) in zip(axes, [("clean11", "control — no proxy to learn"), ("maze11", "trained with a proxy")]):
+    panels = [("clean11", "control — no proxy to learn"), ("maze11", "trained with a proxy")]
+    for ax, (agent, title) in zip(axes, panels):
         labels = arm_at(agent, 1.0)["margin"]["bins"]
         x = np.arange(len(labels))
         for rho, colour, dy in ((1.0, BLUE, 10), (0.0, ORANGE, -15)):
@@ -206,7 +218,9 @@ def fig_margin():
         ax.set_ylim(-6, 116)
         ax.set_yticks([0, 25, 50, 75, 100])
         ax.grid(axis="y", zorder=0)
-        ax.set_title(title, color=INK, pad=10)
+        ax.set_title(title, color=INK, pad=18)
+        scheme = "randomised values" if AGENTS[agent]["randomise_values"] else "fixed values"
+        ax.text(0.5, 1.02, scheme, transform=ax.transAxes, ha="center", fontsize=7.5, color=MUTED)
 
     # The worst-hit band, named from the data rather than asserted.
     hi = np.array(arm_at("maze11", 1.0)["margin"]["chose_optimal"], dtype=float)

@@ -48,6 +48,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-envs", type=int, default=64)
     parser.add_argument("--correlations", type=float, nargs="+", default=[1.0, 0.5, 0.0])
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--randomise-values",
+        action="store_true",
+        help="Must match the run being measured: the value scheme is part of a dataset's fingerprint.",
+    )
     return parser.parse_args()
 
 
@@ -61,6 +66,7 @@ def main() -> None:
             min_size=args.min_size,
             max_size=args.max_size,
             feature_value_correlation=correlation,
+            randomise_values=args.randomise_values,
             level_dataset=args.levels,
             **({"dataset_split": args.split} if args.levels else {}),
             asynchronous=False,

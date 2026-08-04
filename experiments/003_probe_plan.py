@@ -31,6 +31,7 @@ from pathlib import Path
 from cleanba.cleanba_impala import load_train_state
 
 from goalmisgen.analysis import collect_rollouts, probe, probe_by_distance
+from goalmisgen.analysis.probes import ProbeSource
 from goalmisgen.configs.env import MazeConfig
 
 
@@ -94,7 +95,8 @@ def main() -> None:
             env_config(9999).make(), policy, train_state.params, args.test_episodes, seed=9999, steps_to_think=think
         )
 
-        for source, label in (("features", "hidden state"), ("observation", "observation")):
+        sources: tuple[tuple[ProbeSource, str], ...] = (("features", "hidden state"), ("observation", "observation"))
+        for source, label in sources:
             r = probe(train, test, source=source)
             print(f"{think:>6}{label:>14}{r.auc:>9.3f}{r.balanced_accuracy:>10.3f}{r.n_samples:>10,}")
 

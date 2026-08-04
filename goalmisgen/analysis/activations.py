@@ -33,6 +33,14 @@ class Rollout:
     visited: np.ndarray
     """(height, width) bool - cells the agent actually stepped on."""
 
+    visit_step: np.ndarray
+    """(height, width) int - step at which each cell was first reached, -1 if never.
+
+    Distinguishes the cell the agent is about to move onto from the far end of
+    its route. Both are positives for the plan probe, but only the second is
+    evidence of a plan rather than of an imminent action.
+    """
+
     info: dict
     """Episode outcome and ground truth, from the environment's final info."""
 
@@ -86,11 +94,14 @@ def collect_rollouts(
         # NCHW from the wrapper; probes want the spatial axes last.
         height, width = initial_obs.shape[2], initial_obs.shape[3]
         visited = np.zeros((envs.num_envs, height, width), dtype=bool)
+        visit_step = np.full((envs.num_envs, height, width), -1, dtype=np.int16)
         finals: list[dict | None] = [None] * envs.num_envs
         done = np.zeros(envs.num_envs, dtype=bool)
 
         agent_channel = 1
-        visited |= initial_obs[:, agent_channel] > 0.5
+        here = initial_obs[:, agent_channel] > 0.5
+        visited |= here
+        visit_step[here] = 0
 
         action = first_action
         for step_index in range(512):
@@ -101,7 +112,10 @@ def collect_rollouts(
 
             # Record position before autoreset overwrites it for finished episodes.
             live = ~done
-            visited[live] |= np.asarray(observations)[live, agent_channel] > 0.5
+            here = (np.asarray(observations)[:, agent_channel] > 0.5) & live[:, None, None]
+            fresh = here & (visit_step < 0)
+            visited |= here
+            visit_step[fresh] = step_index + 1
 
             if just_done.any():
                 # `final_info` is a numpy object array, so it must be tested
@@ -115,14 +129,16 @@ def collect_rollouts(
                 break
 
         for index in range(envs.num_envs):
-            if finals[index] is None or len(rollouts) >= n_episodes:
+            final = finals[index]
+            if final is None or len(rollouts) >= n_episodes:
                 continue
             rollouts.append(
                 Rollout(
                     features=stack_layers(initial_carry, index),
                     observation=np.moveaxis(initial_obs[index], 0, -1),
                     visited=visited[index],
-                    info=finals[index],
+                    visit_step=visit_step[index],
+                    info=final,
                 )
             )
 

@@ -2,16 +2,18 @@
 
 from goalmisgen.analysis.activations import Rollout, collect_rollouts, stack_layers
 from goalmisgen.analysis.behaviour import BehaviourSummary, collect_episode_outcomes, summarise
-from goalmisgen.analysis.probes import ProbeResult, cell_dataset, probe
+from goalmisgen.analysis.probes import DistanceBand, ProbeResult, cell_dataset, probe, probe_by_distance
 
 __all__ = [
     "BehaviourSummary",
+    "DistanceBand",
     "ProbeResult",
     "Rollout",
     "cell_dataset",
     "collect_episode_outcomes",
     "collect_rollouts",
     "probe",
+    "probe_by_distance",
     "stack_layers",
     "summarise",
 ]

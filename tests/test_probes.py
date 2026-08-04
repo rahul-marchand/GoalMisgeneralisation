@@ -10,16 +10,21 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.probes import cell_dataset, probe, roc_auc
+from goalmisgen.analysis.probes import cell_dataset, probe, probe_by_distance, roc_auc
 
 
 class FakeRollout:
-    def __init__(self, features, observation, visited):
-        self.features, self.observation, self.visited = features, observation, visited
+    def __init__(self, features, observation, visited, visit_step):
+        self.features, self.observation = features, observation
+        self.visited, self.visit_step = visited, visit_step
 
 
-def make_rollouts(n, size=7, informative=True, seed=0):
-    """Rollouts whose features encode the route (or don't)."""
+def make_rollouts(n, size=7, informative=True, seed=0, marked_until=None):
+    """Rollouts whose features encode the route (or don't).
+
+    ``marked_until`` marks only the first few steps of the route, imitating a
+    probe that has found an imminent action rather than a plan.
+    """
     rng = np.random.default_rng(seed)
     out = []
     for _ in range(n):
@@ -27,11 +32,14 @@ def make_rollouts(n, size=7, informative=True, seed=0):
         obs[0, :, 0] = obs[-1, :, 0] = obs[:, 0, 0] = obs[:, -1, 0] = 1.0  # wall border
         visited = np.zeros((size, size), dtype=bool)
         visited[size // 2, 1:-1] = True  # a corridor route
+        visit_step = np.full((size, size), -1, dtype=np.int16)
+        visit_step[size // 2, 1:-1] = np.arange(size - 2)
 
         features = rng.normal(size=(size, size, 8)).astype(np.float32)
         if informative:
-            features[visited, 0] += 4.0  # one channel marks the route
-        out.append(FakeRollout(features, obs, visited))
+            marked = visited if marked_until is None else (visited & (visit_step <= marked_until))
+            features[marked, 0] += 4.0  # one channel marks the route
+        out.append(FakeRollout(features, obs, visited, visit_step))
     return out
 
 
@@ -50,6 +58,24 @@ def test_walls_are_excluded_so_they_cannot_inflate_scores():
     x_all, y_all = cell_dataset(rollouts, mask_walls=False)
     assert len(y_all) == 4 * 49
     assert y_all.mean() < y.mean(), "walls are trivially negative and dilute the positive rate"
+
+
+def test_distance_split_separates_a_plan_from_an_imminent_action():
+    """The check the whole distance breakdown exists to make.
+
+    Both agents score well overall, so only the split can tell them apart: one
+    has the full route in its features, the other only its next two steps.
+    """
+    full = probe_by_distance(make_rollouts(40, seed=0), make_rollouts(20, seed=1))
+    near = probe_by_distance(
+        make_rollouts(40, seed=0, marked_until=1), make_rollouts(20, seed=1, marked_until=1)
+    )
+
+    assert {b.step for b in full} == {b.step for b in near}
+    last = max(b.step for b in full)
+    assert next(b for b in full if b.step == last).auc > 0.95, "a planted route must decode at its far end"
+    assert next(b for b in near if b.step == 0).auc > 0.95, "the near end is marked in both"
+    assert next(b for b in near if b.step == last).auc < 0.7, "an unmarked far end must not decode"
 
 
 def test_probe_recovers_a_route_that_is_present():

@@ -45,20 +45,31 @@ class ProbeResult:
         )
 
 
-def cell_dataset(rollouts, source: str = "features", mask_walls: bool = True):
-    """Flatten rollouts into (cell, feature) rows with an on-route label.
-
-    Wall cells are dropped by default: the agent can never stand on one, so
-    including them inflates every score with trivially-negative examples.
-    """
-    xs, ys = [], []
+def _cells(rollouts, source: str = "features", mask_walls: bool = True):
+    """Flatten rollouts into per-cell rows: features, label, and arrival step."""
+    xs, ys, steps = [], [], []
     for r in rollouts:
         grid = r.features if source == "features" else r.observation
         free = r.observation[:, :, 0] < 0.5  # wall channel
         keep = free if mask_walls else np.ones_like(free, dtype=bool)
         xs.append(grid[keep])
         ys.append(r.visited[keep])
-    return np.concatenate(xs).astype(np.float64), np.concatenate(ys).astype(np.float64)
+        steps.append(getattr(r, "visit_step", np.full(r.visited.shape, -1))[keep])
+    return (
+        np.concatenate(xs).astype(np.float64),
+        np.concatenate(ys).astype(np.float64),
+        np.concatenate(steps).astype(np.int64),
+    )
+
+
+def cell_dataset(rollouts, source: str = "features", mask_walls: bool = True):
+    """Flatten rollouts into (cell, feature) rows with an on-route label.
+
+    Wall cells are dropped by default: the agent can never stand on one, so
+    including them inflates every score with trivially-negative examples.
+    """
+    x, y, _ = _cells(rollouts, source, mask_walls)
+    return x, y
 
 
 def fit_logistic(x: np.ndarray, y: np.ndarray, steps: int = 400, lr: float = 0.5, l2: float = 1e-3):
@@ -98,6 +109,45 @@ def roc_auc(y: np.ndarray, scores: np.ndarray) -> float:
     if n_pos == 0 or n_neg == 0:
         return float("nan")
     return float((ranks[y == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
+@dataclasses.dataclass(frozen=True)
+class DistanceBand:
+    """How well the probe finds cells the agent reaches this many steps later."""
+
+    step: int
+    auc: float
+    n_positive: int
+
+
+def probe_by_distance(train, test, source: str = "features", max_step: int = 12) -> list[DistanceBand]:
+    """Score one probe separately at each distance along the route.
+
+    A probe can reach a high overall AUC by finding only the cell the agent is
+    about to move onto, which would make it a move predictor wearing a plan's
+    clothes. Splitting by arrival step separates the two: a plan stays decodable
+    at the far end of the route, an imminent action does not.
+
+    Cells at a single distance are all positives, so AUC is computed against the
+    never-visited cells — can the probe rank a cell the agent reaches at step
+    ``k`` above one it never reaches at all?
+    """
+    x_train, y_train, _ = _cells(train, source)
+    x_test, y_test, steps = _cells(test, source)
+
+    w, mean, std = fit_logistic(x_train, y_train)
+    scores = apply_logistic(x_test, w, mean, std)
+    negative = scores[y_test == 0]
+
+    bands = []
+    for step in range(max_step + 1):
+        selected = steps == step
+        if selected.sum() < 20:  # too few cells at this distance to be worth reporting
+            continue
+        combined = np.concatenate([scores[selected], negative])
+        labels = np.concatenate([np.ones(int(selected.sum())), np.zeros(len(negative))])
+        bands.append(DistanceBand(step, roc_auc(labels, combined), int(selected.sum())))
+    return bands
 
 
 def probe(train, test, source: str = "features") -> ProbeResult:

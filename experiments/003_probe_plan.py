@@ -30,7 +30,7 @@ from pathlib import Path
 
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_rollouts, probe
+from goalmisgen.analysis import collect_rollouts, probe, probe_by_distance
 from goalmisgen.configs.env import MazeConfig
 
 
@@ -50,6 +50,11 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=[0],
         help="Extra forward passes on the initial observation before probing.",
+    )
+    parser.add_argument(
+        "--by-distance",
+        action="store_true",
+        help="Also score the probe separately at each distance along the route.",
     )
     return parser.parse_args()
 
@@ -92,6 +97,17 @@ def main() -> None:
         for source, label in (("features", "hidden state"), ("observation", "observation")):
             r = probe(train, test, source=source)
             print(f"{think:>6}{label:>14}{r.auc:>9.3f}{r.balanced_accuracy:>10.3f}{r.n_samples:>10,}")
+
+        if args.by_distance:
+            print(f"\n  think={think}, by distance along the route (AUC vs never-visited cells):")
+            print(f"  {'step':>6}{'hidden':>9}{'obs':>9}{'n cells':>10}")
+            hidden = probe_by_distance(train, test, source="features")
+            observation = {b.step: b for b in probe_by_distance(train, test, source="observation")}
+            for band in hidden:
+                other = observation.get(band.step)
+                obs_auc = f"{other.auc:.3f}" if other else "-"
+                print(f"  {band.step:>6}{band.auc:>9.3f}{obs_auc:>9}{band.n_positive:>10,}")
+            print()
 
     print(
         "\nThe hidden-state probe must beat the observation probe. If it does not,\n"

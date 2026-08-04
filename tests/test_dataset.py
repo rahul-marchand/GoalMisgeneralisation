@@ -323,8 +323,19 @@ def test_fingerprint_covers_the_dataset_module_itself():
     assert "dataset" in CONTENT_MODULES
 
 
-def test_fingerprint_ignores_comments_and_docstrings(tmp_path, monkeypatch):
-    """A guard that fires on harmless edits is one that gets switched off."""
+@pytest.mark.parametrize(
+    "edit",
+    [
+        pytest.param(lambda src: "# an added comment, changing bytes but not code\n" + src, id="comment"),
+        pytest.param(lambda src: src.replace('"""', '"""Rewritten prose. ', 1), id="docstring"),
+    ],
+)
+def test_fingerprint_ignores_comments_and_docstrings(edit, monkeypatch):
+    """A guard that fires on harmless edits is one that gets switched off.
+
+    The docstring case is the one that bites: docstrings are string expressions
+    and so survive into the dumped tree unless they are stripped.
+    """
     import ast as _ast
 
     import goalmisgen.envs.values as values_module
@@ -332,9 +343,25 @@ def test_fingerprint_ignores_comments_and_docstrings(tmp_path, monkeypatch):
     before = source_fingerprint()
     original = _ast.parse
     source = pathlib.Path(values_module.__file__).read_text()
-    commented = "# an added comment, changing bytes but not code\n" + source
-    monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(commented if src == source else src, *a, **k))
+    edited = edit(source)
+    assert edited != source, "the edit must actually change the file"
+    monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(edited if src == source else src, *a, **k))
     assert source_fingerprint() == before
+
+
+def test_fingerprint_still_reacts_to_a_change_in_code(monkeypatch):
+    """Stripping prose must not blunt the guard against real edits."""
+    import ast as _ast
+
+    import goalmisgen.envs.values as values_module
+
+    before = source_fingerprint()
+    original = _ast.parse
+    source = pathlib.Path(values_module.__file__).read_text()
+    changed = source.replace("low: float = 0.25", "low: float = 0.30")
+    assert changed != source
+    monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(changed if src == source else src, *a, **k))
+    assert source_fingerprint() != before
 
 
 def test_stored_splits_are_written_and_preferred(tmp_path):

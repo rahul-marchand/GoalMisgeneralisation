@@ -61,20 +61,36 @@ Parallelism therefore cannot change the data.
 """
 
 
+def _without_docstrings(tree: ast.Module) -> ast.Module:
+    """The same tree with every docstring removed.
+
+    Docstrings are ordinary string expressions, so they survive into the dumped
+    tree and would otherwise invalidate a dataset. They cannot affect a level.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        first = node.body[0] if node.body else None
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+            node.body = node.body[1:]
+    return tree
+
+
 def source_fingerprint() -> str:
     """Hash of the *code* of every module that determines level content.
 
-    The abstract syntax tree is hashed rather than the file bytes, so comments
-    and docstrings do not invalidate datasets. Hashing bytes meant that editing
-    a comment rejected a million-level dataset, and a guard that fires on
-    harmless edits is one that ends up switched off.
+    The abstract syntax tree is hashed rather than the file bytes, and prose is
+    stripped from it, so neither comments nor docstrings invalidate datasets.
+    Hashing bytes meant that editing a comment rejected a million-level
+    dataset, and a guard that fires on harmless edits is one that ends up
+    switched off.
     """
     digest = hashlib.sha256()
     for name in CONTENT_MODULES:
         module = importlib.import_module(f"goalmisgen.envs.{name}")
         assert module.__file__ is not None
         source = pathlib.Path(module.__file__).read_text()
-        digest.update(ast.dump(ast.parse(source)).encode())
+        digest.update(ast.dump(_without_docstrings(ast.parse(source))).encode())
     return digest.hexdigest()[:16]
 
 

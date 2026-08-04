@@ -72,6 +72,11 @@ def parse_args() -> argparse.Namespace:
         help="Also score the probe separately at each distance along the route.",
     )
     parser.add_argument(
+        "--randomise-values",
+        action="store_true",
+        help="Must match the run being probed: the value scheme is part of a dataset's fingerprint.",
+    )
+    parser.add_argument(
         "--no-untrained",
         action="store_true",
         help="Skip the untrained-network control, which costs a second set of rollouts.",
@@ -89,6 +94,7 @@ def main() -> None:
             min_size=args.size,
             max_size=args.size,
             feature_value_correlation=args.correlation,
+            randomise_values=args.randomise_values,
             level_dataset=args.levels,
             asynchronous=False,
             seed=seed,

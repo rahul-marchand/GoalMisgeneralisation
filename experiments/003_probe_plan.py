@@ -7,20 +7,30 @@ linear readout, applied identically at every maze cell, tries to predict which
 cells the agent will step on — from the DRC's state at t=0, before it has taken
 an action.
 
-The comparison that carries the claim is against the **same probe fitted to the
-raw observation**. That input contains the walls and both objectives but no
-route, and a linear map cannot search a maze. So:
+The comparison that carries the claim is against an **untrained network of the
+same shape**, not against the raw observation. A pointwise linear readout of a
+one-hot observation cannot express any spatial relation at all, so beating it is
+nearly free — measured, an untrained convolutional tower scores 0.76 against the
+observation's 0.60, and a feature holding only distance-from-agent scores 0.80.
+Neither contains a plan. So:
 
-* observation probe near chance, activation probe well above it
-  → the route is represented, not computed by the probe
-* both high
-  → the label is predictable from layout alone and the probe proves nothing
+* trained well above untrained
+  → training put the route there, which is the result
+* trained ≈ untrained
+  → the score is architecture, not learning, and there is nothing to report
 * both near chance
   → no decodable plan, which would be the interesting negative result
 
-``--think`` re-applies the network to the initial observation before probing,
-without stepping the environment. If plans are refined iteratively across the
-recurrent ticks, accuracy should climb with it.
+``--think`` re-applies the network to the initial observation *for the probe
+only*. Letting it change the agent's actions would change the labels too, so a
+rising score would be unattributable: route quality alone moves this measure by
+0.3 AUC.
+
+Two controls decide whether any of it means anything. The **untrained network**
+is the one that matters: a randomly initialised tower of the same shape already
+beats a pointwise readout of the observation, purely by having a receptive
+field. And distance bands use **distance-matched negatives**, without which a
+feature holding nothing but distance-from-agent reproduces the entire profile.
 """
 
 from __future__ import annotations
@@ -28,11 +38,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import jax
 from cleanba.cleanba_impala import load_train_state
 
 from goalmisgen.analysis import collect_rollouts, probe, probe_by_distance
 from goalmisgen.analysis.probes import ProbeSource
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.configs.presets import maze_drc33
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,6 +68,11 @@ def parse_args() -> argparse.Namespace:
         "--by-distance",
         action="store_true",
         help="Also score the probe separately at each distance along the route.",
+    )
+    parser.add_argument(
+        "--no-untrained",
+        action="store_true",
+        help="Skip the untrained-network control, which costs a second set of rollouts.",
     )
     return parser.parse_args()
 
@@ -85,35 +102,53 @@ def main() -> None:
         f"{args.train_episodes} train / {args.test_episodes} test episodes\n"
     )
 
-    print(f"{'think':>6}{'probe':>14}{'AUC':>9}{'bal.acc':>10}{'n cells':>10}")
+    # An untrained network of the same shape. This, not the observation, is the
+    # baseline that decides whether training put the route there: a random
+    # convolutional tower already has a receptive field, and that alone beats a
+    # pointwise readout of the observation.
+    untrained = None
+    if not args.no_untrained:
+        _, _, untrained = maze_drc33(min_size=args.size, max_size=args.size).net.init_params(
+            env_config(0).make(), jax.random.PRNGKey(12345)
+        )
+
+    def rollouts(seed: int, episodes: int, probe_think: int, params):
+        return collect_rollouts(
+            env_config(seed).make(),
+            policy,
+            train_state.params,
+            episodes,
+            seed=seed,
+            probe_params=params,
+            probe_steps_to_think=probe_think,
+        )
+
+    print(f"{'think':>6}{'probe':>16}{'AUC':>9}{'bal.acc':>10}{'n cells':>10}")
     for think in args.think:
-        # Disjoint seeds so the probe is scored on levels it was not fitted on.
-        train = collect_rollouts(
-            env_config(0).make(), policy, train_state.params, args.train_episodes, seed=0, steps_to_think=think
-        )
-        test = collect_rollouts(
-            env_config(9999).make(), policy, train_state.params, args.test_episodes, seed=9999, steps_to_think=think
-        )
+        arms: list[tuple[str, ProbeSource, object]] = [
+            ("trained", "features", None),
+            ("observation", "observation", None),
+        ]
+        if untrained is not None:
+            arms.insert(1, ("untrained", "features", untrained))
 
-        sources: tuple[tuple[ProbeSource, str], ...] = (("features", "hidden state"), ("observation", "observation"))
-        for source, label in sources:
+        for label, source, params in arms:
+            # Disjoint seeds so the probe is scored on levels it was not fitted on.
+            train = rollouts(0, args.train_episodes, think, params)
+            test = rollouts(9999, args.test_episodes, think, params)
+
             r = probe(train, test, source=source)
-            print(f"{think:>6}{label:>14}{r.auc:>9.3f}{r.balanced_accuracy:>10.3f}{r.n_samples:>10,}")
+            print(f"{think:>6}{label:>16}{r.auc:>9.3f}{r.balanced_accuracy:>10.3f}{r.n_samples:>10,}")
 
-        if args.by_distance:
-            print(f"\n  think={think}, by distance along the route (AUC vs never-visited cells):")
-            print(f"  {'step':>6}{'hidden':>9}{'obs':>9}{'n cells':>10}")
-            hidden = probe_by_distance(train, test, source="features")
-            observation = {b.step: b for b in probe_by_distance(train, test, source="observation")}
-            for band in hidden:
-                other = observation.get(band.step)
-                obs_auc = f"{other.auc:.3f}" if other else "-"
-                print(f"  {band.step:>6}{band.auc:>9.3f}{obs_auc:>9}{band.n_positive:>10,}")
-            print()
+            if args.by_distance:
+                bands = probe_by_distance(train, test, source=source)
+                shown = "  ".join(f"{b.step}:{b.auc:.3f}" for b in bands)
+                print(f"        by distance (matched negatives): {shown}")
 
     print(
-        "\nThe hidden-state probe must beat the observation probe. If it does not,\n"
-        "the label is readable from layout alone and nothing about planning follows."
+        "\nThe trained probe must beat the *untrained* one. Beating only the\n"
+        "observation shows the network has a receptive field, which it has\n"
+        "before any training at all."
     )
 
 

@@ -19,7 +19,8 @@ from functools import partial
 import jax
 import numpy as np
 
-from goalmisgen.envs.observation import AGENT_CHANNEL
+from goalmisgen.envs.observation import AGENT_CHANNEL, WALL_CHANNEL
+from goalmisgen.envs.solver import distance_field
 
 
 @dataclasses.dataclass
@@ -41,6 +42,14 @@ class Rollout:
     Distinguishes the cell the agent is about to move onto from the far end of
     its route. Both are positives for the plan probe, but only the second is
     evidence of a plan rather than of an imminent action.
+    """
+
+    distance: np.ndarray
+    """(height, width) int - BFS distance from the agent's start, UNREACHABLE for walls.
+
+    A cell on the route at step ``k`` is ``k`` steps away, so without this the
+    only available negatives are cells at *every* distance and any feature
+    encoding "how far is this cell" scores well with no plan in it at all.
     """
 
     info: dict
@@ -65,14 +74,26 @@ def collect_rollouts(
     n_episodes: int,
     seed: int = 0,
     steps_to_think: int = 0,
+    probe_params=None,
+    probe_steps_to_think: int = 0,
 ) -> list[Rollout]:
     """Run episodes, capturing the hidden state at t=0 and the route taken.
 
     ``steps_to_think`` is the number of *extra* passes over the initial
     observation before acting, on top of the one the agent always makes. Each
-    pass runs the DRC's three internal ticks, so ``steps_to_think=0`` probes a
-    state that has seen the maze once. If plans refine iteratively, accuracy
-    should climb with this.
+    pass runs the DRC's three internal ticks.
+
+    The two ``probe_`` arguments change *what is probed* without changing what
+    the agent does, which is what makes them controls:
+
+    ``probe_params`` reads the features out of a different network - an
+    untrained one of the same shape is the baseline that matters, since a random
+    convolutional tower already beats a pointwise readout of the observation by
+    virtue of having a receptive field at all.
+
+    ``probe_steps_to_think`` adds thinking passes for the probe alone. Adding
+    them to ``steps_to_think`` instead changes the route the agent walks, so the
+    labels move with the features and any change in accuracy is unattributable.
     """
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     key = jax.random.PRNGKey(seed)
@@ -90,7 +111,27 @@ def collect_rollouts(
         # initialize_carry returns zeros, so capturing before this would probe an
         # empty state - which shows up as an AUC of exactly 0.500.
         carry, first_action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
-        initial_carry = jax.tree_util.tree_map(np.asarray, carry)
+
+        # Everything below feeds the probe only. `key` is deliberately not
+        # advanced and `carry` is not reassigned, so the actions the agent goes
+        # on to take - and therefore the labels - are identical whatever is
+        # probed.
+        features_params = params if probe_params is None else probe_params
+        if probe_params is None:
+            probe_carry = carry
+        else:
+            probe_carry = policy.apply(
+                probe_params, key, envs.observation_space.shape, method=policy.initialize_carry
+            )
+            probe_carry, _, _, _ = get_action(
+                features_params, probe_carry, observations, starts, key, temperature=0.0
+            )
+        for _ in range(probe_steps_to_think):
+            probe_carry, _, _, _ = get_action(
+                features_params, probe_carry, observations, starts, key, temperature=0.0
+            )
+
+        initial_carry = jax.tree_util.tree_map(np.asarray, probe_carry)
         initial_obs = np.asarray(observations)
 
         # NCHW from the wrapper; probes want the spatial axes last.
@@ -161,8 +202,21 @@ def collect_rollouts(
                     observation=np.moveaxis(initial_obs[index], 0, -1),
                     visited=visited[index],
                     visit_step=visit_step[index],
+                    distance=_distance_from_start(initial_obs[index]),
                     info=final,
                 )
             )
 
     return rollouts[:n_episodes]
+
+
+def _distance_from_start(observation: np.ndarray) -> np.ndarray:
+    """BFS distance from the agent to every free cell, read off the observation.
+
+    Taken from the observation rather than the level so the capture path keeps
+    no extra state; the wall and agent channels are all a shortest-path search
+    needs.
+    """
+    walls = observation[WALL_CHANNEL] > 0.5
+    start = np.argwhere(observation[AGENT_CHANNEL] > 0.5)[0]
+    return distance_field(walls, (int(start[0]), int(start[1])))

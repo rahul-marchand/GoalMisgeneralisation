@@ -11,12 +11,13 @@ import numpy as np
 import pytest
 
 from goalmisgen.analysis.probes import cell_dataset, probe, probe_by_distance, roc_auc
+from goalmisgen.envs.solver import distance_field
 
 
 class FakeRollout:
-    def __init__(self, features, observation, visited, visit_step):
+    def __init__(self, features, observation, visited, visit_step, distance):
         self.features, self.observation = features, observation
-        self.visited, self.visit_step = visited, visit_step
+        self.visited, self.visit_step, self.distance = visited, visit_step, distance
 
 
 def make_rollouts(n, size=7, informative=True, seed=0, marked_until=None):
@@ -34,12 +35,13 @@ def make_rollouts(n, size=7, informative=True, seed=0, marked_until=None):
         visited[size // 2, 1:-1] = True  # a corridor route
         visit_step = np.full((size, size), -1, dtype=np.int16)
         visit_step[size // 2, 1:-1] = np.arange(size - 2)
+        distance = distance_field(obs[:, :, 0] > 0.5, (size // 2, 1))
 
         features = rng.normal(size=(size, size, 8)).astype(np.float32)
         if informative:
             marked = visited if marked_until is None else (visited & (visit_step <= marked_until))
             features[marked, 0] += 4.0  # one channel marks the route
-        out.append(FakeRollout(features, obs, visited, visit_step))
+        out.append(FakeRollout(features, obs, visited, visit_step, distance))
     return out
 
 
@@ -72,9 +74,14 @@ def test_distance_split_separates_a_plan_from_an_imminent_action():
     )
 
     assert {b.step for b in full} == {b.step for b in near}
-    last = max(b.step for b in full)
+    # Step 0 is absent by construction: the agent's own cell is the only cell at
+    # distance 0, so it has no matched negatives. It was trivially AUC 1.000 for
+    # every feature set, the raw observation included, and proved nothing.
+    assert 0 not in {b.step for b in full}
+
+    first, last = min(b.step for b in full), max(b.step for b in full)
     assert next(b for b in full if b.step == last).auc > 0.95, "a planted route must decode at its far end"
-    assert next(b for b in near if b.step == 0).auc > 0.95, "the near end is marked in both"
+    assert next(b for b in near if b.step == first).auc > 0.95, "the near end is marked in both"
     assert next(b for b in near if b.step == last).auc < 0.7, "an unmarked far end must not decode"
 
 
@@ -130,3 +137,26 @@ def test_collect_rollouts_runs_against_a_real_vector_env():
         assert np.array_equal(steps, np.arange(len(steps))), f"route has gaps or duplicates: {steps}"
         if r.info.get("reached_objective"):
             assert steps[-1] == r.info["episode_steps"], "the objective cell must be the last one recorded"
+
+
+def test_a_pure_distance_feature_does_not_survive_distance_matching():
+    """The control that invalidated the first version of this measurement.
+
+    A feature holding nothing but distance-from-agent contains no plan, yet it
+    scored 0.99 down to 0.56 across the bands when negatives were pooled over
+    all distances — the same "still high far out" shape that was read as
+    evidence of planning. Matched negatives must reduce it to chance.
+    """
+
+    def distance_only(n, seed):
+        rollouts = make_rollouts(n, size=9, informative=False, seed=seed)
+        for r in rollouts:
+            reachable = r.distance >= 0
+            r.features = np.zeros((*r.visited.shape, 1), dtype=np.float64)
+            r.features[reachable, 0] = -r.distance[reachable]
+        return rollouts
+
+    bands = probe_by_distance(distance_only(40, 0), distance_only(20, 1))
+    assert bands, "the control must produce comparable bands at all"
+    worst = max(abs(b.auc - 0.5) for b in bands)
+    assert worst < 0.15, f"distance alone still decodes after matching: {[(b.step, round(b.auc, 3)) for b in bands]}"

@@ -22,6 +22,8 @@ from typing import Literal, Sequence
 
 import numpy as np
 
+from goalmisgen.envs.observation import WALL_CHANNEL
+
 ProbeSource = Literal["features", "observation"]
 """Which per-cell grid a probe reads. Mistyping a plain string silently
 probed the observation and reported a plausible AUC."""
@@ -51,19 +53,21 @@ class ProbeResult:
 
 
 def _cells(rollouts: Sequence, source: ProbeSource = "features", mask_walls: bool = True):
-    """Flatten rollouts into per-cell rows: features, label, and arrival step."""
-    xs, ys, steps = [], [], []
+    """Flatten rollouts into per-cell rows: features, label, arrival step, distance."""
+    xs, ys, steps, distances = [], [], [], []
     for r in rollouts:
         grid = r.features if source == "features" else r.observation
-        free = r.observation[:, :, 0] < 0.5  # wall channel
+        free = r.observation[:, :, WALL_CHANNEL] < 0.5
         keep = free if mask_walls else np.ones_like(free, dtype=bool)
         xs.append(grid[keep])
         ys.append(r.visited[keep])
         steps.append(r.visit_step[keep])
+        distances.append(r.distance[keep])
     return (
         np.concatenate(xs).astype(np.float64),
         np.concatenate(ys).astype(np.float64),
         np.concatenate(steps).astype(np.int64),
+        np.concatenate(distances).astype(np.int64),
     )
 
 
@@ -73,7 +77,7 @@ def cell_dataset(rollouts, source: ProbeSource = "features", mask_walls: bool = 
     Wall cells are dropped by default: the agent can never stand on one, so
     including them inflates every score with trivially-negative examples.
     """
-    x, y, _ = _cells(rollouts, source, mask_walls)
+    x, y, _, _ = _cells(rollouts, source, mask_walls)
     return x, y
 
 
@@ -133,24 +137,29 @@ def probe_by_distance(train, test, source: ProbeSource = "features", max_step: i
     clothes. Splitting by arrival step separates the two: a plan stays decodable
     at the far end of the route, an imminent action does not.
 
-    Cells at a single distance are all positives, so AUC is computed against the
-    never-visited cells — can the probe rank a cell the agent reaches at step
-    ``k`` above one it never reaches at all?
+    Negatives are **distance-matched**: a cell reached at step ``k`` is scored
+    only against cells the agent never visits that are also ``k`` steps away.
+    Pooling all never-visited cells instead makes the comparison "distance k
+    versus every distance", which a feature encoding nothing but distance-from-
+    agent answers correctly — that control scores 0.99 down to 0.56 across the
+    bands with no plan in it, and exactly 0.50 once the negatives are matched.
     """
-    x_train, y_train, _ = _cells(train, source)
-    x_test, y_test, steps = _cells(test, source)
+    x_train, y_train, _, _ = _cells(train, source)
+    x_test, y_test, steps, distances = _cells(test, source)
 
     w, mean, std = fit_logistic(x_train, y_train)
     scores = apply_logistic(x_test, w, mean, std)
-    negative = scores[y_test == 0]
+    unvisited = y_test == 0
 
     bands = []
     for step in range(max_step + 1):
         selected = steps == step
-        if selected.sum() < 20:  # too few cells at this distance to be worth reporting
+        matched = unvisited & (distances == step)
+        # Both sides need enough cells for the comparison to mean anything.
+        if selected.sum() < 20 or matched.sum() < 20:
             continue
-        combined = np.concatenate([scores[selected], negative])
-        labels = np.concatenate([np.ones(int(selected.sum())), np.zeros(len(negative))])
+        combined = np.concatenate([scores[selected], scores[matched]])
+        labels = np.concatenate([np.ones(int(selected.sum())), np.zeros(int(matched.sum()))])
         bands.append(DistanceBand(step, roc_auc(labels, combined), int(selected.sum())))
     return bands
 

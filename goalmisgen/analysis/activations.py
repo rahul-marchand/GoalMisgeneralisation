@@ -58,10 +58,11 @@ def collect_rollouts(
 ) -> list[Rollout]:
     """Run episodes, capturing the hidden state at t=0 and the route taken.
 
-    ``steps_to_think`` re-applies the network to the initial observation before
-    acting, without stepping the environment. That is the knob from the
-    thinking-time work: if the plan is refined iteratively, probe accuracy
-    should rise with it.
+    ``steps_to_think`` is the number of *extra* passes over the initial
+    observation before acting, on top of the one the agent always makes. Each
+    pass runs the DRC's three internal ticks, so ``steps_to_think=0`` probes a
+    state that has seen the maze once. If plans refine iteratively, accuracy
+    should climb with this.
     """
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     key = jax.random.PRNGKey(seed)
@@ -75,7 +76,10 @@ def collect_rollouts(
         for _ in range(steps_to_think):
             carry, _, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
 
-        # The state we probe, and the input that produced it.
+        # Probe *after* the network has processed the observation at least once.
+        # initialize_carry returns zeros, so capturing before this would probe an
+        # empty state - which shows up as an AUC of exactly 0.500.
+        carry, first_action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
         initial_carry = jax.tree_util.tree_map(np.asarray, carry)
         initial_obs = np.asarray(observations)
 
@@ -88,8 +92,10 @@ def collect_rollouts(
         agent_channel = 1
         visited |= initial_obs[:, agent_channel] > 0.5
 
-        for _ in range(512):
-            carry, action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
+        action = first_action
+        for step_index in range(512):
+            if step_index > 0:
+                carry, action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
             observations, _, terminated, truncated, info = envs.step(np.asarray(action))
             just_done = np.logical_or(terminated, truncated) & ~done
 

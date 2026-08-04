@@ -1,0 +1,15 @@
+{
+  "eval_batch": {
+    "mean": 0.2678393911031024,
+    "n": 128
+  },
+  "split": {
+    "mean": 0.2786672321148739,
+    "sd": 0.3445945531918023,
+    "n": 8192
+  },
+  "batch_offset_in_sem": -0.3554990516996047,
+  "levels": "/workspace/data/levels11rv",
+  "split_name": "valid",
+  "randomise_values": true
+}

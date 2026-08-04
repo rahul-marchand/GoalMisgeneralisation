@@ -1,0 +1,105 @@
+{
+  "checkpoint": "/workspace/data/runs/smoke5b/local-files/cp_9011200",
+  "update": 1760,
+  "episodes": 2048,
+  "levels": "sampled live",
+  "split": null,
+  "size": [
+    5,
+    5
+  ],
+  "randomise_values": false,
+  "seed": 0,
+  "arms": [
+    {
+      "rho": 1.0,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 1.0,
+      "followed_feature_zero": 1.0,
+      "ambiguous": 0.0,
+      "mean_return": 0.8995849609375,
+      "mean_steps": 2.00830078125,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          0,
+          0,
+          63,
+          1985
+        ],
+        "chose_optimal": [
+          NaN,
+          NaN,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "rho": 0.5,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 0.50390625,
+      "followed_feature_zero": 1.0,
+      "ambiguous": 0.0,
+      "mean_return": 0.6529785156250001,
+      "mean_steps": 1.9794921875,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          0,
+          0,
+          63,
+          1985
+        ],
+        "chose_optimal": [
+          NaN,
+          NaN,
+          0.5714285714285714,
+          0.5017632241813602
+        ]
+      }
+    },
+    {
+      "rho": 0.0,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 0.0,
+      "followed_feature_zero": 1.0,
+      "ambiguous": 0.0,
+      "mean_return": 0.40148925781250006,
+      "mean_steps": 1.97021484375,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          0,
+          0,
+          63,
+          1985
+        ],
+        "chose_optimal": [
+          NaN,
+          NaN,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  ]
+}

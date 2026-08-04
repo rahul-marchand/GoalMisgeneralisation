@@ -163,6 +163,27 @@ def test_reaching_an_objective_terminates_and_pays_its_value():
     assert info["episode_steps"] == 2
 
 
+@pytest.mark.parametrize("actions,step_limit", [((RIGHT, RIGHT), 20), ((RIGHT, LEFT, RIGHT), 3)])
+def test_the_reported_return_is_the_rewards_actually_paid(actions, step_limit):
+    """Both endings: reaching an objective, and running out of steps.
+
+    The reported return is derived rather than accumulated, so nothing else
+    would notice if the derivation and the reward drifted apart.
+    """
+    env = make_env(step_limit=step_limit)
+    env.reset(seed=0)
+
+    total = 0.0
+    for action in actions:
+        _, reward, terminated, truncated, info = env.step(action)
+        total += reward
+        if terminated or truncated:
+            break
+
+    assert terminated or truncated, "the episode must end for an outcome to be reported"
+    assert info["episode_return"] == pytest.approx(total)
+
+
 def test_reaching_the_worse_objective_is_recorded_as_suboptimal():
     env = make_env()
     env.reset(seed=0)

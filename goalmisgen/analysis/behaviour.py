@@ -49,6 +49,12 @@ class BehaviourSummary:
     """Fraction where two objectives tied, so either choice counted as optimal."""
 
     mean_return: float
+    """Undiscounted episode return, comparable with the training curves.
+
+    Not the value of the objective reached: that ignores the step penalty, and
+    so scores a slow agent identically to a fast one.
+    """
+
     mean_steps: float
 
     def __str__(self) -> str:
@@ -114,6 +120,6 @@ def summarise(outcomes: list[dict]) -> BehaviourSummary:
         chose_optimal=fraction(unambiguous, lambda o: o.get("chose_optimal")),
         followed_feature_zero=fraction(reached, lambda o: o.get("reached_feature_id") == 0),
         ambiguous=fraction(reached, lambda o: o.get("is_ambiguous", False)),
-        mean_return=float(np.mean([o.get("reached_value", 0.0) for o in outcomes])),
+        mean_return=float(np.mean([o.get("episode_return", 0.0) for o in outcomes])),
         mean_steps=float(np.mean([o.get("episode_steps", 0) for o in outcomes])),
     )

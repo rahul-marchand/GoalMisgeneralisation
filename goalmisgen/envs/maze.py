@@ -168,8 +168,15 @@ class MazeEnv(gym.Env):
         that learned "go to colour 0" will keep reaching feature 0 even once
         that no longer marks the valuable objective.
         """
+        # Reward is -step_penalty per step plus the objective's value, so the
+        # return follows from the step count and needs no accumulator.
+        walked = -self.step_penalty * self.elapsed_steps
         if reached is None:
-            return {"reached_objective": False, "episode_steps": self.elapsed_steps}
+            return {
+                "reached_objective": False,
+                "episode_steps": self.elapsed_steps,
+                "episode_return": walked,
+            }
         return {
             "reached_objective": True,
             "reached_index": reached,
@@ -177,4 +184,5 @@ class MazeEnv(gym.Env):
             "reached_value": self.level.objectives[reached].value,
             "chose_optimal": reached in self.solution.optimal_indices,
             "episode_steps": self.elapsed_steps,
+            "episode_return": walked + self.level.objectives[reached].value,
         }

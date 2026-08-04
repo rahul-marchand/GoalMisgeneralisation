@@ -99,7 +99,8 @@ def main() -> None:
 
         return step
 
-    print(f"{'rho':>6}{'chose_optimal':>16}{'followed_f0':>14}{'reached':>10}{'ambiguous':>12}{'steps':>8}")
+    header = f"{'rho':>6}{'chose_optimal':>16}{'followed_f0':>14}{'reached':>10}{'ambiguous':>12}"
+    print(f"{header}{'return':>9}{'steps':>8}")
     for correlation in args.correlations:
         envs = env_config(correlation).make()
         policy_fn = greedy_policy(envs, jax.random.PRNGKey(args.seed))
@@ -107,7 +108,8 @@ def main() -> None:
         summary = summarise(outcomes)
         print(
             f"{correlation:>6.2f}{summary.chose_optimal:>15.1%}{summary.followed_feature_zero:>14.1%}"
-            f"{summary.reached_objective:>10.1%}{summary.ambiguous:>12.1%}{summary.mean_steps:>8.1f}"
+            f"{summary.reached_objective:>10.1%}{summary.ambiguous:>12.1%}"
+            f"{summary.mean_return:>9.3f}{summary.mean_steps:>8.1f}"
         )
 
     print(

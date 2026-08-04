@@ -36,23 +36,32 @@ if TYPE_CHECKING:
 
 
 class SeededVectorEnv(gym.vector.VectorEnvWrapper):
-    """Applies the configured seed when ``reset`` is called without one.
+    """Applies the configured seed to the *first* seedless ``reset``.
 
     ``gym.vector.make`` takes no seed, and cleanba's evaluation calls
     ``envs.reset()`` bare, so ``EnvConfig.seed`` never reached the environment:
     every construction drew different levels. That silently unpaired the
     comparison the whole experiment rests on - the rho=1.0 and rho=0.0 arms were
     scored on *different mazes*, so the gap carried level-difficulty variance on
-    top of the effect. It also made cleanba's own ``seed + actor_id`` offsets and
-    its "same levels every evaluation" comment no-ops for us.
+    top of the effect.
+
+    Only the first reset is pinned. Seeding *every* reset makes the level
+    sequence constant rather than merely reproducible, which silently defeats
+    cleanba's evaluator: it advances to the Nth batch of levels by resetting N
+    times, so a pinned seed hands it the same batch every time and
+    ``n_episode_multiple`` scores one batch repeatedly instead of several.
+    Seeding once gives both properties - the arms see the same sequence, and the
+    sequence still moves.
     """
 
     def __init__(self, env: gym.vector.VectorEnv, seed: int) -> None:
         super().__init__(env)
-        self._configured_seed = seed
+        self._configured_seed: int | None = seed
 
     def reset_wait(self, seed=None, **kwargs):  # type: ignore[override]
-        return super().reset_wait(seed=self._configured_seed if seed is None else seed, **kwargs)
+        if seed is None:
+            seed, self._configured_seed = self._configured_seed, None
+        return super().reset_wait(seed=seed, **kwargs)
 
     @classmethod
     def wrap(cls, fn, seed: int) -> gym.vector.VectorEnv:

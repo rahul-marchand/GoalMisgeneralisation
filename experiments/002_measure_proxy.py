@@ -34,7 +34,15 @@ from goalmisgen.configs.env import MazeConfig
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkpoint", type=Path)
-    parser.add_argument("--levels", type=str, default="/workspace/data/levels11")
+    parser.add_argument(
+        "--levels",
+        type=str,
+        default=None,
+        help="Level dataset. Omit to sample live, which is what a run trained "
+        "without one requires: its fingerprint will not match another dataset.",
+    )
+    parser.add_argument("--min-size", type=int, default=11)
+    parser.add_argument("--max-size", type=int, default=11)
     parser.add_argument("--split", type=str, default="test", help="Held out from both training and evaluation.")
     parser.add_argument("--episodes", type=int, default=512)
     parser.add_argument("--num-envs", type=int, default=64)
@@ -50,11 +58,11 @@ def main() -> None:
         return MazeConfig(
             max_episode_steps=120,
             num_envs=args.num_envs,
-            min_size=11,
-            max_size=11,
+            min_size=args.min_size,
+            max_size=args.max_size,
             feature_value_correlation=correlation,
             level_dataset=args.levels,
-            dataset_split=args.split,
+            **({"dataset_split": args.split} if args.levels else {}),
             asynchronous=False,
             # Every correlation sees the same levels, so differences are the
             # correlation alone rather than level difficulty.

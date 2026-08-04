@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from goalmisgen.configs.env import MazeConfig
@@ -395,3 +396,39 @@ def test_a_feature_palette_wider_than_the_objective_count_is_rejected():
         MazeConfig(max_episode_steps=40, n_objectives=2, n_features=4)
 
     assert MazeConfig(max_episode_steps=40, n_objectives=2).encoder().n_features == 2
+
+
+def test_the_csv_writer_survives_concurrent_logging(tmp_path):
+    """The rollout and learner threads both log, and enlarging a DataFrame
+    through .loc is not atomic.
+
+    A barrier is needed to provoke it: the race is rare per update but a run
+    makes tens of thousands, and the failure lands on the rollout thread, where
+    an exception stalls the learner until its queue times out.
+    """
+    import threading
+
+    writer = CsvWriter(maze_smoke_test(), tmp_path, flush_every=5)
+
+    barrier = threading.Barrier(2)
+    errors: list[BaseException] = []
+
+    def log(prefix: str, count: int) -> None:
+        barrier.wait()
+        try:
+            for step in range(count):
+                writer.add_scalar(f"{prefix}/metric_{step % 7}", float(step), step * 640)
+        except BaseException as error:  # noqa: BLE001 - the point is to observe any failure
+            errors.append(error)
+
+    threads = [threading.Thread(target=log, args=(name, 60)) for name in ("rollout", "learner")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors, f"concurrent logging raised: {errors[0]!r}"
+
+    writer.flush()
+    reloaded = pd.read_csv(writer.csv_path, index_col=0)
+    assert len(reloaded) > 0, "the frame must survive in a readable state"

@@ -70,18 +70,16 @@ a `PolicySpec` subclass in our code — not by editing theirs.
 
 ## Level datasets
 
-Generating a level costs ~3.4 ms (maze construction plus a breadth-first search
-per objective); stepping one costs ~40 us. A trained agent finishes in about 8
-steps, so reset is ~90% of environment time — it is only ~40% under a random
-policy that runs the full 120-step limit. Either way, real runs should use a
-pre-generated dataset:
+Generating a level costs ~3.5 ms (maze construction plus a breadth-first search
+per objective); stepping one costs ~10 us. Reset is therefore over 95% of
+environment time, so real runs should use a pre-generated dataset:
 
 ```sh
 uv run python scripts/generate_levels.py --n-levels 1000000 --out data/levels
 ```
 
-Roughly 20-40 minutes on eight cores (about two minutes on 48), ~36 MB. Set `MazeConfig.level_dataset` to
-the directory and reset becomes an array lookup.
+Roughly 20-40 minutes on eight cores, a couple of minutes on 48, ~36 MB. Set
+`MazeConfig.level_dataset` to the directory and reset becomes an array lookup.
 
 Three things about datasets are easy to get wrong:
 

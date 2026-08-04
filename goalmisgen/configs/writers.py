@@ -23,6 +23,7 @@ being redefined ad hoc per script.
 from __future__ import annotations
 
 import math
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,14 @@ class CsvWriter(WandbWriter):
         self.flush_every = flush_every
         self._writes = 0
 
+        # The rollout and learner threads both log, and enlarging a DataFrame
+        # through .loc is not atomic - concurrent bursts can leave the frame in
+        # a state that raises on the next read. Rare per update, but a run makes
+        # tens of thousands of them, and the failure surfaces on the rollout
+        # thread, where an exception stalls the learner until its queue times
+        # out five minutes later.
+        self._lock = threading.Lock()
+
         save_dir = Path(save_dir)
         self._save_dir = save_dir / "local-files"
         self._save_dir.mkdir(parents=True, exist_ok=True)
@@ -54,21 +63,31 @@ class CsvWriter(WandbWriter):
         try:
             values = list(value)
         except TypeError:
-            self.metrics.loc[global_step, name] = value
-            self._maybe_flush()
-            return
+            values = None
 
-        for offset, item in enumerate(values):
-            try:
-                self.metrics.loc[global_step + 640 * offset, name] = item.item()
-            except (TypeError, AttributeError, ValueError):
-                continue  # non-numeric metrics have no place in a CSV of scalars
-        self._maybe_flush()
+        with self._lock:
+            if values is None:
+                self.metrics.loc[global_step, name] = value
+            else:
+                for offset, item in enumerate(values):
+                    try:
+                        self.metrics.loc[global_step + 640 * offset, name] = item.item()
+                    except (TypeError, AttributeError, ValueError):
+                        continue  # non-numeric metrics have no place in a CSV of scalars
+            self._writes += 1
+            due = self._writes % self.flush_every == 0
 
-    def _maybe_flush(self) -> None:
-        self._writes += 1
-        if self._writes % self.flush_every == 0:
+        # Outside the lock: flush() takes it again, and a plain Lock is not
+        # reentrant.
+        if due:
             self.flush()
 
     def flush(self) -> None:
-        self.metrics.sort_index().to_csv(self.csv_path)
+        """Snapshot under the lock, write outside it.
+
+        Holding the lock across the file write would block both logging threads
+        for the duration of the write.
+        """
+        with self._lock:
+            snapshot = self.metrics.sort_index().copy()
+        snapshot.to_csv(self.csv_path)

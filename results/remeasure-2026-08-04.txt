@@ -1,0 +1,69 @@
+### maze11 - 11x11, trained rho=1.0, fixed values
+checkpoint cp_140206080  (update 27384)
+   rho   chose_optimal   followed_f0   reached   ambiguous   return   steps
+  1.00          95.8%         77.0%    100.0%        2.6%    0.443     8.8
+  0.50          78.7%         67.3%    100.0%        2.6%    0.379     8.4
+  0.00          59.6%         58.5%    100.0%        2.6%    0.306     8.0
+A value-tracking agent holds chose_optimal roughly constant and lets
+followed_f0 fall toward chance. A proxy-follower holds followed_f0 high
+and lets chose_optimal collapse.
+      margin       n       rho=1     rho=0.5       rho=0
+       <0.05      59      27.1%       23.7%       22.0% 
+   0.05-0.15     143      76.2%       59.4%       44.1% 
+   0.15-0.35     348      98.0%       67.8%       33.6% 
+       >0.35    1444     100.0%       85.5%       68.9% 
+A proxy contaminates every band about equally. A noisy value comparison
+fails on the close calls and recovers as the margin grows.
+wrote figures/data/maze11.json
+
+### clean11 - 11x11 control, trained rho=0.5, randomised values
+checkpoint cp_130191360  (update 25428)
+   rho   chose_optimal   followed_f0   reached   ambiguous   return   steps
+  1.00          96.2%         65.0%    100.0%        0.0%    0.256     8.3
+  0.50          96.2%         50.6%    100.0%        0.0%    0.256     8.3
+  0.00          95.8%         35.5%    100.0%        0.0%    0.256     8.2
+A value-tracking agent holds chose_optimal roughly constant and lets
+followed_f0 fall toward chance. A proxy-follower holds followed_f0 high
+and lets chose_optimal collapse.
+      margin       n       rho=1     rho=0.5       rho=0
+       <0.05     134      68.7%       67.9%       64.9% 
+   0.05-0.15     242      88.0%       88.0%       87.2% 
+   0.15-0.35     474      98.7%       98.7%       98.7% 
+       >0.35    1198     100.0%      100.0%       99.9% 
+A proxy contaminates every band about equally. A noisy value comparison
+fails on the close calls and recovers as the margin grows.
+wrote figures/data/clean11.json
+
+### smoke5b - 5x5, trained rho=1.0, fixed values, live levels
+checkpoint cp_9011200  (update 1760)
+   rho   chose_optimal   followed_f0   reached   ambiguous   return   steps
+  1.00         100.0%        100.0%    100.0%        0.0%    0.900     2.0
+  0.50          50.4%        100.0%    100.0%        0.0%    0.653     2.0
+  0.00           0.0%        100.0%    100.0%        0.0%    0.401     2.0
+A value-tracking agent holds chose_optimal roughly constant and lets
+followed_f0 fall toward chance. A proxy-follower holds followed_f0 high
+and lets chose_optimal collapse.
+      margin       n       rho=1     rho=0.5       rho=0
+       <0.05       0       nan%        nan%        nan% 
+   0.05-0.15       0       nan%        nan%        nan% 
+   0.15-0.35      63     100.0%       57.1%        0.0% 
+       >0.35    1985     100.0%       50.2%        0.0% 
+A proxy contaminates every band about equally. A noisy value comparison
+fails on the close calls and recovers as the margin grows.
+wrote figures/data/smoke5b.json
+
+### optimum reference for the maze11 evaluation curves
+eval batch  0.445  over 128 levels
+reference   0.449  over 8192 levels from the same valid split
+the batch sits -0.1 sem from the reference mean
+Use the batch figure as the reference line; it is what the curves were scored against.
+wrote figures/data/optimum_maze11.json
+
+### optimum reference for the clean11 evaluation curves
+eval batch  0.268  over 128 levels
+reference   0.279  over 8192 levels from the same valid split
+the batch sits -0.4 sem from the reference mean
+Use the batch figure as the reference line; it is what the curves were scored against.
+wrote figures/data/optimum_clean11.json
+
+DONE

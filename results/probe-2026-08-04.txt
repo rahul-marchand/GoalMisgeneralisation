@@ -1,0 +1,35 @@
+### maze11 - trained with a proxy, held-out test levels
+checkpoint cp_140206080  (update 27384)
+11x11, rho=1.0, 256 train / 128 test episodes
+ think           probe      AUC          95% CI   bal.acc  episodes
+     0         trained    0.967  [0.956, 0.977]     0.860       128
+        by distance (matched negatives): 1:0.955  2:0.966  3:0.971  4:0.983  5:0.979  6:0.974  7:0.968  8:0.974  9:0.976  10:0.970  11:0.977  12:0.957
+     0       untrained    0.523  [0.493, 0.555]     0.500       128
+        by distance (matched negatives): 1:0.490  2:0.471  3:0.504  4:0.480  5:0.515  6:0.556  7:0.568  8:0.488  9:0.521  10:0.515  11:0.520  12:0.517
+     0     observation    0.583  [0.574, 0.596]     0.577       128
+        by distance (matched negatives): 1:0.504  2:0.543  3:0.515  4:0.565  5:0.551  6:0.528  7:0.552  8:0.559  9:0.591  10:0.491  11:0.523  12:0.572
+     4         trained    0.999  [0.998, 1.000]     0.973       128
+        by distance (matched negatives): 1:0.999  2:1.000  3:1.000  4:1.000  5:1.000  6:1.000  7:1.000  8:1.000  9:1.000  10:1.000  11:1.000  12:0.999
+     4       untrained    0.542  [0.520, 0.560]     0.500       128
+        by distance (matched negatives): 1:0.499  2:0.492  3:0.513  4:0.495  5:0.521  6:0.603  7:0.585  8:0.505  9:0.473  10:0.468  11:0.543  12:0.608
+     4     observation    0.583  [0.574, 0.596]     0.577       128
+        by distance (matched negatives): 1:0.504  2:0.543  3:0.515  4:0.565  5:0.551  6:0.528  7:0.552  8:0.559  9:0.591  10:0.491  11:0.523  12:0.572
+The trained probe must beat the *untrained* one. Beating only the
+observation shows the network has a receptive field, which it has
+before any training at all.
+
+### clean11 - control, held-out test levels
+checkpoint cp_130191360  (update 25428)
+11x11, rho=1.0, 256 train / 128 test episodes
+ think           probe      AUC          95% CI   bal.acc  episodes
+     0         trained    0.916  [0.896, 0.932]     0.748       128
+        by distance (matched negatives): 1:0.951  2:0.933  3:0.885  4:0.889  5:0.881  6:0.894  7:0.906  8:0.892  9:0.872  10:0.861  11:0.873  12:0.888
+     0       untrained    0.541  [0.509, 0.577]     0.500       128
+        by distance (matched negatives): 1:0.499  2:0.503  3:0.572  4:0.560  5:0.523  6:0.542  7:0.522  8:0.500  9:0.488  10:0.516  11:0.551  12:0.643
+     0     observation    0.600  [0.590, 0.612]     0.588       128
+        by distance (matched negatives): 1:0.523  2:0.541  3:0.559  4:0.549  5:0.547  6:0.555  7:0.557  8:0.545  9:0.586  10:0.550  11:0.587  12:0.607
+The trained probe must beat the *untrained* one. Beating only the
+observation shows the network has a receptive field, which it has
+before any training at all.
+
+DONE

@@ -63,16 +63,24 @@ class BehaviourSummary:
 def collect_episode_outcomes(envs, policy, n_episodes: int, seed: int | None = None) -> list[dict]:
     """Run ``policy`` until ``n_episodes`` have finished, returning their infos.
 
-    ``policy`` maps a batch of observations to a batch of actions. Outcomes are
-    taken from ``final_info`` so they describe the episode that just ended
-    rather than the one autoreset has already begun.
+    ``policy`` maps a batch of observations and episode-start flags to a batch
+    of actions. Outcomes are taken from ``final_info`` so they describe the
+    episode that just ended rather than the one autoreset has already begun.
+
+    The start flags are what let a recurrent policy clear its state. Autoreset
+    hands back the first observation of a *new* level in the same slot, so an
+    agent told nothing would carry the previous level's plan into it. cleanba's
+    own evaluator avoids the problem by running one episode per environment and
+    discarding the rest; we reuse environments, so we have to report resets.
     """
     observations, _ = envs.reset(seed=seed)
+    starts = np.ones(envs.num_envs, dtype=bool)
     outcomes: list[dict] = []
 
     while len(outcomes) < n_episodes:
-        observations, _, terminated, truncated, info = envs.step(policy(observations))
+        observations, _, terminated, truncated, info = envs.step(policy(observations, starts))
         done = np.logical_or(terminated, truncated)
+        starts = done
         if not done.any():
             continue
 

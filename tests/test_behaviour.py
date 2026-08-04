@@ -16,10 +16,38 @@ from goalmisgen.configs.env import MazeConfig
 
 
 def random_policy(rng):
-    def policy(observations):
+    def policy(observations, starts):
+        del starts  # a stateless policy has nothing to reset
         return rng.integers(0, 4, size=len(observations))
 
     return policy
+
+
+def test_a_recurrent_policy_is_told_when_a_new_episode_begins():
+    """Without this, a stateful agent carries the finished level's plan forward.
+
+    Every episode after the first would then be measured on an agent that
+    started with a plan for a different maze — quietly, and only in the runs
+    long enough to reuse an environment.
+    """
+    config = MazeConfig(max_episode_steps=20, num_envs=4, min_size=5, max_size=5, asynchronous=False)
+    envs = config.make()
+
+    seen: list[np.ndarray] = []
+    rng = np.random.default_rng(0)
+
+    def policy(observations, starts):
+        seen.append(np.asarray(starts).copy())
+        return rng.integers(0, 4, size=len(observations))
+
+    collect_episode_outcomes(envs, policy, n_episodes=20, seed=0)
+
+    assert seen[0].all(), "the first step after reset begins an episode in every environment"
+    assert not all(s.any() for s in seen[1:]), "mid-episode steps must not clear the recurrent state"
+    # Collection stops the moment it has enough episodes, so the final batch of
+    # terminations is never shown to the policy; everything earlier must be.
+    flagged = sum(int(s.sum()) for s in seen[1:])
+    assert flagged >= 20 - envs.num_envs, f"only {flagged} episode starts were reported to the policy"
 
 
 def test_outcomes_come_from_the_finished_episode_not_the_next_one():

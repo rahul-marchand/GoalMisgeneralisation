@@ -84,14 +84,14 @@ def main() -> None:
     def greedy_policy(envs, key):
         """Greedy actions, carrying the recurrent state across steps.
 
-        The carry is the DRC's hidden state; resetting it mid-episode would
-        discard the plan the network has built, which is the thing under study.
+        The carry is the DRC's hidden state, held across the episode because
+        clearing it mid-episode would discard the plan the network has built —
+        the thing under study. ``starts`` clears it at episode boundaries only.
         """
         carry = policy.apply(train_state.params, key, envs.observation_space.shape, method=policy.initialize_carry)
-        starts = np.zeros(envs.num_envs, dtype=bool)
         state = {"carry": carry, "key": key}
 
-        def step(observations):
+        def step(observations, starts):
             state["carry"], action, _, state["key"] = get_action(
                 train_state.params, state["carry"], observations, starts, state["key"], temperature=0.0
             )

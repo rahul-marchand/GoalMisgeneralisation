@@ -164,6 +164,45 @@ def probe_by_distance(train, test, source: ProbeSource = "features", max_step: i
     return bands
 
 
+def auc_interval(
+    train,
+    test,
+    source: ProbeSource = "features",
+    resamples: int = 200,
+    seed: int = 0,
+    level: float = 0.95,
+) -> tuple[float, float]:
+    """Bootstrap the AUC by resampling whole episodes.
+
+    Cells are not independent: every cell in an episode shares one maze and one
+    route. Treating a few thousand cells as a few thousand samples understates
+    the uncertainty by about 1.6x, and reads as a far larger experiment than the
+    hundred-odd episodes it actually is.
+    """
+    x_train, y_train = cell_dataset(train, source)
+    w, mean, std = fit_logistic(x_train, y_train)
+
+    episodes = []
+    for rollout in test:
+        x, y = cell_dataset([rollout], source)
+        episodes.append((apply_logistic(x, w, mean, std), y))
+
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(resamples):
+        chosen = rng.integers(0, len(episodes), len(episodes))
+        auc = roc_auc(
+            np.concatenate([episodes[i][1] for i in chosen]),
+            np.concatenate([episodes[i][0] for i in chosen]),
+        )
+        if not np.isnan(auc):
+            values.append(auc)
+
+    tail = (1.0 - level) / 2.0
+    low, high = np.quantile(values, [tail, 1.0 - tail])
+    return float(low), float(high)
+
+
 def probe(train, test, source: ProbeSource = "features") -> ProbeResult:
     """Fit on ``train`` rollouts, score on held-out ``test`` rollouts."""
     x_train, y_train = cell_dataset(train, source)

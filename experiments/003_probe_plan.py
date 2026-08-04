@@ -9,10 +9,10 @@ an action.
 
 The comparison that carries the claim is against an **untrained network of the
 same shape**, not against the raw observation. A pointwise linear readout of a
-one-hot observation cannot express any spatial relation at all, so beating it is
-nearly free — measured, an untrained convolutional tower scores 0.76 against the
-observation's 0.60, and a feature holding only distance-from-agent scores 0.80.
-Neither contains a plan. So:
+one-hot observation cannot express any spatial relation, so beating it may cost
+nothing but having a receptive field: on synthetic labels a random convolutional
+tower scores 0.76 against the observation's 0.60, and a feature holding only
+distance-from-agent scores 0.80, neither containing a plan. So:
 
 * trained well above untrained
   → training put the route there, which is the result
@@ -26,11 +26,13 @@ only*. Letting it change the agent's actions would change the labels too, so a
 rising score would be unattributable: route quality alone moves this measure by
 0.3 AUC.
 
-Two controls decide whether any of it means anything. The **untrained network**
-is the one that matters: a randomly initialised tower of the same shape already
-beats a pointwise readout of the observation, purely by having a receptive
-field. And distance bands use **distance-matched negatives**, without which a
-feature holding nothing but distance-from-agent reproduces the entire profile.
+Distance bands use **distance-matched negatives**: a cell reached at step k is
+scored only against never-visited cells that are also k steps away. Pooled
+negatives let a pure distance feature reproduce the entire "still high far out"
+profile, which is otherwise read as evidence of a plan.
+
+Intervals are bootstrapped over **episodes**, not cells. Cells within an episode
+share a maze and a route, so the cell-level interval is roughly 1.6x too narrow.
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ from pathlib import Path
 import jax
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_rollouts, probe, probe_by_distance
+from goalmisgen.analysis import auc_interval, collect_rollouts, probe, probe_by_distance
 from goalmisgen.analysis.probes import ProbeSource
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.configs.presets import maze_drc33
@@ -123,7 +125,7 @@ def main() -> None:
             probe_steps_to_think=probe_think,
         )
 
-    print(f"{'think':>6}{'probe':>16}{'AUC':>9}{'bal.acc':>10}{'n cells':>10}")
+    print(f"{'think':>6}{'probe':>16}{'AUC':>9}{'95% CI':>16}{'bal.acc':>10}{'episodes':>10}")
     for think in args.think:
         arms: list[tuple[str, ProbeSource, object]] = [
             ("trained", "features", None),
@@ -138,7 +140,9 @@ def main() -> None:
             test = rollouts(9999, args.test_episodes, think, params)
 
             r = probe(train, test, source=source)
-            print(f"{think:>6}{label:>16}{r.auc:>9.3f}{r.balanced_accuracy:>10.3f}{r.n_samples:>10,}")
+            low, high = auc_interval(train, test, source=source)
+            interval = f"[{low:.3f}, {high:.3f}]"
+            print(f"{think:>6}{label:>16}{r.auc:>9.3f}{interval:>16}{r.balanced_accuracy:>10.3f}{len(test):>10,}")
 
             if args.by_distance:
                 bands = probe_by_distance(train, test, source=source)

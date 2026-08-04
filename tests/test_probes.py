@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.probes import cell_dataset, probe, probe_by_distance, roc_auc
+from goalmisgen.analysis.probes import auc_interval, cell_dataset, probe, probe_by_distance, roc_auc
 from goalmisgen.envs.solver import distance_field
 
 
@@ -160,3 +160,21 @@ def test_a_pure_distance_feature_does_not_survive_distance_matching():
     assert bands, "the control must produce comparable bands at all"
     worst = max(abs(b.auc - 0.5) for b in bands)
     assert worst < 0.15, f"distance alone still decodes after matching: {[(b.step, round(b.auc, 3)) for b in bands]}"
+
+
+def test_uncertainty_is_estimated_over_episodes_not_cells():
+    """Cells within an episode share a maze and a route.
+
+    Resampling cells would treat a few hundred episodes as a few thousand
+    independent samples and report an interval far too narrow to be honest.
+    """
+    train, test = make_rollouts(30, seed=0), make_rollouts(20, seed=1)
+    low, high = auc_interval(train, test, resamples=100)
+
+    result = probe(train, test)
+    assert low <= result.auc <= high, "the point estimate must lie inside its own interval"
+    assert high - low > 0, "a bootstrap over 20 episodes cannot be exactly certain"
+
+    # Identical rollouts differ only by noise, so a wider sample must not widen
+    # the interval without bound - this catches resampling the wrong axis.
+    assert high - low < 0.5

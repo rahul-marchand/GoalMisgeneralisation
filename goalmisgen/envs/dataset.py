@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import functools
 import hashlib
 import importlib
 import json
@@ -76,6 +77,7 @@ def _without_docstrings(tree: ast.Module) -> ast.Module:
     return tree
 
 
+@functools.lru_cache(maxsize=1)
 def source_fingerprint() -> str:
     """Hash of the *code* of every module that determines level content.
 
@@ -84,6 +86,12 @@ def source_fingerprint() -> str:
     Hashing bytes meant that editing a comment rejected a million-level
     dataset, and a guard that fires on harmless edits is one that ends up
     switched off.
+
+    Computed once per process. The modules that generate levels are already
+    imported, so re-reading them from disk describes the working tree rather
+    than the code actually running: editing the checkout during a long run made
+    the next evaluation reject the dataset the run had been training on for
+    hours, which is a report about git, not about the data.
     """
     digest = hashlib.sha256()
     for name in CONTENT_MODULES:

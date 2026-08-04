@@ -30,6 +30,16 @@ from goalmisgen.envs.values import UniformValues
 SAMPLER = MazeLevelSampler(size_range=(5, 11))
 
 
+@pytest.fixture(autouse=True)
+def _isolate_the_fingerprint_cache():
+    """The fingerprint is cached per process, so a test that recomputes it under
+    a patched parser would otherwise leave the wrong value behind for whatever
+    runs next."""
+    source_fingerprint.cache_clear()
+    yield
+    source_fingerprint.cache_clear()
+
+
 def small_dataset(n: int = 60, sampler: MazeLevelSampler = SAMPLER) -> LevelDataset:
     return LevelDataset.generate(sampler, n_levels=n, seed=0, block_size=25)
 
@@ -346,6 +356,9 @@ def test_fingerprint_ignores_comments_and_docstrings(edit, monkeypatch):
     edited = edit(source)
     assert edited != source, "the edit must actually change the file"
     monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(edited if src == source else src, *a, **k))
+    # The fingerprint is cached per process, so a fresh computation has to be
+    # forced or this test passes without ever rehashing anything.
+    source_fingerprint.cache_clear()
     assert source_fingerprint() == before
 
 
@@ -361,6 +374,7 @@ def test_fingerprint_still_reacts_to_a_change_in_code(monkeypatch):
     changed = source.replace("low: float = 0.25", "low: float = 0.30")
     assert changed != source
     monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(changed if src == source else src, *a, **k))
+    source_fingerprint.cache_clear()
     assert source_fingerprint() != before
 
 
@@ -386,3 +400,25 @@ def test_generation_parameters_are_recorded(tmp_path):
     small_dataset(n=50).save(path, seed=7, block_size=25)
     meta = json.loads((path / "meta.json").read_text())
     assert meta["seed"] == 7 and meta["block_size"] == 25
+
+
+def test_the_fingerprint_is_fixed_for_the_life_of_a_process(monkeypatch):
+    """Editing the checkout must not invalidate a dataset mid-run.
+
+    The generating modules are already imported, so re-reading them from disk
+    describes the working tree rather than the code actually running. A pull
+    during a long run made the next evaluation reject the dataset the run had
+    trained on for hours - a report about git, not about the data.
+    """
+    import ast as _ast
+
+    import goalmisgen.envs.values as values_module
+
+    before = source_fingerprint()
+    original = _ast.parse
+    source = pathlib.Path(values_module.__file__).read_text()
+    changed = source.replace("low: float = 0.25", "low: float = 0.99")
+    assert changed != source
+    monkeypatch.setattr(_ast, "parse", lambda src, *a, **k: original(changed if src == source else src, *a, **k))
+
+    assert source_fingerprint() == before, "a mid-process source change must not move the fingerprint"

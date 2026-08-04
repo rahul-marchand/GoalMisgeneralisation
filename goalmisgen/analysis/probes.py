@@ -18,8 +18,13 @@ dependency, and a per-cell binary readout does not need one.
 from __future__ import annotations
 
 import dataclasses
+from typing import Literal, Sequence
 
 import numpy as np
+
+ProbeSource = Literal["features", "observation"]
+"""Which per-cell grid a probe reads. Mistyping a plain string silently
+probed the observation and reported a plausible AUC."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -45,7 +50,7 @@ class ProbeResult:
         )
 
 
-def _cells(rollouts, source: str = "features", mask_walls: bool = True):
+def _cells(rollouts: Sequence, source: ProbeSource = "features", mask_walls: bool = True):
     """Flatten rollouts into per-cell rows: features, label, and arrival step."""
     xs, ys, steps = [], [], []
     for r in rollouts:
@@ -54,7 +59,7 @@ def _cells(rollouts, source: str = "features", mask_walls: bool = True):
         keep = free if mask_walls else np.ones_like(free, dtype=bool)
         xs.append(grid[keep])
         ys.append(r.visited[keep])
-        steps.append(getattr(r, "visit_step", np.full(r.visited.shape, -1))[keep])
+        steps.append(r.visit_step[keep])
     return (
         np.concatenate(xs).astype(np.float64),
         np.concatenate(ys).astype(np.float64),
@@ -62,7 +67,7 @@ def _cells(rollouts, source: str = "features", mask_walls: bool = True):
     )
 
 
-def cell_dataset(rollouts, source: str = "features", mask_walls: bool = True):
+def cell_dataset(rollouts, source: ProbeSource = "features", mask_walls: bool = True):
     """Flatten rollouts into (cell, feature) rows with an on-route label.
 
     Wall cells are dropped by default: the agent can never stand on one, so
@@ -120,7 +125,7 @@ class DistanceBand:
     n_positive: int
 
 
-def probe_by_distance(train, test, source: str = "features", max_step: int = 12) -> list[DistanceBand]:
+def probe_by_distance(train, test, source: ProbeSource = "features", max_step: int = 12) -> list[DistanceBand]:
     """Score one probe separately at each distance along the route.
 
     A probe can reach a high overall AUC by finding only the cell the agent is
@@ -150,7 +155,7 @@ def probe_by_distance(train, test, source: str = "features", max_step: int = 12)
     return bands
 
 
-def probe(train, test, source: str = "features") -> ProbeResult:
+def probe(train, test, source: ProbeSource = "features") -> ProbeResult:
     """Fit on ``train`` rollouts, score on held-out ``test`` rollouts."""
     x_train, y_train = cell_dataset(train, source)
     x_test, y_test = cell_dataset(test, source)

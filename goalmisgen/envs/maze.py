@@ -25,10 +25,11 @@ from goalmisgen.envs.rendering import render
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.solver import MOVES, LevelSolution, solve
 
-# Action index -> (row, column) delta. Shared with the solver so the ground
+# Action index -> (row, column) delta comes from the solver, so the ground
 # truth and the environment cannot disagree about what a move is.
-_ACTION_DELTAS = MOVES
-ACTION_NAMES: tuple[str, ...] = ("up", "down", "left", "right")
+
+MAX_RESET_ATTEMPTS = 100
+"""Resamples allowed before a level is declared impossible for the step limit."""
 
 
 class MazeEnv(gym.Env):
@@ -62,7 +63,7 @@ class MazeEnv(gym.Env):
         if step_limit < 1:
             raise ValueError(f"step_limit must be at least 1, got {step_limit}")
 
-        self.action_space = gym.spaces.Discrete(len(_ACTION_DELTAS))
+        self.action_space = gym.spaces.Discrete(len(MOVES))
         self.observation_space = self.encoder.space()
 
         # Set by reset(); typed here so attribute access is checkable.
@@ -76,28 +77,42 @@ class MazeEnv(gym.Env):
     # ------------------------------------------------------------------
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[np.ndarray, dict[str, Any]]:
+        del options  # no per-episode control channel is needed; samplers are swapped instead
         super().reset(seed=seed)
 
-        # Forwarded rather than discarded: `options` is gymnasium's per-episode
-        # control channel, and it is the only way a curriculum can reach a
-        # sampler that has been pickled into a worker process.
-        self.level = (
-            self.sampler.sample(self.np_random, **options)  # type: ignore[call-arg]
-            if options
-            else self.sampler.sample(self.np_random)
-        )
+        self.level, self.solution = self._sample_solvable_level()
         self.encoder.reset(self.level)
-        self.solution = solve(self.level, self.step_penalty, step_limit=self.step_limit)
         self.agent_position = self.level.agent_start
         self.elapsed_steps = 0
 
         return self._observation(), self._level_info()
 
+    def _sample_solvable_level(self) -> tuple[Level, LevelSolution]:
+        """Draw a level whose objectives are not all beyond the step limit.
+
+        The sampler guarantees objectives are mutually *reachable*, but knows
+        nothing of ``step_limit``, so on large mazes it occasionally produces a
+        level where every objective is further away than the episode is long —
+        2.2% of levels at 25x25 with a 120-step limit. ``solve`` rightly refuses
+        those, and the exception used to escape ``reset``, which under autoreset
+        kills an actor mid-rollout rather than at startup.
+        """
+        for _ in range(MAX_RESET_ATTEMPTS):
+            level = self.sampler.sample(self.np_random)
+            try:
+                return level, solve(level, self.step_penalty, step_limit=self.step_limit)
+            except ValueError:
+                continue
+        raise RuntimeError(
+            f"no level with an objective reachable within {self.step_limit} steps after "
+            f"{MAX_RESET_ATTEMPTS} attempts; the step limit is probably too low for the maze size"
+        )
+
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(int(action)):
-            raise ValueError(f"invalid action {action!r}; expected 0..{len(_ACTION_DELTAS) - 1}")
+            raise ValueError(f"invalid action {action!r}; expected 0..{len(MOVES) - 1}")
 
-        d_row, d_col = _ACTION_DELTAS[int(action)]
+        d_row, d_col = MOVES[int(action)]
         candidate = (self.agent_position[0] + d_row, self.agent_position[1] + d_col)
         if self._is_free(candidate):
             self.agent_position = candidate

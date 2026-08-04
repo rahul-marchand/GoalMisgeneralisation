@@ -110,9 +110,21 @@ def collect_rollouts(
             observations, _, terminated, truncated, info = envs.step(np.asarray(action))
             just_done = np.logical_or(terminated, truncated) & ~done
 
-            # Record position before autoreset overwrites it for finished episodes.
+            # On the terminating step gymnasium has already autoreset, so
+            # `observations` holds the *next* level. Reading it would record
+            # that level's start cell and lose this episode's final cell - the
+            # objective, which is the deepest point of the route the probe is
+            # meant to find. `final_observation` carries the real last frame.
+            # `final_observation` is left in HWC by cleanba's NHWC->NCHW
+            # wrapper, which transposes the batched observation only.
+            frames = np.asarray(observations).copy()
+            finished = info.get("final_observation")
+            for index in np.flatnonzero(just_done):
+                if finished is not None and finished[index] is not None:
+                    frames[index] = np.moveaxis(np.asarray(finished[index]), -1, 0)
+
             live = ~done
-            here = (np.asarray(observations)[:, agent_channel] > 0.5) & live[:, None, None]
+            here = (frames[:, agent_channel] > 0.5) & live[:, None, None]
             fresh = here & (visit_step < 0)
             visited |= here
             visit_step[fresh] = step_index + 1

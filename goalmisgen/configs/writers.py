@@ -39,7 +39,6 @@ class CsvWriter(WandbWriter):
 
     def __init__(self, cfg: Any, save_dir: Path, flush_every: int = 25) -> None:
         self.metrics = pd.DataFrame()
-        self.states: dict = {}
         self.flush_every = flush_every
         self._writes = 0
 
@@ -63,7 +62,7 @@ class CsvWriter(WandbWriter):
             try:
                 self.metrics.loc[global_step + 640 * offset, name] = item.item()
             except (TypeError, AttributeError, ValueError):
-                self.states[global_step + 640 * offset, name] = value
+                continue  # non-numeric metrics have no place in a CSV of scalars
         self._maybe_flush()
 
     def _maybe_flush(self) -> None:

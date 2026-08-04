@@ -10,25 +10,30 @@ times — pin every reset and it silently scores one batch over and over.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL, ObservationEncoder
 
-WALL_CHANNEL, AGENT_CHANNEL, VALUE_CHANNEL = 0, 1, 4
+VALUE_CHANNEL = ObservationEncoder(max_size=11, n_features=2).first_value_channel
 
 
-def batches(seed: int, correlation: float = 1.0, n: int = 3) -> list[np.ndarray]:
+def batches(seed: int, correlation: float = 1.0, n: int = 3, asynchronous: bool = False) -> list[np.ndarray]:
     config = MazeConfig(
         max_episode_steps=120,
         num_envs=4,
         min_size=11,
         max_size=11,
+        asynchronous=asynchronous,
         randomise_values=True,
         feature_value_correlation=correlation,
-        asynchronous=False,
         seed=seed,
     )
     envs = config.make()
-    return [envs.reset()[0].copy() for _ in range(n)]
+    try:
+        return [envs.reset()[0].copy() for _ in range(n)]
+    finally:
+        envs.close()
 
 
 def test_successive_resets_draw_new_levels():
@@ -48,3 +53,22 @@ def test_correlation_arms_are_scored_on_the_same_levels():
     high, low = batches(seed=1, correlation=1.0), batches(seed=1, correlation=0.0)
     for channel in (WALL_CHANNEL, AGENT_CHANNEL, VALUE_CHANNEL):
         assert all(np.array_equal(a[:, channel], b[:, channel]) for a, b in zip(high, low))
+
+    # Without this the test would pass even if the correlation were ignored
+    # entirely, which is the failure that would make the experiment vacuous.
+    assert not all(
+        np.array_equal(a[:, FIRST_FEATURE_CHANNEL], b[:, FIRST_FEATURE_CHANNEL]) for a, b in zip(high, low)
+    )
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_the_seed_reaches_an_asynchronous_env_too(asynchronous):
+    """A synchronous env takes the seed in ``reset_wait``, an async one in
+    ``reset_async``. Intercepting one left training envs, which default to
+    asynchronous, drawing their levels from OS entropy."""
+    first = batches(seed=5, n=1, asynchronous=asynchronous)
+    again = batches(seed=5, n=1, asynchronous=asynchronous)
+    other = batches(seed=6, n=1, asynchronous=asynchronous)
+
+    assert np.array_equal(first[0], again[0]), "the same seed must reproduce the same levels"
+    assert not np.array_equal(first[0], other[0]), "a different seed must give different levels"

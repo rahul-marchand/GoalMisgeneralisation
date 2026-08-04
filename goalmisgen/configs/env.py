@@ -52,16 +52,24 @@ class SeededVectorEnv(gym.vector.VectorEnvWrapper):
     ``n_episode_multiple`` scores one batch repeatedly instead of several.
     Seeding once gives both properties - the arms see the same sequence, and the
     sequence still moves.
+
+    ``reset`` is the interception point rather than ``reset_wait``, because a
+    synchronous env consumes the seed in ``reset_wait`` and an asynchronous one
+    in ``reset_async``. Overriding only the former left every *training* env -
+    which defaults to asynchronous - drawing its levels from OS entropy, so no
+    training run was reproducible.
     """
 
     def __init__(self, env: gym.vector.VectorEnv, seed: int) -> None:
         super().__init__(env)
         self._configured_seed: int | None = seed
 
-    def reset_wait(self, seed=None, **kwargs):  # type: ignore[override]
+    def reset(self, *, seed=None, options=None):  # type: ignore[override]
         if seed is None:
             seed, self._configured_seed = self._configured_seed, None
-        return super().reset_wait(seed=seed, **kwargs)
+        else:
+            self._configured_seed = None
+        return super().reset(seed=seed, options=options)
 
     @classmethod
     def wrap(cls, fn, seed: int) -> gym.vector.VectorEnv:
@@ -134,19 +142,11 @@ class MazeConfig(EnvConfig):
     The experimental variable. Train at 1.0 and evaluate at 0.0 to test for goal
     misgeneralisation; sweep it for the dose-response curve.
 
-    Chance is ``1 / n_objectives``, not 0.5 - see :attr:`chance_correlation`.
-    Kept as a flat float so the command-line surface stays simple; it is turned
-    into a :class:`~goalmisgen.envs.features.CorrelatedFeatures` scheme.
+    Chance is ``1 / n_objectives``, not 0.5: with three objectives a rho=0.5 arm
+    is a *positively correlated* condition, not a control. Kept as a flat float
+    so the command-line surface stays simple; it is turned into a
+    :class:`~goalmisgen.envs.features.CorrelatedFeatures` scheme.
     """
-
-    @property
-    def chance_correlation(self) -> float:
-        """The correlation an uninformative feature would show.
-
-        With two objectives that is 0.5; with three it is 0.333, so a rho=0.5
-        evaluation arm is a *positively correlated* condition, not a control.
-        """
-        return 1.0 / self.n_objectives
 
     value_encoding: ValueEncoding = "at_objective"
     """Must not be "none" with several objectives.

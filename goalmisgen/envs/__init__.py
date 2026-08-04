@@ -4,14 +4,13 @@ from gymnasium.envs.registration import register
 
 from goalmisgen.envs.generation import MazeGenerator, RecursiveBacktracker
 from goalmisgen.envs.level import Level, Objective, Position
-from goalmisgen.envs.maze import ACTION_NAMES, MazeEnv
+from goalmisgen.envs.maze import MazeEnv
 from goalmisgen.envs.observation import ObservationEncoder
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
 from goalmisgen.envs.solver import LevelSolution, distance_field, shortest_path, solve
 from goalmisgen.envs.values import FixedValues, UniformValues, ValueScheme
 
 __all__ = [
-    "ACTION_NAMES",
     "FixedValues",
     "Level",
     "LevelSampler",

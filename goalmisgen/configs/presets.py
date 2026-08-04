@@ -43,6 +43,17 @@ def default_eval_correlations(n_objectives: int) -> tuple[float, ...]:
     return (1.0, 1.0 / n_objectives, 0.0)
 
 
+EVAL_SEED_OFFSET = 1_000_000
+"""Separation between the training and evaluation seeds.
+
+A vector environment seeds sub-environment *i* with ``seed + i``, so an
+evaluation seed of ``seed + 1`` put every evaluation level inside the training
+seed range whenever levels are sampled live - evaluating on training levels,
+which confounds misgeneralisation with memorisation. The offset must exceed any
+plausible environment count.
+"""
+
+
 def maze_drc33(
     feature_value_correlation: float = 1.0,
     eval_correlations: tuple[float, ...] | None = None,
@@ -99,7 +110,7 @@ def maze_drc33(
             # fast environment the learner laps the evaluator and dies with
             # queue.Full. Forking 256 subprocesses per correlation was the cost,
             # and it is also what triggers JAX's fork-deadlock warning.
-            env(correlation, split="valid", num_envs=eval_num_envs, seed=seed + 1, asynchronous=False),
+            env(correlation, split="valid", num_envs=eval_num_envs, seed=seed + EVAL_SEED_OFFSET, asynchronous=False),
             n_episode_multiple=2,
             # Extra thinking time before acting is the test-time-compute knob
             # from the Sokoban work. Each extra value multiplies evaluation cost,

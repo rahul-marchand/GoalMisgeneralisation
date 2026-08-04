@@ -119,3 +119,14 @@ def test_collect_rollouts_runs_against_a_real_vector_env():
         assert r.features.shape[2] == 3 * 32, "three layers of 32 channels each"
         assert r.visited.any(), "the agent must occupy at least its start cell"
         assert r.visited.sum() <= 25
+        assert r.visit_step[r.visited].min() == 0, "the start cell is reached at step 0"
+        assert (r.visit_step[~r.visited] == -1).all(), "unvisited cells carry no arrival step"
+
+        # The route must be a contiguous run of arrival steps. Autoreset hands
+        # back the *next* level on the terminating step, so reading it drops the
+        # objective - the deepest cell of the route - and adds a disconnected
+        # cell belonging to a different maze.
+        steps = np.sort(r.visit_step[r.visited])
+        assert np.array_equal(steps, np.arange(len(steps))), f"route has gaps or duplicates: {steps}"
+        if r.info.get("reached_objective"):
+            assert steps[-1] == r.info["episode_steps"], "the objective cell must be the last one recorded"

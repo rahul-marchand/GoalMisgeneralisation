@@ -15,7 +15,7 @@ import pytest
 from gymnasium.utils.env_checker import check_env
 
 from goalmisgen.envs.level import Level, Objective
-from goalmisgen.envs.maze import _ACTION_DELTAS, MazeEnv
+from goalmisgen.envs.maze import MazeEnv
 from goalmisgen.envs.observation import ObservationEncoder
 from goalmisgen.envs.sampling import MazeLevelSampler
 from goalmisgen.envs.solver import path_to_objective, solve
@@ -60,7 +60,9 @@ def make_env(level: Level | None = None, **kwargs) -> MazeEnv:
 
 
 def path_to_actions(path) -> list[int]:
-    deltas = {delta: index for index, delta in enumerate(_ACTION_DELTAS)}
+    from goalmisgen.envs.solver import MOVES
+
+    deltas = {delta: index for index, delta in enumerate(MOVES)}
     return [deltas[(after[0] - before[0], after[1] - before[1])] for before, after in zip(path, path[1:])]
 
 
@@ -194,6 +196,25 @@ def test_reaching_the_worse_objective_is_recorded_as_suboptimal():
     assert reward == pytest.approx(0.5 - 0.01)
     assert info["reached_feature_id"] == 1
     assert not info["chose_optimal"]
+
+
+def test_reset_survives_levels_whose_objectives_all_exceed_the_step_limit():
+    """The production size range, which no other test reaches.
+
+    At 25x25 with a 120-step limit about 2% of levels have every objective
+    further away than the episode is long. ``solve`` refuses those, and the
+    exception used to escape ``reset`` — under autoreset that kills an actor
+    mid-rollout, hundreds of steps into a run rather than at startup.
+    """
+    env = MazeEnv(
+        sampler=MazeLevelSampler(size_range=(25, 25)),
+        encoder=ObservationEncoder(max_size=25, n_features=2),
+        step_penalty=0.05,
+        step_limit=120,
+    )
+    for seed in range(300):
+        _, info = env.reset(seed=seed)
+        assert info["optimal_distance"] <= 120, "the chosen objective must be reachable in time"
 
 
 def test_episodes_truncate_at_the_step_limit():
@@ -337,5 +358,4 @@ def test_the_solver_and_the_environment_agree_about_what_a_move_is():
     """
     from goalmisgen.envs.solver import MOVES
 
-    assert _ACTION_DELTAS == MOVES
-    assert len(_ACTION_DELTAS) == MazeEnv().action_space.n
+    assert len(MOVES) == MazeEnv().action_space.n

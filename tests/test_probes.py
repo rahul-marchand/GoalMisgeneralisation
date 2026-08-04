@@ -64,3 +64,32 @@ def test_probe_finds_nothing_when_the_route_is_absent():
     test = make_rollouts(15, informative=False, seed=1)
     result = probe(train, test)
     assert result.auc < 0.65, f"probe found signal in noise: {result}"
+
+
+@pytest.mark.slow
+def test_collect_rollouts_runs_against_a_real_vector_env():
+    """Exercises the capture path end to end.
+
+    The rollout loop touches gymnasium's autoreset semantics and the object
+    array it returns as final_info, neither of which any unit test reaches — the
+    first version of this code raised on `final_info or [...]` and only failed
+    when run for real.
+    """
+    import jax
+
+    from goalmisgen.analysis import collect_rollouts
+    from goalmisgen.configs.env import MazeConfig
+    from goalmisgen.configs.presets import maze_drc33
+
+    config = MazeConfig(max_episode_steps=20, num_envs=8, min_size=5, max_size=5, asynchronous=False)
+    envs = config.make()
+    args = maze_drc33(min_size=5, max_size=5)
+    policy, _, params = args.net.init_params(envs, jax.random.PRNGKey(0))
+
+    rollouts = collect_rollouts(envs, policy, params, n_episodes=8, seed=0)
+    assert len(rollouts) == 8
+    for r in rollouts:
+        assert r.features.shape[:2] == (5, 5)
+        assert r.features.shape[2] == 3 * 32, "three layers of 32 channels each"
+        assert r.visited.any(), "the agent must occupy at least its start cell"
+        assert r.visited.sum() <= 25

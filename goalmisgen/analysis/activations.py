@@ -98,8 +98,11 @@ def collect_rollouts(
             visited[live] |= np.asarray(observations)[live, agent_channel] > 0.5
 
             if just_done.any():
+                # `final_info` is a numpy object array, so it must be tested
+                # against None explicitly - `x or y` raises on an array.
+                reported = info.get("final_info")
                 for index in np.flatnonzero(just_done):
-                    entry = (info.get("final_info") or [None] * envs.num_envs)[index]
+                    entry = reported[index] if reported is not None else None
                     finals[index] = dict(entry) if entry is not None else {}
                 done |= just_done
             if done.all():

@@ -82,3 +82,24 @@ def test_rejects_out_of_range_correlation():
 
 def test_single_objective_is_always_feature_zero():
     assert CorrelatedFeatures(0.3).assign((1.0,), np.random.default_rng(0)) == (0,)
+
+
+@pytest.mark.parametrize("n_objectives", [2, 3, 4])
+def test_every_correlation_consumes_the_same_randomness(n_objectives):
+    """Correlation arms must stay on the same level sequence.
+
+    ``assign`` runs inside the sampler's rejection loop, so if the number of
+    random draws depended on the correlation the arms would diverge after the
+    first level and be scored on different mazes - reintroducing exactly the
+    level-difficulty variance the shared seed removes.
+    """
+    values = tuple(np.linspace(1.0, 0.2, n_objectives))
+
+    def state_after(correlation: float) -> int:
+        rng = np.random.default_rng(0)
+        scheme = CorrelatedFeatures(correlation)
+        for _ in range(20):
+            scheme.assign(values, rng)
+        return rng.bit_generator.state["state"]["state"]
+
+    assert len({state_after(rho) for rho in (0.0, 0.25, 0.5, 1.0)}) == 1

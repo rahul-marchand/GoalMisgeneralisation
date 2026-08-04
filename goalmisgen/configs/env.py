@@ -196,6 +196,14 @@ class MazeConfig(EnvConfig):
             raise ValueError(
                 f"objective_values has {len(self.objective_values)} entries " f"but n_objectives={self.n_objectives}"
             )
+        if self.n_features is not None and self.n_features != self.n_objectives:
+            # CorrelatedFeatures emits a permutation of 0..n_objectives-1, so a
+            # wider palette only adds channels that are always zero - the
+            # experiment it is meant to enable would quietly not be running.
+            raise ValueError(
+                f"n_features={self.n_features} but n_objectives={self.n_objectives}; the feature "
+                "scheme assigns one feature per objective, so a wider palette yields dead channels"
+            )
 
     def value_scheme(self) -> ValueScheme:
         if self.randomise_values:
@@ -241,15 +249,19 @@ class MazeConfig(EnvConfig):
         )
 
     def encoder(self) -> ObservationEncoder:
-        highest = self.value_high if self.randomise_values else max(self.objective_values)
+        values = (self.value_low, self.value_high) if self.randomise_values else self.objective_values
+        # Both bounds are derived. Deriving only the upper one left the lower
+        # pinned at 0.0, so any negative objective value passed construction and
+        # then failed on every reset.
+        lowest, highest = min(values), max(values)
         return ObservationEncoder(
             max_size=self.max_size,
             pad_size=self.pad_size,
             n_features=self.n_features or self.n_objectives,
             value_encoding=self.value_encoding,
-            # Widened slightly so exactly-maximal values are not rejected by
+            # Widened slightly so exactly-extremal values are not rejected by
             # floating point comparison at the boundary.
-            value_range=(0.0, max(1.0, float(highest))),
+            value_range=(min(0.0, float(lowest)), max(1.0, float(highest))),
         )
 
     def build_env(self) -> "MazeEnv":

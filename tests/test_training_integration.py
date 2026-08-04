@@ -382,9 +382,16 @@ def test_build_env_gives_analysis_the_same_environment_training_saw():
     assert env.observation_space.shape == (9, 9, config.encoder().n_channels)
 
 
-def test_feature_palette_can_exceed_the_objective_count():
-    """Distinguishes 'the agent learned this colour' from 'the agent learned
-    whichever colour is first'."""
-    config = MazeConfig(max_episode_steps=40, n_objectives=2, n_features=4)
-    assert config.encoder().n_features == 4
+def test_a_feature_palette_wider_than_the_objective_count_is_rejected():
+    """It was accepted, and did nothing.
+
+    ``CorrelatedFeatures`` assigns a permutation of one feature per objective,
+    so the extra channels were always zero: the experiment this was meant to
+    enable — 'did the agent learn *this* colour, or whichever colour is first' —
+    silently was not running. Supporting it needs a scheme that draws from the
+    wider palette, so until then the configuration must fail rather than lie.
+    """
+    with pytest.raises(ValueError, match="dead channels"):
+        MazeConfig(max_episode_steps=40, n_objectives=2, n_features=4)
+
     assert MazeConfig(max_episode_steps=40, n_objectives=2).encoder().n_features == 2

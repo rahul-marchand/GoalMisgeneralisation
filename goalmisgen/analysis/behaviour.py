@@ -78,12 +78,18 @@ def collect_episode_outcomes(envs, policy, n_episodes: int, seed: int | None = N
     agent told nothing would carry the previous level's plan into it. cleanba's
     own evaluator avoids the problem by running one episode per environment and
     discarding the rest; we reuse environments, so we have to report resets.
+
+    Every environment contributes the same number of episodes. Stopping at a
+    total instead lets fast environments contribute more, which oversamples
+    short episodes: timeouts run the full step limit and are systematically
+    missed, so the reach rate comes out high and the mean length low.
     """
     observations, _ = envs.reset(seed=seed)
     starts = np.ones(envs.num_envs, dtype=bool)
-    outcomes: list[dict] = []
+    per_env = -(-n_episodes // envs.num_envs)  # ceiling, so every slot runs equally
+    collected: list[list[dict]] = [[] for _ in range(envs.num_envs)]
 
-    while len(outcomes) < n_episodes:
+    while any(len(episodes) < per_env for episodes in collected):
         observations, _, terminated, truncated, info = envs.step(policy(observations, starts))
         done = np.logical_or(terminated, truncated)
         starts = done
@@ -97,10 +103,10 @@ def collect_episode_outcomes(envs, policy, n_episodes: int, seed: int | None = N
                 "outcomes would describe the next episode, not the one that ended"
             )
         for index, was_done in enumerate(done):
-            if was_done and finals[index] is not None:
-                outcomes.append(dict(finals[index]))
+            if was_done and finals[index] is not None and len(collected[index]) < per_env:
+                collected[index].append(dict(finals[index]))
 
-    return outcomes[:n_episodes]
+    return [outcome for episodes in collected for outcome in episodes][:n_episodes]
 
 
 def summarise(outcomes: list[dict]) -> BehaviourSummary:

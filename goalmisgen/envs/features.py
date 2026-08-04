@@ -79,11 +79,15 @@ class CorrelatedFeatures:
         maxima = np.flatnonzero(np.asarray(values) >= max(values) - 1e-12)
         best = int(maxima[rng.integers(len(maxima))])
 
-        if rng.random() < self.correlation:
-            holder_of_feature_zero = best
-        else:
-            others = [index for index in range(n) if index != best]
-            holder_of_feature_zero = others[int(rng.integers(len(others)))]
+        # Both draws happen whichever branch is taken. Drawing the alternative
+        # only when it is used made the number of random values consumed depend
+        # on the correlation, so with three or more objectives the level streams
+        # of two correlation arms diverged after the first episode - scoring
+        # them on different mazes, which is what the shared seed exists to stop.
+        follows_value = rng.random() < self.correlation
+        others = [index for index in range(n) if index != best]
+        alternative = others[int(rng.integers(len(others)))]
+        holder_of_feature_zero = best if follows_value else alternative
 
         remaining = [index for index in range(n) if index != holder_of_feature_zero]
         rng.shuffle(remaining)

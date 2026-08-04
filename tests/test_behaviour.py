@@ -98,3 +98,35 @@ def test_timeouts_count_against_reaching_but_not_against_optimality():
 def test_summarising_nothing_is_an_error():
     with pytest.raises(ValueError, match="no episodes"):
         summarise([])
+
+
+def test_every_environment_contributes_the_same_number_of_episodes():
+    """Otherwise fast environments dominate and short episodes are oversampled.
+
+    Timeouts run the full step limit, so they are exactly the episodes a
+    total-count loop misses - inflating the reach rate and deflating the mean
+    length, in the direction that flatters the agent.
+    """
+    config = MazeConfig(max_episode_steps=20, num_envs=4, min_size=5, max_size=5, asynchronous=False)
+    envs = config.make()
+
+    # `starts` is the previous step's done flags, so counting it counts the
+    # episodes each environment actually finished while collection ran.
+    finished = np.zeros(4, dtype=int)
+    rng = np.random.default_rng(0)
+
+    def policy(observations, starts):
+        finished[:] += np.asarray(starts)
+        return rng.integers(0, 4, size=len(observations))
+
+    outcomes = collect_episode_outcomes(envs, policy, n_episodes=24, seed=0)
+    assert len(outcomes) == 24
+
+    # The first call flags every slot as a start rather than a finish, and the
+    # final step's flags are never shown to the policy because the loop exits
+    # first — so the count trails the truth by one.
+    finished -= 1
+    per_env = 24 // 4
+    assert finished.min() >= per_env - 1, (
+        f"collection stopped before the slowest environment had {per_env} episodes: {finished}"
+    )

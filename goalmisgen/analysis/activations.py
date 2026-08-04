@@ -19,6 +19,8 @@ from functools import partial
 import jax
 import numpy as np
 
+from goalmisgen.envs.observation import AGENT_CHANNEL
+
 
 @dataclasses.dataclass
 class Rollout:
@@ -98,13 +100,17 @@ def collect_rollouts(
         finals: list[dict | None] = [None] * envs.num_envs
         done = np.zeros(envs.num_envs, dtype=bool)
 
-        agent_channel = 1
+        agent_channel = AGENT_CHANNEL
         here = initial_obs[:, agent_channel] > 0.5
         visited |= here
         visit_step[here] = 0
 
+        # Bounded by the environment's own limit rather than a magic number:
+        # if the loop ever exits early, `finals` stays None and the outer
+        # while-loop retries the same seed forever.
+        step_budget = getattr(envs, "max_episode_steps", None) or 512
         action = first_action
-        for step_index in range(512):
+        for step_index in range(step_budget + 1):
             if step_index > 0:
                 carry, action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
             observations, _, terminated, truncated, info = envs.step(np.asarray(action))
@@ -139,6 +145,11 @@ def collect_rollouts(
                 done |= just_done
             if done.all():
                 break
+        else:
+            raise RuntimeError(
+                f'episodes did not finish within {step_budget} steps; the step limit could not be read '
+                'from the environment, so the capture loop would have retried this seed forever'
+            )
 
         for index in range(envs.num_envs):
             final = finals[index]

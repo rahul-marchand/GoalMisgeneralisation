@@ -105,7 +105,7 @@ def fig_task():
     ax.imshow(render(level, level.agent_start, cell_pixels=14))
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title("rendered for humans only", color=INK2, fontsize=8.5, pad=4)
+    ax.set_title("not passed to agent", color=INK2, fontsize=8.5, pad=4)
     sub = (
         f"blue = agent   ·   red = feature 0 (value {vals[0]:.1f}, {d[0]} steps away)   ·   "
         f"green = feature 1 (value {vals[1]:.1f}, {d[1]} steps away)   →   "

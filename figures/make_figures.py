@@ -314,9 +314,73 @@ def fig_dynamics():
     save(fig, "fig4_dynamics")
 
 
+# ---------------------------------------------------------------- figure 5
+def fig_example_plan():
+    """What the probe actually sees, on episodes it was not fitted on.
+
+    The AUC table establishes that the route is decodable; it does not let a
+    reader see it. Each panel shades every free cell by the probe's score at
+    t=0 — before the agent has moved — with the route it went on to walk drawn
+    over the top. The probe is linear and applied identically at every cell, so
+    the shape it lights up is in the representation, not in the readout.
+    """
+    data = np.load(DATA / "plan_examples.npz")
+    scores, visit_step, obs = data["scores"], data["visit_step"], data["observations"]
+
+    # Longest routes first: a two-step route shows nothing a reader can judge.
+    lengths = (visit_step >= 0).sum(axis=(1, 2))
+    chosen = np.argsort(-lengths)[:4]
+
+    fig, axes = plt.subplots(1, 4, figsize=(10.2, 3.0))
+    ramp = mpl.colormaps["Blues"].with_extremes(bad="#d8d6d0")
+    for ax, index in zip(axes, chosen):
+        ax.imshow(np.ma.masked_invalid(scores[index]), cmap=ramp, vmin=0, vmax=1, interpolation="nearest")
+
+        # The route, in the order it was walked.
+        rows, cols = np.nonzero(visit_step[index] >= 0)
+        order = np.argsort(visit_step[index][rows, cols])
+        ax.plot(cols[order], rows[order], color=INK, lw=1.6, alpha=0.85, zorder=3)
+
+        start = np.argwhere(obs[index][:, :, 1] > 0.5)[0]
+        ax.plot(start[1], start[0], "o", ms=7, mfc="none", mec=INK, mew=1.8, zorder=4)
+        for channel, colour in ((2, ORANGE), (3, AQUA)):
+            for row, col in np.argwhere(obs[index][:, :, channel] > 0.5):
+                ax.plot(col, row, "*", ms=13, color=colour, mec=SURFACE, mew=0.8, zorder=5)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"{int(lengths[index])} steps", color=INK2, fontsize=8.5, pad=4)
+        for spine in ax.spines.values():
+            spine.set_color(MUTED)
+            spine.set_linewidth(0.6)
+
+    bar = fig.colorbar(
+        mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap=ramp),
+        ax=axes,
+        fraction=0.015,
+        pad=0.012,
+        shrink=0.72,
+    )
+    bar.set_label("probe score at t=0", fontsize=8, color=INK2)
+    bar.outline.set_edgecolor(MUTED)
+
+    fig.text(
+        0.5,
+        -0.02,
+        "shading = linear probe on the recurrent state before the first move   ·   line = route actually walked   ·   "
+        "○ start   ★ objectives (orange = feature 0)",
+        ha="center",
+        fontsize=8,
+        color=INK2,
+    )
+    fig.suptitle("The route is readable in the recurrent state before the agent moves", y=1.02, fontsize=10.5, color=INK)
+    save(fig, "fig5_example_plan")
+
+
 if __name__ == "__main__":
     print("writing figures to", OUT)
     fig_task()
     fig_rho_response()
     fig_margin()
     fig_dynamics()
+    fig_example_plan()

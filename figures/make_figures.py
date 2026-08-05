@@ -400,7 +400,7 @@ def fig_example_plan():
 
     fig.text(
         0.5,
-        -0.14,
+        -0.02,
         "shading = linear probe on the recurrent state before the first move   ·   line = route actually walked   ·   "
         "○ start   ★ objectives\n"
         f"under each panel: value − {penalty:g} × distance = what that objective is worth.  "
@@ -409,7 +409,6 @@ def fig_example_plan():
         fontsize=8,
         color=INK2,
     )
-    fig.suptitle("The route is readable in the recurrent state before the agent moves", y=1.02, fontsize=10.5, color=INK)
     save(fig, "fig5_example_plan")
 
 

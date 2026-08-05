@@ -326,12 +326,29 @@ def fig_example_plan():
     """
     data = np.load(DATA / "plan_examples.npz")
     scores, visit_step, obs = data["scores"], data["visit_step"], data["observations"]
+    distances, penalty = data["distances"], float(data["step_penalty"])
 
-    # Longest routes first: a two-step route shows nothing a reader can judge.
+    def objectives_of(index):
+        out = []
+        for feature, colour in ((0, ORANGE), (1, AQUA)):
+            row, col = np.argwhere(obs[index][:, :, 2 + feature] > 0.5)[0]
+            value = float(obs[index][row, col, 4])
+            steps_away = int(distances[index][row, col])
+            out.append((feature, colour, row, col, value, steps_away, value - penalty * steps_away))
+        return out
+
+    # Two considerations pull against each other. A long route shows the plan;
+    # but the episodes where the *less valuable* objective is the right answer
+    # are exactly the short ones, since that only happens when it is much
+    # nearer. Showing only long routes would suggest the task is "go to the
+    # bigger number", which is the thing the agent must not be doing. So: the
+    # two longest, plus the two longest in which value and distance disagree.
     lengths = (visit_step >= 0).sum(axis=(1, 2))
-    chosen = np.argsort(-lengths)[:4]
+    by_length = list(np.argsort(-lengths))
+    upsets = [i for i in by_length if max(objectives_of(i), key=lambda o: o[-1])[4] < 1.0]
+    chosen = by_length[:2] + [i for i in upsets if i not in by_length[:2]][:2]
 
-    fig, axes = plt.subplots(1, 4, figsize=(10.2, 3.0))
+    fig, axes = plt.subplots(1, 4, figsize=(10.2, 3.3))
     ramp = mpl.colormaps["Blues"].with_extremes(bad="#d8d6d0")
     for ax, index in zip(axes, chosen):
         ax.imshow(np.ma.masked_invalid(scores[index]), cmap=ramp, vmin=0, vmax=1, interpolation="nearest")
@@ -343,13 +360,30 @@ def fig_example_plan():
 
         start = np.argwhere(obs[index][:, :, 1] > 0.5)[0]
         ax.plot(start[1], start[0], "o", ms=7, mfc="none", mec=INK, mew=1.8, zorder=4)
-        for channel, colour in ((2, ORANGE), (3, AQUA)):
-            for row, col in np.argwhere(obs[index][:, :, channel] > 0.5):
-                ax.plot(col, row, "*", ms=13, color=colour, mec=SURFACE, mew=0.8, zorder=5)
+
+        # Value and distance are what decide the answer, so state them rather
+        # than leaving the reader to count corridor squares.
+        objectives = objectives_of(index)
+        best = max(objectives, key=lambda o: o[-1])
+        for feature, colour, row, col, value, steps_away, utility in objectives:
+            ax.plot(col, row, "*", ms=13, color=colour, mec=SURFACE, mew=0.8, zorder=5)
+            if (feature, utility) == (best[0], best[-1]):
+                ax.plot(col, row, "o", ms=19, mfc="none", mec=INK, mew=1.4, zorder=4)
+            winner = feature == best[0]
+            ax.text(
+                0.5,
+                -0.11 - 0.10 * feature,
+                f"{value:.2f} − {penalty:g}×{steps_away} = {utility:+.2f}",
+                transform=ax.transAxes,
+                ha="center",
+                fontsize=7.4,
+                color=colour,
+                fontweight="bold" if winner else "normal",
+            )
 
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title(f"{int(lengths[index])} steps", color=INK2, fontsize=8.5, pad=4)
+        ax.set_title(f"{int(lengths[index])} steps walked", color=INK2, fontsize=8.5, pad=4)
         for spine in ax.spines.values():
             spine.set_color(MUTED)
             spine.set_linewidth(0.6)
@@ -366,9 +400,11 @@ def fig_example_plan():
 
     fig.text(
         0.5,
-        -0.02,
+        -0.14,
         "shading = linear probe on the recurrent state before the first move   ·   line = route actually walked   ·   "
-        "○ start   ★ objectives (orange = feature 0)",
+        "○ start   ★ objectives\n"
+        f"under each panel: value − {penalty:g} × distance = what that objective is worth.  "
+        "The better one is ringed and in bold — often the nearer one, not the more valuable one.",
         ha="center",
         fontsize=8,
         color=INK2,

@@ -98,7 +98,7 @@ def fig_task():
     enc = ObservationEncoder(max_size=11, n_features=2)
     obs = enc.encode(level, level.agent_start)
 
-    fig = plt.figure(figsize=(9.4, 3.1))
+    fig = plt.figure(figsize=(9.4, 1.9))
     gs = fig.add_gridspec(1, 6, width_ratios=[1.55, 1, 1, 1, 1, 1], wspace=0.18)
 
     ax = fig.add_subplot(gs[0])
@@ -106,12 +106,15 @@ def fig_task():
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_title("not passed to agent", color=INK2, fontsize=8.5, pad=4)
-    sub = (
-        f"blue = agent   ·   red = feature 0 (value {vals[0]:.1f}, {d[0]} steps away)   ·   "
-        f"green = feature 1 (value {vals[1]:.1f}, {d[1]} steps away)   →   "
-        f"optimal is feature {best}, by value − 0.05 × distance"
+    fig.text(
+        0.5,
+        0.02,
+        f"red = feature 0 (value {vals[0]:.1f}, {d[0]} steps)   ·   "
+        f"green = feature 1 (value {vals[1]:.1f}, {d[1]} steps)   ·   optimal: feature {best}",
+        ha="center",
+        fontsize=8,
+        color=INK2,
     )
-    fig.text(0.5, -0.04, sub, ha="center", fontsize=8, color=INK2)
 
     names = ["ch0 walls", "ch1 agent", "ch2 feature 0", "ch3 feature 1", "ch4 value"]
     for i, nm in enumerate(names):
@@ -125,7 +128,6 @@ def fig_task():
             s.set_color(MUTED)
             s.set_linewidth(0.6)
 
-    fig.suptitle("The agent sees five symbolic channels — no colour, no pixels", y=1.0, fontsize=10.5, color=INK)
     save(fig, "fig1_task")
 
 
@@ -144,12 +146,12 @@ def fig_rho_response():
     and so is not what the claim rests on.
     """
     panels = [
-        ("smoke5b", "5×5 — proxy is free", "trained ρ=1.0"),
-        ("maze11", "11×11 — proxy costs a detour", "trained ρ=1.0"),
-        ("clean11fv", "11×11 control — no proxy to learn", "trained ρ=0.5"),
+        ("smoke5b", "5×5,  trained ρ=1.0"),
+        ("maze11", "11×11,  trained ρ=1.0"),
+        ("clean11fv", "11×11,  trained ρ=0.5"),
     ]
     fig, axes = plt.subplots(1, 3, figsize=(10.6, 3.4), sharey=True)
-    for ax, (agent, title, sub) in zip(axes, panels):
+    for ax, (agent, title) in zip(axes, panels):
         # One series is labelled above its markers and the other below, so the
         # two never collide where the curves meet.
         for field, colour, label, dy in (
@@ -168,19 +170,12 @@ def fig_rho_response():
         ax.set_ylim(-12, 114)
         ax.set_yticks([0, 25, 50, 75, 100])
         ax.grid(axis="y", zorder=0)
-        ax.set_title(title, color=INK, pad=18)
-        ax.text(0.5, 1.02, sub, transform=ax.transAxes, ha="center", fontsize=7.5, color=MUTED)
+        ax.set_title(title, color=INK2, fontsize=9, pad=6)
 
     axes[0].set_ylabel("% of episodes")
     axes[0].annotate("chance", (1.04, 50), va="bottom", ha="left", fontsize=7, color=MUTED)
     axes[1].legend(loc="lower center", fontsize=8)
-    fig.supxlabel("ρ  at test time   (P that colour marks the higher-value objective)", y=-0.04, fontsize=9, color=INK2)
-    fig.suptitle(
-        "Held out from training, across ρ:  only the agents that could learn a proxy lose optimality",
-        y=1.08,
-        fontsize=10.5,
-        color=INK,
-    )
+    fig.supxlabel("test ρ", y=-0.02, fontsize=9, color=INK2)
     save(fig, "fig2_rho_response")
 
 
@@ -197,7 +192,7 @@ def fig_margin():
     in training correlation — so the profiles are directly comparable.
     """
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.5), sharey=True)
-    panels = [("clean11fv", "control — trained at ρ = 0.5"), ("maze11", "trained with a proxy, ρ = 1.0")]
+    panels = [("clean11fv", "control,  trained ρ=0.5"), ("maze11", "trained ρ=1.0")]
     for ax, (agent, title) in zip(axes, panels):
         labels = arm_at(agent, 1.0)["margin"]["bins"]
         x = np.arange(len(labels))
@@ -219,9 +214,7 @@ def fig_margin():
         ax.set_ylim(-6, 116)
         ax.set_yticks([0, 25, 50, 75, 100])
         ax.grid(axis="y", zorder=0)
-        ax.set_title(title, color=INK, pad=18)
-        scheme = "randomised values" if AGENTS[agent]["randomise_values"] else "fixed values"
-        ax.text(0.5, 1.02, scheme, transform=ax.transAxes, ha="center", fontsize=7.5, color=MUTED)
+        ax.set_title(title, color=INK2, fontsize=9, pad=6)
 
     # The worst-hit band, named from the data rather than asserted.
     hi = np.array(arm_at("maze11", 1.0)["margin"]["chose_optimal"], dtype=float)
@@ -243,13 +236,7 @@ def fig_margin():
     )
     axes[0].set_ylabel("% chose optimal")
     axes[0].legend(loc="lower right", fontsize=8)
-    fig.supxlabel("utility margin  (how clear-cut the decision was)", y=-0.06, fontsize=9, color=INK2)
-    fig.suptitle(
-        "The proxy does not just add noise — it captures the decisions that should be easy",
-        y=1.06,
-        fontsize=10.5,
-        color=INK,
-    )
+    fig.supxlabel("utility margin", y=-0.04, fontsize=9, color=INK2)
     save(fig, "fig3_margin")
 
 
@@ -280,16 +267,10 @@ def fig_dynamics():
         s_ = arm(proxy, name)
         ax1.plot(s_.index / 1e6, s_.values, "-", color=colour, lw=2, label=label, zorder=3)
     ax1.axvspan(15, 20, color="#e6e5e0", alpha=0.7, zorder=0)
-    ax1.annotate("competence\nappears", (21, -3.4), ha="left", fontsize=7.5, color=INK2)
+    ax1.annotate("competence", (21, -3.4), ha="left", fontsize=7.5, color=INK2)
     ax1.grid(axis="y", zorder=0)
     ax1.set_ylabel("evaluation return")
     ax1.legend(loc="lower right", fontsize=8, ncol=3)
-    ax1.set_title(
-        "the proxy run's three test correlations — indistinguishable at this scale",
-        color=INK,
-        fontsize=9.5,
-        pad=6,
-    )
 
     # Bottom: the gap. This is the claim, and it is invisible in the panel above.
     for df, colour, label in (
@@ -314,14 +295,11 @@ def fig_dynamics():
     ax2.axvspan(0, 20, color="#e6e5e0", alpha=0.55, zorder=0)
     ax2.set_xlim(-4, 162)
     ax2.set_ylim(-0.24, 0.24)
-    ax2.annotate("before competence:\ngap is meaningless", (10, -0.225), ha="center", va="bottom", fontsize=7.5, color=MUTED)
     ax2.grid(axis="y", zorder=0)
     ax2.set_xlabel("training steps (millions)")
     ax2.set_ylabel("gap  (ρ=1.0 − ρ=0.0)")
     ax2.legend(loc="lower right", fontsize=8)
-    ax2.set_title("the misgeneralisation signal", color=INK, fontsize=9.5, pad=6)
 
-    fig.suptitle("Misgeneralisation appears after competence, and only when a proxy exists", y=0.97, fontsize=10.5, color=INK)
     save(fig, "fig4_dynamics")
 
 
@@ -394,7 +372,7 @@ def fig_example_plan():
 
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title(f"{int(lengths[index])} steps walked", color=INK2, fontsize=8.5, pad=4)
+        ax.set_title(f"{int(lengths[index])} steps", color=INK2, fontsize=8.5, pad=4)
         for spine in ax.spines.values():
             spine.set_color(MUTED)
             spine.set_linewidth(0.6)
@@ -409,17 +387,6 @@ def fig_example_plan():
     bar.set_label("probe score at t=0", fontsize=8, color=INK2)
     bar.outline.set_edgecolor(MUTED)
 
-    fig.text(
-        0.5,
-        -0.02,
-        "shading = linear probe on the recurrent state before the first move   ·   line = route actually walked   ·   "
-        "○ start   ★ objectives\n"
-        f"under each panel: value − {penalty:g} × distance = what that objective is worth.  "
-        "The better one is ringed and in bold — often the nearer one, not the more valuable one.",
-        ha="center",
-        fontsize=8,
-        color=INK2,
-    )
     save(fig, "fig5_example_plan")
 
 

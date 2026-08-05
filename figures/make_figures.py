@@ -54,7 +54,10 @@ mpl.rcParams.update(
     }
 )
 
-AGENTS = {name: json.loads((DATA / f"{name}.json").read_text()) for name in ("smoke5b", "maze11", "clean11")}
+AGENTS = {
+    name: json.loads((DATA / f"{name}.json").read_text())
+    for name in ("smoke5b", "maze11", "clean11", "clean11fv")
+}
 
 
 def arms(agent: str, field: str) -> tuple[list[float], list[float]]:
@@ -134,17 +137,16 @@ def fig_rho_response():
     falling ``chose_optimal`` could be any weakness of the agent; beside an
     agent that stays flat, the proxy is the explanation left standing.
 
-    It is not yet a single-variable control, and the subtitles say so. The
-    control run differs from the proxy run in *two* ways — it trains at chance
-    correlation and on randomised rather than fixed objective values — so it
-    rules out "11x11 is simply too hard" but not "randomised values teach value
-    comparison better". Closing that needs a fourth run holding the value
-    scheme fixed.
+    The control shown is single-variable: same maze size, same value scheme,
+    same level dataset and split as the proxy run, differing only in the
+    training correlation. A second control trained on randomised values
+    (``clean11``) agrees, but confounds the correlation with the value scheme
+    and so is not what the claim rests on.
     """
     panels = [
-        ("smoke5b", "5×5 — proxy is free", "trained ρ=1.0, fixed values"),
-        ("maze11", "11×11 — proxy costs a detour", "trained ρ=1.0, fixed values"),
-        ("clean11", "11×11 control — no proxy to learn", "trained ρ=0.5, randomised values"),
+        ("smoke5b", "5×5 — proxy is free", "trained ρ=1.0"),
+        ("maze11", "11×11 — proxy costs a detour", "trained ρ=1.0"),
+        ("clean11fv", "11×11 control — no proxy to learn", "trained ρ=0.5"),
     ]
     fig, axes = plt.subplots(1, 3, figsize=(10.6, 3.4), sharey=True)
     for ax, (agent, title, sub) in zip(axes, panels):
@@ -191,12 +193,11 @@ def fig_margin():
     like. The proxy agent matches it at ρ=1.0 and falls apart at ρ=0.0, and the
     damage is worst in the middle, not on the close calls.
 
-    The two panels are not on the same level distribution — the bin counts
-    differ because fixed values put most decisions in the widest margin band —
-    so read each panel's ρ=1.0 against its own ρ=0.0, not across panels.
+    Both panels are the same levels in the same bins — the two runs differ only
+    in training correlation — so the profiles are directly comparable.
     """
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.5), sharey=True)
-    panels = [("clean11", "control — no proxy to learn"), ("maze11", "trained with a proxy")]
+    panels = [("clean11fv", "control — trained at ρ = 0.5"), ("maze11", "trained with a proxy, ρ = 1.0")]
     for ax, (agent, title) in zip(axes, panels):
         labels = arm_at(agent, 1.0)["margin"]["bins"]
         x = np.arange(len(labels))
@@ -256,15 +257,16 @@ def fig_margin():
 def fig_dynamics():
     """When misgeneralisation appears — and that it needs a proxy to appear at all.
 
-    These curves come from cleanba's own in-training evaluation, so they predate
-    the seeding fix and are scored on a smaller batch of levels than a current
-    run would use. The *gap* between arms is unaffected: both arms of a run see
-    the same levels, whatever those levels are. Absolute heights are not
-    comparable with the held-out numbers in figures 2 and 3, so no optimum
-    reference is drawn here.
+    These curves come from cleanba's own in-training evaluation. The two older
+    runs predate the seeding fix and are scored on a smaller batch of levels
+    than a current run would use; ``clean11fv`` was trained after it. The *gap*
+    between arms is unaffected either way, because both arms of a run see the
+    same levels whatever those levels are — but absolute heights are not
+    comparable across runs or with figures 2 and 3, so no optimum reference is
+    drawn here.
     """
     proxy = pd.read_csv(DATA / "maze11.csv", index_col=0).sort_index()
-    control = pd.read_csv(DATA / "clean11.csv", index_col=0).sort_index()
+    control = pd.read_csv(DATA / "clean11fv.csv", index_col=0).sort_index()
 
     def arm(df, name):
         return df[f"{name}/00_episode_returns"].dropna()
@@ -292,7 +294,7 @@ def fig_dynamics():
     # Bottom: the gap. This is the claim, and it is invisible in the panel above.
     for df, colour, label in (
         (proxy, BLUE, "trained at ρ = 1.0  (proxy available)"),
-        (control, ORANGE, "trained at chance  (control: no proxy)"),
+        (control, ORANGE, "trained at ρ = 0.5  (control: no proxy)"),
     ):
         hi, lo = arm(df, "rho100"), arm(df, "rho000")
         idx = hi.index.intersection(lo.index)

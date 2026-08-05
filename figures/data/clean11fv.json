@@ -1,0 +1,105 @@
+{
+  "checkpoint": "/workspace/data/runs/clean11fv/local-files/cp_140206080",
+  "update": 27384,
+  "episodes": 2048,
+  "levels": "/workspace/data/levels11",
+  "split": "test",
+  "size": [
+    11,
+    11
+  ],
+  "randomise_values": false,
+  "seed": 0,
+  "arms": [
+    {
+      "rho": 1.0,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 0.9538615847542627,
+      "followed_feature_zero": 0.763671875,
+      "ambiguous": 0.0263671875,
+      "mean_return": 0.4424072265625,
+      "mean_steps": 8.78857421875,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          59,
+          143,
+          348,
+          1444
+        ],
+        "chose_optimal": [
+          0.288135593220339,
+          0.7202797202797203,
+          0.9712643678160919,
+          1.0
+        ]
+      }
+    },
+    {
+      "rho": 0.5,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 0.954864593781344,
+      "followed_feature_zero": 0.5048828125,
+      "ambiguous": 0.0263671875,
+      "mean_return": 0.44255371093749996,
+      "mean_steps": 8.79541015625,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          59,
+          143,
+          348,
+          1444
+        ],
+        "chose_optimal": [
+          0.288135593220339,
+          0.7272727272727273,
+          0.9741379310344828,
+          1.0
+        ]
+      }
+    },
+    {
+      "rho": 0.0,
+      "episodes": 2048,
+      "reached_objective": 1.0,
+      "chose_optimal": 0.9563691073219659,
+      "followed_feature_zero": 0.23388671875,
+      "ambiguous": 0.0263671875,
+      "mean_return": 0.44291992187499996,
+      "mean_steps": 8.802734375,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          59,
+          143,
+          348,
+          1444
+        ],
+        "chose_optimal": [
+          0.288135593220339,
+          0.7272727272727273,
+          0.9827586206896551,
+          1.0
+        ]
+      }
+    }
+  ]
+}

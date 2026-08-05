@@ -69,7 +69,7 @@ def main() -> None:
     weights, mean, std = fit_logistic(*cell_dataset(train))
     examples = rollouts(9999, args.examples)
 
-    scores, visited, visit_step, observations = [], [], [], []
+    scores, visited, visit_step, observations, distances = [], [], [], [], []
     for rollout in examples:
         free = rollout.observation[:, :, WALL_CHANNEL] < 0.5
         grid = np.full(free.shape, np.nan)
@@ -78,6 +78,12 @@ def main() -> None:
         visited.append(rollout.visited)
         visit_step.append(rollout.visit_step)
         observations.append(rollout.observation)
+        # Distance from the start, so a drawing can state each objective's
+        # utility rather than leaving the reader to count corridor squares.
+        distances.append(rollout.distance)
+
+    def info_column(key, default):
+        return np.array([rollout.info.get(key, default) for rollout in examples])
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
@@ -86,6 +92,11 @@ def main() -> None:
         visited=np.stack(visited),
         visit_step=np.stack(visit_step),
         observations=np.stack(observations),
+        distances=np.stack(distances),
+        step_penalty=env_config(0).step_penalty,
+        optimal_feature_id=info_column("optimal_feature_id", -1),
+        reached_feature_id=info_column("reached_feature_id", -1),
+        chose_optimal=info_column("chose_optimal", False),
         checkpoint=str(args.checkpoint),
     )
     print(f"wrote {args.out}  ({len(scores)} episodes)")

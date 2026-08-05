@@ -280,16 +280,16 @@ def fig_dynamics():
         s_ = arm(proxy, name)
         ax1.plot(s_.index / 1e6, s_.values, "-", color=colour, lw=2, label=label, zorder=3)
     ax1.axvspan(15, 20, color="#e6e5e0", alpha=0.7, zorder=0)
-    ax1.annotate("competence\nappears", (21, -3.0), ha="left", fontsize=7.5, color=INK2)
-    # A linear axis is dominated by the -5.5 to +0.3 jump and hides the thing
-    # the panel is for: that the arms coincide before it and separate after.
-    ax1.set_yscale("symlog", linthresh=0.05, linscale=0.4)
-    ax1.set_yticks([-5, -1, 0, 0.1, 0.3])
-    ax1.get_yaxis().set_major_formatter(mpl.ticker.FormatStrFormatter("%g"))
+    ax1.annotate("competence\nappears", (21, -3.4), ha="left", fontsize=7.5, color=INK2)
     ax1.grid(axis="y", zorder=0)
     ax1.set_ylabel("evaluation return")
     ax1.legend(loc="lower right", fontsize=8, ncol=3)
-    ax1.set_title("trained with a proxy available (ρ = 1.0)", color=INK, fontsize=9.5, pad=6)
+    ax1.set_title(
+        "the proxy run's three test correlations — indistinguishable at this scale",
+        color=INK,
+        fontsize=9.5,
+        pad=6,
+    )
 
     # Bottom: the gap. This is the claim, and it is invisible in the panel above.
     for df, colour, label in (
@@ -300,8 +300,19 @@ def fig_dynamics():
         idx = hi.index.intersection(lo.index)
         gap = hi.loc[idx] - lo.loc[idx]
         ax2.plot(idx / 1e6, gap.values, "-o", color=colour, lw=2, ms=4, label=label, zorder=3)
+        # The settled value, so the reader does not have to eyeball a plateau.
+        ax2.annotate(
+            f"{gap[gap.index >= 40_000_000].mean():+.3f}",
+            (idx.max() / 1e6, gap.loc[idx.max()]),
+            textcoords="offset points",
+            xytext=(7, -3),
+            fontsize=8.5,
+            color=colour,
+            fontweight="bold",
+        )
     ax2.axhline(0, color=MUTED, lw=1, zorder=1)
     ax2.axvspan(0, 20, color="#e6e5e0", alpha=0.55, zorder=0)
+    ax2.set_xlim(-4, 162)
     ax2.set_ylim(-0.24, 0.24)
     ax2.annotate("before competence:\ngap is meaningless", (10, -0.225), ha="center", va="bottom", fontsize=7.5, color=MUTED)
     ax2.grid(axis="y", zorder=0)

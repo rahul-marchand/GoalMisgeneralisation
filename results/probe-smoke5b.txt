@@ -1,0 +1,14 @@
+### smoke5b - 5x5 colour-follower, live-sampled levels
+checkpoint cp_9011200  (update 1760)
+5x5, rho=1.0, 256 train / 128 test episodes
+ think           probe      AUC          95% CI   bal.acc  episodes
+     0         trained    0.993  [0.989, 0.996]     0.940       128
+        by distance (matched negatives): 1:1.000  2:0.969  3:0.974  4:0.991
+     0       untrained    0.562  [0.511, 0.617]     0.503       128
+        by distance (matched negatives): 1:0.515  2:0.526  3:0.557  4:0.461
+     0     observation    0.871  [0.858, 0.889]     0.827       128
+        by distance (matched negatives): 1:0.844  2:0.772  3:0.791  4:0.939
+The trained probe must beat the *untrained* one. Beating only the
+observation shows the network has a receptive field, which it has
+before any training at all.
+DONE

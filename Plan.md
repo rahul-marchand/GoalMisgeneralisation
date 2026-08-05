@@ -127,6 +127,41 @@ observation row bit-identical, so the labels did not move.
 **The 5×5 row is the weak one**: seven free cells and two-step routes mean the
 observation alone gets 0.871. Little headroom for a plan to live in.
 
+#### Figure provenance — for captions
+
+Everything behavioural is `cp_140206080` (150M-step runs) or `cp_9011200` (5×5),
+2,048 episodes per arm, on the **test** split — held out from both training and
+in-training evaluation. Dataset `levels11`, fingerprint `d0e70f346ac4a46a`.
+
+| fig | runs shown | source |
+|---|---|---|
+| 1 | none — a sampled level | `MazeLevelSampler`, seed 3 |
+| 2 | `smoke5b`, `maze11`, `clean11fv` | `002`, held-out test episodes |
+| 3 | `clean11fv` and `maze11`, ρ=1.0 vs ρ=0.0 arms | same episodes as fig 2 |
+| 4 | `maze11` (both panels), `clean11fv` (gap panel) | cleanba's **in-training** eval, `metrics.csv` |
+| 5 | `maze11` | probe fitted on 256 episodes, drawn on 12 it never saw |
+
+**Fig 4 is the odd one out and needs the most caption.** It is the only figure
+not drawn from `002`: it uses cleanba's own evaluation *during* training, which
+is a different, smaller set of levels from the `valid` split. So its absolute
+heights are not comparable with figs 2–3, and `maze11`'s curves predate the
+seeding fix while `clean11fv`'s do not. Only the **within-run gap** is
+comparable, because both arms of a run always see the same levels.
+
+What fig 4 is meant to show, in order:
+
+1. *Top panel* — the proxy run becomes competent at ~20M steps (return jumps
+   from −5.5 to +0.3). Its three test correlations are **indistinguishable at
+   this scale**. That is the point of the panel: returns alone hide the effect.
+2. *Bottom panel* — subtract ρ=0.0 from ρ=1.0 and it appears. The proxy run
+   settles at **+0.165**; the control at **−0.001**. Before 20M the gap is noise
+   between two incompetent agents and means nothing.
+
+So: misgeneralisation shows up only after the agent can solve the task at all,
+and only in the run where a proxy was available. Final returns, `maze11`
+ρ=1.0 / ρ=0.0 = 0.409 / 0.230; `clean11fv` = 0.441 / 0.441 — note the control
+beats the proxy run even in the condition the proxy run was trained on.
+
 #### What is *not* established
 
 - The probe reads **routes, not targets**. It says where the agent will step,

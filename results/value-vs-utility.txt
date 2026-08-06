@@ -1,0 +1,45 @@
+commit b886149
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --think 0
+checkpoint cp_140206080  (update 27384)
+     capture    target                       arm  partial  within hard shape  hard R2    MAE  dim  drop  n_hard
+   trained@0     d->f0               activations    0.705   0.739      0.273    0.250   3.50   96     0  11,193
+   trained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  11,193
+   trained@0     d->f0  null:manhattan+chebyshev    0.054   0.075      0.085   -0.337   5.51    2     0  11,193
+   trained@0     d->f0            shuffled:d->f0    0.024   0.007      0.001   -0.653   6.95    1     0  11,193
+                      controls ok (oracle passes, null and shuffled fail)
+   trained@0     d->f1               activations    0.394   0.456      0.089   -0.290   5.37   96     0  10,967
+   trained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  10,967
+   trained@0     d->f1  null:manhattan+chebyshev    0.056   0.093      0.058   -0.439   5.63    2     0  10,967
+   trained@0     d->f1shuffled:d->f1 (l2 clipped)    0.011   0.002      0.000   -0.703   6.98    1     0  10,967
+                      controls ok (oracle passes, null and shuffled fail)
+            110 of 512 episodes have value and utility disagreeing
+                                           split    first   second          difference
+                               chosen vs ignored    0.652    0.576  [+0.032, +0.115]  *
+                                richer vs poorer    0.739    0.456  [+0.252, +0.313]  *
+                               nearer vs further    0.571    0.648  [-0.119, -0.035]  *
+                         higher vs lower utility    0.666    0.558  [+0.069, +0.144]  *
+                             coin flip (control)    0.614    0.607  [-0.037, +0.043]  
+             richer vs poorer | value != utility    0.756    0.407  [+0.285, +0.405]  *
+               higher utility | value != utility    0.407    0.756  [-0.405, -0.285]  *
+            (trained@0)
+ untrained@0     d->f0  activations (l2 clipped)    0.041   0.060      0.006   -0.601   6.64   96     0  11,193
+ untrained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  11,193
+ untrained@0     d->f0  null:manhattan+chebyshev    0.054   0.075      0.085   -0.337   5.51    2     0  11,193
+ untrained@0     d->f0            shuffled:d->f0    0.024   0.007      0.001   -0.653   6.95    1     0  11,193
+                      controls ok (oracle passes, null and shuffled fail)
+ untrained@0     d->f1  activations (l2 clipped)    0.025   0.025      0.001   -0.668   6.72   96     0  10,967
+ untrained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  10,967
+ untrained@0     d->f1  null:manhattan+chebyshev    0.056   0.093      0.058   -0.439   5.63    2     0  10,967
+ untrained@0     d->f1shuffled:d->f1 (l2 clipped)    0.011   0.002      0.000   -0.703   6.98    1     0  10,967
+                      controls ok (oracle passes, null and shuffled fail)
+            110 of 512 episodes have value and utility disagreeing
+                                           split    first   second          difference
+                               chosen vs ignored    0.046    0.040  [-0.025, +0.037]  
+                                richer vs poorer    0.060    0.025  [+0.002, +0.063]  *
+                               nearer vs further    0.019    0.060  [-0.068, -0.015]  *
+                         higher vs lower utility    0.046    0.040  [-0.022, +0.037]  
+                             coin flip (control)    0.042    0.044  [-0.029, +0.029]  
+             richer vs poorer | value != utility    0.065    0.003  [+0.001, +0.122]  *
+               higher utility | value != utility    0.003    0.065  [-0.122, -0.001]  *
+            (untrained@0)
+DONESPLITS

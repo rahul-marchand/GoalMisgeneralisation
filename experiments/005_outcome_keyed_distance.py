@@ -224,6 +224,20 @@ def report_splits(split, rollouts, capture: str) -> None:
         and targets.richer(rollout, n) != targets.best_utility(rollout, n)
     ]
 
+    def gap_at_most(limit):
+        return [
+            index
+            for index, rollout in enumerate(rollouts)
+            if (gap := targets.distance_gap(rollout, n)) is not None and gap <= limit
+        ]
+
+    # Where value and distance can be told apart: the two objectives are the
+    # same walk away, so anything distinguishing them is not about distance.
+    # On the disagreement subset the two are collinear by construction - value
+    # and utility only disagree when the cheaper objective is much nearer - so
+    # that subset cannot answer this and this one can.
+    close, closer = gap_at_most(4), gap_at_most(2)
+
     named = [
         ("chosen vs ignored", targets.reached, everywhere),
         ("richer vs poorer", lambda r: targets.richer(r, n), everywhere),
@@ -232,9 +246,15 @@ def report_splits(split, rollouts, capture: str) -> None:
         ("coin flip (control)", lambda r: targets.coinflip(r), everywhere),
         ("richer vs poorer | value != utility", lambda r: targets.richer(r, n), disagree),
         ("higher utility | value != utility", lambda r: targets.best_utility(r, n), disagree),
+        ("richer vs poorer | gap <= 4", lambda r: targets.richer(r, n), close),
+        ("richer vs poorer | gap <= 2", lambda r: targets.richer(r, n), closer),
+        ("coin flip | gap <= 4 (control)", lambda r: targets.coinflip(r), close),
     ]
 
-    print(f"{'':>12}{len(disagree)} of {len(rollouts)} episodes have value and utility disagreeing\n")
+    print(
+        f"{'':>12}{len(disagree)} of {len(rollouts)} episodes have value and utility disagreeing; "
+        f"{len(close)} have the objectives within 4 steps of each other, {len(closer)} within 2\n"
+    )
     print(f"{'':>12}{'split':>36}{'first':>9}{'second':>9}{'difference':>20}")
     for label, selector, episodes in named:
         line = one_split(split, rollouts, selector, episodes)

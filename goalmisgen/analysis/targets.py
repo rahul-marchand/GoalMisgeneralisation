@@ -253,3 +253,21 @@ def coinflip(rollout, seed: int = 0, n_features: int = 2) -> int:
     about the network. Deterministic per episode so a re-run is comparable.
     """
     return int(np.random.default_rng((seed, id(rollout) % 2**32)).integers(n_features))
+
+
+def distance_gap(rollout, n_features: int = 2) -> float | None:
+    """How much nearer one objective is than the other. ``None`` if cut off.
+
+    Small gaps are where value can be separated from distance: the two
+    objectives are the same walk away, so anything that distinguishes them is
+    not about how far they are.
+    """
+    if n_features != 2:
+        raise ValueError(f"a single gap is only defined for two objectives, got {n_features}")
+    try:
+        first, second = (objective_distance(rollout, feature, n_features) for feature in range(n_features))
+    except ValueError:
+        return None
+    if not (np.isfinite(first) and np.isfinite(second)):
+        return None
+    return abs(first - second)

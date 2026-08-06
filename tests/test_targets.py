@@ -199,3 +199,25 @@ def test_the_coin_flip_control_is_deterministic_per_episode():
     once = [targets.coinflip(rollout) for rollout in rollouts]
     assert once == [targets.coinflip(rollout) for rollout in rollouts]
     assert 0 < sum(once) < len(once), "the control split put every episode on one side"
+
+
+def test_the_distance_gap_matches_the_solver():
+    """The equidistant subset is only meaningful if the gap is the real one."""
+    from goalmisgen.envs.observation import ObservationEncoder
+    from goalmisgen.envs.sampling import MazeLevelSampler
+    from goalmisgen.envs.solver import objective_distances
+
+    sampler = MazeLevelSampler(size_range=(11, 11))
+    encoder = ObservationEncoder(max_size=11, n_features=2)
+    rng = np.random.default_rng(5)
+
+    checked = 0
+    for _ in range(50):
+        level = sampler.sample(rng)
+        rollout = types.SimpleNamespace(observation=encoder.encode(level, level.agent_start), info={}, index=0)
+        distances = objective_distances(level)
+        if any(d is None for d in distances):
+            continue
+        assert targets.distance_gap(rollout) == pytest.approx(abs(distances[0] - distances[1]))
+        checked += 1
+    assert checked > 30

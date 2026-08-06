@@ -183,7 +183,7 @@ def main() -> None:
 
         # Shuffling the labels breaks the pairing while keeping their
         # distribution, so anything it still finds is leakage in the fit.
-        x_fit, y_fit = episode_rows(fit_set, activations, args.feature, site)
+        x_fit, y_fit = episode_rows(fit_trained, activations, args.feature, site)
         x_test, y_test = episode_rows(test_trained, activations, args.feature, site)
         shuffled = np.random.default_rng(args.seed).permutation(y_fit)
         correlation, (low, high), mae = score((x_fit, shuffled), (x_test, y_test), seed=args.seed)

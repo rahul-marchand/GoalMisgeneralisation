@@ -4,31 +4,43 @@
 
 The pilot found maze-aware distance in the recurrent state, measured to a fixed
 objective. But at test rho=1.0 the agent goes to feature 0 in about three
-quarters of episodes, so that measurement was a mixture of "the objective it is
-heading to" and "the one it ignored" — and a clean field for the target averaged
-with noise for the other looks exactly like a weak field for both.
+quarters of episodes, so that measurement mixed "the objective it is heading to"
+with "the one it ignored" — and a clean field for the target averaged with noise
+for the other looks exactly like a weak field for both.
 
-Keying the same field by outcome separates them, and the answer is mechanistic
-either way:
+**The obvious fix does not work, and it is worth saying why.** Re-keying the
+target to "distance to whichever objective the agent chose" makes the quantity
+change identity between episodes. A 1x1 linear probe is one fixed map applied
+everywhere; if the network holds the two fields in different channels, no such
+map can follow that switch. Asked this way the probe scores badly for its own
+reasons, and the first version of this experiment measured exactly that — the
+"ignored" keying scored *higher* than the "chosen" one, which is the tell.
 
-**Both decode** — the network computes a field for each objective and compares
-them. That is the substrate the utility comparison would need, and it means the
-choice is made *after* the distances exist.
+So the identity stays fixed and the outcome enters by splitting episodes. One
+probe per objective, each decoding a quantity that never changes meaning. Then
+for each episode, the probe for the objective it reached is **own** and the
+other is **other**. Every episode contributes to both sides, so the comparison
+is genuinely paired and the between-maze variance cancels.
 
-**Only the reached one** — the network commits to a target first and computes
-distance second, so the comparison happens somewhere this probe cannot see.
+Either answer is mechanistic:
 
-Read the table in this order. The controls come first because they decide
-whether anything else is readable: ``oracle`` must pass, ``null`` and
-``shuffled`` must fail. Then the reached-minus-unreached difference, which is
-computed on a *paired* bootstrap — two overlapping intervals would not settle
-it, and the difference interval is far tighter than either alone.
+**own = other** — the network computes a field for each objective and compares
+them, so the choice is made *after* the distances exist. That is the substrate
+a utility comparison needs.
+
+**own > other** — it commits to a target first and computes distance second, so
+the comparison happens somewhere this probe cannot see.
+
+Read the controls first: ``oracle`` must pass and ``null`` and ``shuffled`` must
+fail, or nothing below them is readable. The headline columns are ``partial``
+and ``hard shape``, both immune to how the fit is scaled; ``hard R2`` is printed
+as a diagnostic and runs negative for every arm, because the recalibration is
+fitted over all cells while the hard subset has a systematically larger target.
 """
 
 from __future__ import annotations
 
 import argparse
-import functools
 import operator
 import subprocess
 import sys
@@ -118,17 +130,14 @@ def main() -> None:
 
     fit_cache, score_cache = collect(args.fit_split), collect(args.split)
 
-    keyed = {
-        "reached": targets.DistanceToObjective(targets.reached, name="d->reached", n_features=N_FEATURES),
-        "unreached": targets.DistanceToObjective(
-            functools.partial(targets.unreached, n_features=N_FEATURES), name="d->unreached", n_features=N_FEATURES
-        ),
-        "feature0": targets.DistanceToObjective(targets.fixed(0), name="d->f0", n_features=N_FEATURES),
+    by_feature = {
+        feature: targets.DistanceToObjective(targets.fixed(feature), name=f"d->f{feature}", n_features=N_FEATURES)
+        for feature in range(N_FEATURES)
     }
     activations = Feature("activations", operator.attrgetter("features"))
 
-    header = f"{'capture':>12}{'target':>12}{'arm':>26}{'hard R2':>9}{'95% CI':>18}"
-    print(f"\n{header}{'shape':>8}{'partial':>9}{'within':>8}{'MAE':>7}{'dim':>5}{'drop':>6}{'n_hard':>8}")
+    header = f"{'capture':>12}{'target':>10}{'arm':>26}{'partial':>9}{'within':>8}{'hard shape':>11}"
+    print(f"\n{header}{'hard R2':>9}{'MAE':>7}{'dim':>5}{'drop':>6}{'n_hard':>8}")
 
     for think in args.think:
         captures = [Capture(f"trained@{think}", reader="agent", steps_to_think=think)]
@@ -139,9 +148,9 @@ def main() -> None:
         for capture in captures:
             fit_rollouts = fit_cache.get(capture, 0, args.train_episodes)
             score_rollouts = score_cache.get(capture, 9999, args.test_episodes)
-            paired = {}
+            split = {}
 
-            for key, target in keyed.items():
+            for feature, target in by_feature.items():
                 arms = [activations, *targets.controls(target, score_rollouts)]
                 fit_arms = [activations, *targets.controls(target, fit_rollouts)]
 
@@ -153,67 +162,101 @@ def main() -> None:
                     scores[arm.name.split(":")[0]] = result
                     if arm is activations:
                         _, prediction, _, _ = fields.fit_predict(train, test)
-                        paired[key] = (test, prediction)
+                        split[feature] = (test, prediction)
 
                     print(
-                        f"{capture.name:>12}{key:>12}{result.name:>26}{result.hard_r2:>9.3f}"
-                        f"{f'[{result.hard_interval[0]:.3f}, {result.hard_interval[1]:.3f}]':>18}"
-                        f"{result.hard_shape_r2:>8.3f}{result.partial_r:>9.3f}"
-                        f"{result.partial_r_within_episode:>8.3f}{result.mae:>7.2f}"
+                        f"{capture.name:>12}{target.name:>10}{result.name:>26}{result.partial_r:>9.3f}"
+                        f"{result.partial_r_within_episode:>8.3f}{result.hard_shape_r2:>11.3f}"
+                        f"{result.hard_r2:>9.3f}{result.mae:>7.2f}"
                         f"{result.depth:>5}{result.dropped_columns:>6}{result.n_hard:>8,}"
                     )
-                print(f"{'':>24}{check_rig(scores)}\n")
+                print(f"{'':>22}{check_rig(scores)}\n")
 
-            report_difference(paired, capture.name)
+            report_own_versus_other(split, score_rollouts, capture.name)
 
 
 def check_rig(scores) -> str:
-    """The controls decide whether the row above is readable, so say it aloud.
+    """The controls decide whether the rows above are readable, so say it aloud.
 
-    Left to a reader to notice, this is the check that gets skipped — the first
+    Left to a reader to notice, this is the check that gets skipped - the first
     distance-band result was invalidated by a confound raised and waved through.
+
+    Judged on ``hard_shape_r2`` rather than ``hard_r2``: the recalibration is
+    fitted on every cell but the hard subset has a systematically larger target,
+    so the level is wrong there for every arm and R2 goes negative even when the
+    ordering is perfect. Shape is immune to that by construction.
     """
     missing = {"oracle", "null", "shuffled"} - set(scores)
     if missing:
         raise ValueError(f"a headline was about to be printed without its controls: missing {sorted(missing)}")
 
     problems = []
-    if scores["oracle"].hard_r2 < 0.9:
-        problems.append(f"positive control failed ({scores['oracle'].hard_r2:.3f})")
+    if scores["oracle"].hard_shape_r2 < 0.9:
+        problems.append(f"positive control failed ({scores['oracle'].hard_shape_r2:.3f})")
     for name in ("null", "shuffled"):
-        if scores[name].hard_r2 > 0.1:
-            problems.append(f"{name} control passed ({scores[name].hard_r2:.3f})")
+        if abs(scores[name].partial_r) > 0.2:
+            problems.append(f"{name} control survived stratification ({scores[name].partial_r:.3f})")
 
     if problems:
-        return "RIG INVALID — " + "; ".join(problems) + ". No number in this block means anything."
+        return "RIG INVALID - " + "; ".join(problems) + ". No number in this block means anything."
     return "controls ok (oracle passes, null and shuffled fail)"
 
 
-def report_difference(paired, capture: str) -> None:
-    """Reached minus unreached, on a common resample of episodes.
+def report_own_versus_other(split, rollouts, capture: str) -> None:
+    """Is the field sharper for the objective the agent went to?
 
-    Two overlapping intervals do not settle this. Sharing the resample cancels
-    the between-episode variance both statistics carry, and the two targets mask
-    different cells, so each statistic looks up its own rows.
+    Each probe is fitted to a *fixed* objective, so the quantity it decodes
+    never changes identity and a single linear map can represent it. The
+    outcome enters by splitting episodes, not by re-keying the target: for each
+    episode, the probe for the objective it reached is "own" and the other is
+    "other".
+
+    Every episode contributes to both sides, so the bootstrap is genuinely
+    paired and the between-maze variance the two share cancels.
     """
-    if not {"reached", "unreached"} <= set(paired):
-        return
+    own, other = {"y": [], "p": [], "s": []}, {"y": [], "p": [], "s": []}
+    for feature, (data, prediction) in split.items():
+        went_to = np.array([targets.reached(rollouts[index]) for index in data.episode])
+        mine = went_to == feature
+        # Stratify within episode *and* within straight-line distance: the
+        # strongest form, and the one the table reports as "within".
+        stratum = data.episode * 1000 + data.confound[:, 0].astype(np.int64)
+        for side, rows in ((own, mine), (other, ~mine)):
+            side["y"].append(data.y[rows])
+            side["p"].append(prediction[rows])
+            side["s"].append(stratum[rows])
 
-    def hard_r2_over(data, prediction):
-        def compute(chosen):
-            rows = metrics.select_rows(data.episode, chosen)
-            hard = fields.hard_cells(data, TAU)[rows]
-            return metrics.r2(data.y[rows][hard], prediction[rows][hard])
+    packed = {
+        name: tuple(np.concatenate(side[key]) for key in ("y", "p", "s"))
+        for name, side in (("own", own), ("other", other))
+    }
+    episodes = {name: (stratum // 1000) for name, (_, _, stratum) in packed.items()}
+
+    def statistic(name):
+        y, prediction, stratum = packed[name]
+        episode = episodes[name]
+
+        def compute(ids):
+            rows = metrics.select_rows(episode, ids)
+            return metrics.stratified_correlation(prediction[rows], y[rows], stratum[rows])
 
         return compute
 
-    low, high = metrics.bootstrap_paired(
-        hard_r2_over(*paired["reached"]),
-        hard_r2_over(*paired["unreached"]),
-        np.unique(paired["reached"][0].episode),
+    summary = "   ".join(
+        f"{name} partial r {metrics.stratified_correlation(prediction, y, stratum):+.3f} ({len(y):,} cells)"
+        for name, (y, prediction, stratum) in packed.items()
     )
-    verdict = "the field is target-specific" if low > 0 else "no detectable difference"
-    print(f"{'':>12}reached − unreached hard R²: [{low:+.3f}, {high:+.3f}]   {verdict}   ({capture})\n")
+    print(f"{'':>12}{summary}")
+
+    low, high = metrics.bootstrap_paired(statistic("own"), statistic("other"), np.unique(episodes["own"]))
+    verdict = (
+        "the field is sharper for the objective it chose"
+        if low > 0
+        else "sharper for the one it ignored"
+        if high < 0
+        else "no detectable difference"
+    )
+    print(f"{'':>12}own - other: [{low:+.3f}, {high:+.3f}]   {verdict}   ({capture})\n")
 
 
 if __name__ == "__main__":

@@ -62,7 +62,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=2048)
     parser.add_argument("--num-envs", type=int, default=64)
     parser.add_argument("--correlation", type=float, default=1.0)
-    parser.add_argument("--scales", type=float, nargs="+", default=[-3, -1.5, 0, 1.5, 3])
+    parser.add_argument(
+        "--scales",
+        type=float,
+        nargs="+",
+        default=[-0.3, -0.15, -0.05, 0, 0.05, 0.15, 0.3],
+        help="Norm of the added vector. The policy survives to about 0.3 and is destroyed by 1.0, "
+        "so a sweep has to stay inside the band where the agent still reaches objectives.",
+    )
     parser.add_argument("--randomise-values", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
@@ -160,8 +167,13 @@ def main() -> None:
     )
     raw, pairs = choice_contrast(fit_rollouts, last)
     choice = steering.Direction("choice (f0 - f1)", raw / np.linalg.norm(raw))
-    print(f"choice direction from {pairs} gap-matched pairs, norm {np.linalg.norm(raw):.4f}")
-    print("scales are multiples of that unit direction, not cells — this quantity has no natural unit\n")
+    print(f"choice direction from {pairs} gap-matched pairs, raw norm {np.linalg.norm(raw):.4f}")
+
+    # The scale that matters is relative to what it is added to. A perturbation
+    # the size of the readout destroys the policy whatever direction it points,
+    # which is a fact about magnitude rather than about the quantity steered.
+    typical = float(np.mean([np.linalg.norm(last(r)[geometry.agent_cell(r.observation)]) for r in fit_rollouts[:256]]))
+    print(f"typical readout norm at the agent's cell {typical:.3f}; scales below are absolute norms\n")
 
     controls = [
         ("random", steering.matched_random("random", choice, seed=args.seed)),
@@ -205,9 +217,11 @@ def main() -> None:
         print()
 
     print(
-        "If the choice direction moves the threshold and random does not, steering works here\n"
-        "and the four distance nulls are about the field rather than the method. If both are\n"
-        "flat, no steering result so far is interpretable."
+        "Only rows where the agent still reaches objectives (>= 95%) are interpretable. Below that\n"
+        "the perturbation is destroying the policy rather than steering it, and every direction\n"
+        "including random does the same. Inside that band: if the choice direction moves the\n"
+        "threshold and random does not, steering works here and the four distance nulls are real.\n"
+        "If both are flat inside the band, no steering result so far is interpretable."
     )
 
 

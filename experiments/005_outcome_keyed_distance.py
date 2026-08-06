@@ -79,7 +79,7 @@ def main() -> None:
     print(provenance())
 
     def env_config(seed: int, split: str) -> MazeConfig:
-        settings = dict(
+        settings: dict[str, object] = dict(
             max_episode_steps=120,
             num_envs=args.num_envs,
             min_size=args.size,

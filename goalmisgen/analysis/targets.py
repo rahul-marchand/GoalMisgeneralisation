@@ -34,8 +34,16 @@ from goalmisgen.analysis.probes import Feature
 class CellTarget(Protocol):
     """One probe question, asked at every cell, carrying its own null."""
 
-    name: str
-    confound_names: tuple[str, ...]
+    # Declared read-only so a frozen dataclass satisfies the protocol; a bare
+    # attribute would require the implementation to be writable, which every
+    # target here deliberately is not.
+    @property
+    def name(self) -> str:
+        ...
+
+    @property
+    def confound_names(self) -> tuple[str, ...]:
+        ...
 
     def labels(self, rollout) -> np.ndarray:
         """``(height, width)`` float. ``NaN`` marks a cell that must not be scored."""

@@ -100,6 +100,81 @@ Interestingly in the 11x11 maze the model learns to complete the task optimally 
 ![](figures/fig4_dynamics.png)
 *Figure 5: returns hide the effect — the three test correlations are indistinguishable. Subtracting them, the proxy run's ρ=1.0 − ρ=0.0 gap settles at +0.165 and the control's at −0.001, and neither moves before competence at ~20M. From cleanba's in-training eval, so only the within-run gap is comparable.*
 
+## Stage 2 — what the agent computes (2026-08-06)
+
+All on `clean11fv`, the control agent. Probes are linear 1x1 maps on the
+ConvLSTM state, fitted on `valid` and scored on `test`.
+
+### A distance field, to both objectives
+
+At every free cell the recurrent state linearly encodes **that cell's
+shortest-path distance to an objective** — a field over the whole maze, not a
+scalar at the goal. Partial correlation, after conditioning away straight-line
+distance:
+
+| | d→f0 | d→f1 |
+|---|---|---|
+| trained | **0.705** | 0.394 |
+| untrained, same architecture | 0.041 | 0.025 |
+| straight-line geometry only | 0.054 | 0.056 |
+
+Both objectives have a field, including the one the agent doesn't go to. So
+the choice is made **after** both distances exist — the substrate a utility
+comparison needs. Accuracy is ~3.5 cells on a field averaging 12; it degrades
+where walls force long detours (r 0.84 → 0.52).
+
+Extra thinking time **prunes the road not taken**: at think=4 the unchosen
+objective's field falls 0.394 → 0.241 while the chosen one barely moves. That
+also explains the pilot's puzzle, where thinking appeared to degrade the field
+— it was discarding the objective being abandoned.
+
+### The asymmetry is value, not channel, distance or utility
+
+- **Not channel.** Re-running at ρ=0.0, so feature 0 marks the *lower*-value
+  objective, mirrors the gap: 0.391 / 0.706.
+- **Not utility.** The utility split *reverses sign* on the 212 levels where
+  value and utility disagree.
+- **Not distance.** On the 205 levels where the objectives are within 2 steps
+  of each other, richer vs poorer is 0.773 / 0.423, **[+0.301, +0.397]**.
+
+One alternative is open, and only the untrained control revealed it: on that
+same subset an untrained tower still gives [+0.047, +0.133]. The richer
+objective carries a literally larger number in the value channel, so its
+neighbourhood has stronger activations. The trained effect is 4x larger
+(difference of differences +0.265), but *value-weighted computation* and
+*amplified input magnitude* are not separated. Separating them needs
+`clean11`, where values vary continuously.
+
+### The exchange rate it learned
+
+Behavioural, no probe. The agent abandons the richer objective at **7.8 extra
+steps** [7.7, 8.0]; the task's rate puts it at 10.0, or 9.3 once γ=0.995 is
+accounted for. Implied step penalty **0.064** against the true 0.05 — it
+over-weights distance by ~28%.
+
+The threshold is near-deterministic: 100% below +2, 0% above +14, the whole
+transition in one bin. And it is **identical at ρ=1.0 and ρ=0.0** (7.8 vs 7.9),
+so the decision is about value, not colour.
+
+**This accounts for the agent's entire error budget.** A 7.8 threshold predicts
+4.2% wrong choices; measured `chose_optimal` is 95.4%. The ~4% suboptimality
+carried since stage 1 is this one mis-learned exchange rate.
+
+### Infrastructure
+
+A target declares `labels` **and** `confound`, and `controls()` generates the
+oracle, null and shuffled arms from that declaration — so a probe question
+cannot be asked without the controls that make it readable. `check_rig` raises
+rather than warns. Metrics split ordering from calibration exactly
+(`R² = ρ² − (ρ−k)² − b²`). No `Environment` protocol: the port boundary is
+`geometry.py` + `targets.py` and a test enforces it.
+
+### Not established
+
+- Everything is **correlational**. Nothing has been intervened on.
+- The value-vs-amplitude alternative above.
+- n=1 seed; only the control agent — the proxy agent has not been probed.
+
 ## Going Forwards
 
 I think the questions I am interested in sort of cluster into two groups:

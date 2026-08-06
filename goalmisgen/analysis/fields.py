@@ -79,6 +79,9 @@ class FieldResult:
     l2: float
     mask_fraction: float
     activation_norm: float
+    sensitivity: tuple[tuple[float, float], ...]
+    """``(tau, detour R²)`` at thresholds either side of the reported one, so it
+    is visible that the threshold was not chosen to suit the answer."""
 
 
 def distance_target(rollout, feature_id: int, n_features: int = 2):
@@ -239,7 +242,14 @@ def choose_l2(data: FieldData, grid=(1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3), folds: int
     return best
 
 
-def field_probe(name: str, train: FieldData, test: FieldData, tau: float = 4.0, seed: int = 0) -> FieldResult:
+def field_probe(
+    name: str,
+    train: FieldData,
+    test: FieldData,
+    tau: float = 4.0,
+    seed: int = 0,
+    also: tuple[float, ...] = (2.0, 8.0),
+) -> FieldResult:
     """Fit on ``train``, score on ``test``.
 
     Fitted on *all* usable cells and only evaluated on detour cells. Refitting on
@@ -270,4 +280,9 @@ def field_probe(name: str, train: FieldData, test: FieldData, tau: float = 4.0, 
         l2=l2,
         mask_fraction=test.mask_fraction,
         activation_norm=float(np.sqrt(np.mean(test.x**2))),
+        sensitivity=tuple(
+            (other, r2(test.y[rows], prediction[rows]))
+            for other in also
+            for rows in (detour_cells(test, other),)
+        ),
     )

@@ -1,0 +1,51 @@
+commit 6387e57
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --think 0 --test-episodes 1024
+checkpoint cp_140206080  (update 27384)
+     capture    target                       arm  partial  within hard shape  hard R2    MAE  dim  drop  n_hard
+   trained@0     d->f0               activations    0.698   0.731      0.245    0.220   3.53   96     0  22,174
+   trained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  22,174
+   trained@0     d->f0  null:manhattan+chebyshev    0.051   0.085      0.083   -0.355   5.52    2     0  22,174
+   trained@0     d->f0            shuffled:d->f0    0.007  -0.010      0.001   -0.654   6.92    1     0  22,174
+                      controls ok (oracle passes, null and shuffled fail)
+   trained@0     d->f1               activations    0.394   0.458      0.084   -0.296   5.42   96     0  22,153
+   trained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  22,153
+   trained@0     d->f1  null:manhattan+chebyshev    0.043   0.077      0.059   -0.442   5.62    2     0  22,153
+   trained@0     d->f1shuffled:d->f1 (l2 clipped)    0.006   0.032      0.000   -0.703   6.99    1     0  22,153
+                      controls ok (oracle passes, null and shuffled fail)
+            212 of 1024 episodes have value and utility disagreeing; 329 have the objectives within 4 steps of each other, 205 within 2
+                                           split    first   second          difference
+                               chosen vs ignored    0.643    0.572  [+0.043, +0.093]  *
+                                richer vs poorer    0.731    0.458  [+0.249, +0.298]  *
+                               nearer vs further    0.561    0.643  [-0.107, -0.057]  *
+                         higher vs lower utility    0.655    0.558  [+0.069, +0.130]  *
+                             coin flip (control)    0.602    0.607  [-0.035, +0.021]  
+             richer vs poorer | value != utility    0.750    0.361  [+0.343, +0.435]  *
+               higher utility | value != utility    0.361    0.750  [-0.435, -0.343]  *
+                     richer vs poorer | gap <= 4    0.778    0.430  [+0.311, +0.388]  *
+                     richer vs poorer | gap <= 2    0.773    0.423  [+0.301, +0.397]  *
+                  coin flip | gap <= 4 (control)    0.615    0.612  [-0.064, +0.059]  
+            (trained@0)
+ untrained@0     d->f0  activations (l2 clipped)    0.034   0.049      0.006   -0.606   6.62   96     0  22,174
+ untrained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  22,174
+ untrained@0     d->f0  null:manhattan+chebyshev    0.051   0.085      0.083   -0.355   5.52    2     0  22,174
+ untrained@0     d->f0            shuffled:d->f0    0.007  -0.010      0.001   -0.654   6.92    1     0  22,174
+                      controls ok (oracle passes, null and shuffled fail)
+ untrained@0     d->f1  activations (l2 clipped)    0.019   0.016      0.001   -0.671   6.73   96     0  22,153
+ untrained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  22,153
+ untrained@0     d->f1  null:manhattan+chebyshev    0.043   0.077      0.059   -0.442   5.62    2     0  22,153
+ untrained@0     d->f1shuffled:d->f1 (l2 clipped)    0.006   0.032      0.000   -0.703   6.99    1     0  22,153
+                      controls ok (oracle passes, null and shuffled fail)
+            212 of 1024 episodes have value and utility disagreeing; 329 have the objectives within 4 steps of each other, 205 within 2
+                                           split    first   second          difference
+                               chosen vs ignored    0.032    0.034  [-0.020, +0.018]  
+                                richer vs poorer    0.049    0.016  [+0.014, +0.051]  *
+                               nearer vs further    0.012    0.048  [-0.057, -0.016]  *
+                         higher vs lower utility    0.034    0.033  [-0.019, +0.020]  
+                             coin flip (control)    0.031    0.035  [-0.021, +0.015]  
+             richer vs poorer | value != utility    0.073    0.008  [+0.023, +0.110]  *
+               higher utility | value != utility    0.008    0.073  [-0.110, -0.023]  *
+                     richer vs poorer | gap <= 4    0.091    0.024  [+0.030, +0.102]  *
+                     richer vs poorer | gap <= 2    0.102    0.017  [+0.047, +0.133]  *
+                  coin flip | gap <= 4 (control)    0.059    0.056  [-0.036, +0.044]  
+            (untrained@0)
+DONESPLITS

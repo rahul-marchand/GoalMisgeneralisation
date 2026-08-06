@@ -141,6 +141,7 @@ def collect_rollouts(
     steps_to_think: int = 0,
     probe_params=None,
     probe_steps_to_think: int = 0,
+    steer_delta=None,
 ) -> list[Rollout]:
     """Run episodes, capturing the hidden state at t=0 and the route taken.
 
@@ -195,6 +196,15 @@ def collect_rollouts(
             probe_carry, _, _, _ = get_action(
                 features_params, probe_carry, observations, starts, key, temperature=0.0
             )
+
+        # Capture the state the agent will actually act from, including any
+        # intervention. Steering the arithmetic is easy; showing the shift
+        # survives nine gated recurrent updates is the part that decides
+        # whether a null result means "ignored" or "did not stick".
+        if steer_delta is not None:
+            from goalmisgen.analysis.steering import apply_to_carry
+
+            probe_carry = apply_to_carry(probe_carry, steer_delta)
 
         initial_carry = jax.tree_util.tree_map(np.asarray, probe_carry)
         initial_obs = np.asarray(observations)

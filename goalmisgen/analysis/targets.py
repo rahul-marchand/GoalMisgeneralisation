@@ -180,3 +180,76 @@ def _shuffled_oracle(target: CellTarget, rollouts: Sequence, seed: int = 0) -> F
         id(rollout): np.nan_to_num(target.labels(rollouts[order[index]]))[:, :, None] for index, rollout in enumerate(rollouts)
     }
     return Feature(f"shuffled:{target.name}", lambda rollout: grids[id(rollout)])
+
+
+STEP_PENALTY = 0.05
+"""What a step costs, so utility is ``value - STEP_PENALTY x distance``.
+
+Matches the environment's default. If a run changes it, this must change with
+it, or "the higher-utility objective" names a different objective than the one
+the agent was trained to prefer.
+"""
+
+
+def objective_distance(rollout, feature_id: int, n_features: int = 2) -> float:
+    """Steps from the agent to one objective, routing around the other.
+
+    Routing around matters: reaching either objective ends the episode, so a
+    path through the wrong one never arrives.
+    """
+    observation = rollout.observation
+    field = geometry.bfs_field(
+        geometry.blocking_walls(observation, feature_id, n_features),
+        geometry.objective_cell(observation, feature_id),
+    )
+    return float(field[geometry.agent_cell(observation)])
+
+
+def _pick(rollout, score, n_features: int) -> int | None:
+    """The objective maximising ``score``. ``None`` on a tie or if one is cut off.
+
+    Ties are dropped rather than broken. A tie means the two objectives are
+    indistinguishable on this criterion, so an episode contributed under either
+    label would be noise on both sides of a comparison.
+    """
+    values = []
+    for feature in range(n_features):
+        try:
+            value = score(rollout, feature)
+        except ValueError:
+            return None
+        if not np.isfinite(value):
+            return None
+        values.append(value)
+
+    best = max(values)
+    return None if values.count(best) > 1 else int(np.argmax(values))
+
+
+def richer(rollout, n_features: int = 2) -> int | None:
+    """The objective worth more, ignoring how far away it is."""
+    return _pick(rollout, lambda r, f: geometry.objective_value(r.observation, f, n_features), n_features)
+
+
+def nearer(rollout, n_features: int = 2) -> int | None:
+    """The objective fewer steps away, ignoring what it is worth."""
+    return _pick(rollout, lambda r, f: -objective_distance(r, f, n_features), n_features)
+
+
+def best_utility(rollout, n_features: int = 2, step_penalty: float = STEP_PENALTY) -> int | None:
+    """The objective an optimal agent would take: value minus the walk."""
+    return _pick(
+        rollout,
+        lambda r, f: geometry.objective_value(r.observation, f, n_features) - step_penalty * objective_distance(r, f, n_features),
+        n_features,
+    )
+
+
+def coinflip(rollout, seed: int = 0, n_features: int = 2) -> int:
+    """A split with nothing behind it.
+
+    The control for the comparison machinery itself: any difference between two
+    sides assigned at random is a bug in how the sides are built, not a fact
+    about the network. Deterministic per episode so a re-run is comparable.
+    """
+    return int(np.random.default_rng((seed, id(rollout) % 2**32)).integers(n_features))

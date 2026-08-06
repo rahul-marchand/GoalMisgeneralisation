@@ -114,6 +114,17 @@ def blocking_walls(observation: np.ndarray, feature_id: int, n_features: int) ->
     return walls
 
 
+def value_channel(n_features: int) -> int:
+    """Index of the channel carrying an objective's worth, at its own cell."""
+    return FIRST_FEATURE_CHANNEL + n_features
+
+
+def objective_value(observation: np.ndarray, feature_id: int, n_features: int) -> float:
+    """What one objective is worth, read where the encoder wrote it."""
+    row, col = objective_cell(observation, feature_id)
+    return float(observation[row, col, value_channel(n_features)])
+
+
 def bfs_field(walls: np.ndarray, source: Position) -> np.ndarray:
     """Shortest-path distance from ``source`` to every cell, ``NaN`` if unreachable.
 

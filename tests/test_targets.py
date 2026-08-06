@@ -141,3 +141,61 @@ def test_the_shuffled_oracle_still_holds_real_fields():
     _, _, shuffled = targets.controls(FIXED, rollouts)
     values = np.concatenate([shuffled(rollout).ravel() for rollout in rollouts])
     assert values.max() > 5, "the permuted grids do not look like distance fields"
+
+
+def value_and_distance_rollouts(n, size=11, seed=0):
+    """Real levels with the outcome recorded, for the ground-truth selectors."""
+    return make_rollouts(n, size=size, seed=seed)
+
+
+def test_the_selectors_agree_with_the_solver():
+    """richer, nearer and best_utility must name the same objectives the
+    environment's own ground truth does, or every split is mislabelled."""
+    from goalmisgen.envs.observation import ObservationEncoder
+    from goalmisgen.envs.sampling import MazeLevelSampler
+    from goalmisgen.envs.solver import solve
+
+    sampler = MazeLevelSampler(size_range=(11, 11))
+    encoder = ObservationEncoder(max_size=11, n_features=2)
+    rng = np.random.default_rng(3)
+
+    checked = 0
+    for _ in range(60):
+        level = sampler.sample(rng)
+        rollout = types.SimpleNamespace(observation=encoder.encode(level, level.agent_start), info={}, index=0)
+        solution = solve(level, targets.STEP_PENALTY)
+        if solution.is_ambiguous:
+            continue
+
+        feature_of = {index: objective.feature_id for index, objective in enumerate(level.objectives)}
+        assert targets.best_utility(rollout) == feature_of[solution.optimal_index], "utility selector disagrees with solve()"
+
+        values = [objective.value for objective in level.objectives]
+        assert targets.richer(rollout) == feature_of[int(np.argmax(values))]
+
+        distances = [d for d in solution.distances]
+        if len(set(distances)) == len(distances):
+            assert targets.nearer(rollout) == feature_of[int(np.argmin(distances))]
+        checked += 1
+    assert checked > 30, f"only {checked} unambiguous levels — the test is not exercising much"
+
+
+def test_a_tie_is_dropped_rather_than_broken():
+    """An objective pair indistinguishable on a criterion would be noise on both
+    sides of the comparison it is supposed to split."""
+    rollout = make_rollouts(1)[0]
+    observation = rollout.observation
+    value = geometry.value_channel(2)
+    row0, col0 = geometry.objective_cell(observation, 0)
+    row1, col1 = geometry.objective_cell(observation, 1)
+    observation[row0, col0, value] = observation[row1, col1, value] = 0.75
+
+    assert targets.richer(rollout) is None, "a value tie should drop the episode"
+
+
+def test_the_coin_flip_control_is_deterministic_per_episode():
+    """A re-run must produce the same split, or two runs are not comparable."""
+    rollouts = make_rollouts(20, seed=11)
+    once = [targets.coinflip(rollout) for rollout in rollouts]
+    assert once == [targets.coinflip(rollout) for rollout in rollouts]
+    assert 0 < sum(once) < len(once), "the control split put every episode on one side"

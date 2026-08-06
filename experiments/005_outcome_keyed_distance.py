@@ -172,7 +172,7 @@ def main() -> None:
                     )
                 print(f"{'':>22}{check_rig(scores)}\n")
 
-            report_own_versus_other(split, score_rollouts, capture.name)
+            report_splits(split, score_rollouts, capture.name)
 
 
 def check_rig(scores) -> str:
@@ -202,39 +202,73 @@ def check_rig(scores) -> str:
     return "controls ok (oracle passes, null and shuffled fail)"
 
 
-def report_own_versus_other(split, rollouts, capture: str) -> None:
-    """Is the field sharper for the objective the agent went to?
+def report_splits(split, rollouts, capture: str) -> None:
+    """Which property of an objective predicts a sharper field for it?
 
     Each probe is fitted to a *fixed* objective, so the quantity it decodes
-    never changes identity and a single linear map can represent it. The
-    outcome enters by splitting episodes, not by re-keying the target: for each
-    episode, the probe for the objective it reached is "own" and the other is
-    "other".
+    never changes identity. The property enters by splitting episodes: for each
+    episode one objective is the "first" side and the other the "second", and
+    every episode contributes to both, so the bootstrap is genuinely paired.
 
-    Every episode contributes to both sides, so the bootstrap is genuinely
-    paired and the between-maze variance the two share cancels.
+    Value and utility agree on most levels, because the value gap only loses to
+    distance when the cheaper objective is much nearer. The subset where they
+    disagree is what separates them, and it is reported on its own.
     """
-    own, other = {"y": [], "p": [], "s": []}, {"y": [], "p": [], "s": []}
+    n = N_FEATURES
+    everywhere = list(range(len(rollouts)))
+    disagree = [
+        index
+        for index, rollout in enumerate(rollouts)
+        if targets.richer(rollout, n) is not None
+        and targets.best_utility(rollout, n) is not None
+        and targets.richer(rollout, n) != targets.best_utility(rollout, n)
+    ]
+
+    named = [
+        ("chosen vs ignored", targets.reached, everywhere),
+        ("richer vs poorer", lambda r: targets.richer(r, n), everywhere),
+        ("nearer vs further", lambda r: targets.nearer(r, n), everywhere),
+        ("higher vs lower utility", lambda r: targets.best_utility(r, n), everywhere),
+        ("coin flip (control)", lambda r: targets.coinflip(r), everywhere),
+        ("richer vs poorer | value != utility", lambda r: targets.richer(r, n), disagree),
+        ("higher utility | value != utility", lambda r: targets.best_utility(r, n), disagree),
+    ]
+
+    print(f"{'':>12}{len(disagree)} of {len(rollouts)} episodes have value and utility disagreeing\n")
+    print(f"{'':>12}{'split':>36}{'first':>9}{'second':>9}{'difference':>20}")
+    for label, selector, episodes in named:
+        line = one_split(split, rollouts, selector, episodes)
+        print(f"{'':>12}{label:>36}{line}")
+    print(f"{'':>12}({capture})\n")
+
+
+def one_split(split, rollouts, selector, episodes) -> str:
+    """Partial r either side of one split, and a paired interval on the gap."""
+    keep = set(episodes)
+    first, second = {"y": [], "p": [], "s": []}, {"y": [], "p": [], "s": []}
+
     for feature, (data, prediction) in split.items():
-        went_to = np.array([targets.reached(rollouts[index]) for index in data.episode])
-        mine = went_to == feature
-        # Stratify within episode *and* within straight-line distance: the
-        # strongest form, and the one the table reports as "within".
+        picked = np.array([selector(rollouts[index]) for index in data.episode], dtype=object)
+        usable = np.array([index in keep and value is not None for index, value in zip(data.episode, picked)])
+        mine = np.array([value == feature for value in picked]) & usable
+        theirs = np.array([value is not None and value != feature for value in picked]) & usable
+
         stratum = data.episode * 1000 + data.confound[:, 0].astype(np.int64)
-        for side, rows in ((own, mine), (other, ~mine)):
+        for side, rows in ((first, mine), (second, theirs)):
             side["y"].append(data.y[rows])
             side["p"].append(prediction[rows])
             side["s"].append(stratum[rows])
 
     packed = {
         name: tuple(np.concatenate(side[key]) for key in ("y", "p", "s"))
-        for name, side in (("own", own), ("other", other))
+        for name, side in (("first", first), ("second", second))
     }
-    episodes = {name: (stratum // 1000) for name, (_, _, stratum) in packed.items()}
+    if min(len(packed[name][0]) for name in packed) < 200:
+        return f"{'too few cells':>38}"
 
     def statistic(name):
         y, prediction, stratum = packed[name]
-        episode = episodes[name]
+        episode = stratum // 1000
 
         def compute(ids):
             rows = metrics.select_rows(episode, ids)
@@ -242,21 +276,14 @@ def report_own_versus_other(split, rollouts, capture: str) -> None:
 
         return compute
 
-    summary = "   ".join(
-        f"{name} partial r {metrics.stratified_correlation(prediction, y, stratum):+.3f} ({len(y):,} cells)"
-        for name, (y, prediction, stratum) in packed.items()
+    scores = {
+        name: metrics.stratified_correlation(prediction, y, stratum) for name, (y, prediction, stratum) in packed.items()
+    }
+    low, high = metrics.bootstrap_paired(
+        statistic("first"), statistic("second"), np.unique(packed["first"][2] // 1000)
     )
-    print(f"{'':>12}{summary}")
-
-    low, high = metrics.bootstrap_paired(statistic("own"), statistic("other"), np.unique(episodes["own"]))
-    verdict = (
-        "the field is sharper for the objective it chose"
-        if low > 0
-        else "sharper for the one it ignored"
-        if high < 0
-        else "no detectable difference"
-    )
-    print(f"{'':>12}own - other: [{low:+.3f}, {high:+.3f}]   {verdict}   ({capture})\n")
+    mark = "" if low <= 0 <= high else "  *"
+    return f"{scores['first']:>9.3f}{scores['second']:>9.3f}{f'[{low:+.3f}, {high:+.3f}]':>18}{mark:>2}"
 
 
 if __name__ == "__main__":

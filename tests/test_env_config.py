@@ -72,3 +72,19 @@ def test_the_seed_reaches_an_asynchronous_env_too(asynchronous):
 
     assert np.array_equal(first[0], again[0]), "the same seed must reproduce the same levels"
     assert not np.array_equal(first[0], other[0]), "a different seed must give different levels"
+
+
+def test_dropping_the_value_channel_needs_an_explicit_opt_in():
+    """Without a value channel colour is the only cue to value, so a
+    colour-follower and a value-follower are indistinguishable and no
+    misgeneralisation can be measured. Legitimate for a mechanism experiment,
+    never something to reach by accident."""
+    with pytest.raises(ValueError, match="colour_is_the_only_value_cue"):
+        MazeConfig(max_episode_steps=120, n_objectives=2, value_encoding="none")
+
+    config = MazeConfig(
+        max_episode_steps=120, n_objectives=2, value_encoding="none", colour_is_the_only_value_cue=True
+    )
+    encoder = config.encoder()
+    assert encoder.n_value_channels == 0
+    assert encoder.n_channels == 4, "walls, agent and two feature channels, and nothing else"

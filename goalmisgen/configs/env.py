@@ -149,6 +149,18 @@ class MazeConfig(EnvConfig):
     """
 
     value_encoding: ValueEncoding = "at_objective"
+
+    colour_is_the_only_value_cue: bool = False
+    """Permit an observation with no value channel, knowingly.
+
+    Without one the agent cannot read what an objective is worth, so it has to
+    learn the values as internal constants and still trade them against
+    distance. That makes a value representation something the network built
+    rather than something it was handed, which is the point of probing for one.
+
+    The cost is that no misgeneralisation can be measured on such a run: colour
+    is the only cue to value, so following it is the sole available strategy
+    rather than a proxy. Opt in per experiment, never by default."""
     """Must not be "none" with several objectives.
 
     Without a value cue, colour is the only signal of which objective is worth
@@ -186,11 +198,12 @@ class MazeConfig(EnvConfig):
     """MazeEnv has four actions and no no-op, so nothing should be stripped."""
 
     def __post_init__(self) -> None:
-        if self.n_objectives > 1 and self.value_encoding == "none":
+        if self.n_objectives > 1 and self.value_encoding == "none" and not self.colour_is_the_only_value_cue:
             raise ValueError(
                 "value_encoding='none' with several objectives makes colour the only cue "
                 "to value, so a colour-following policy cannot be distinguished from a "
-                "value-following one and no misgeneralisation can be measured"
+                "value-following one and no misgeneralisation can be measured. Set "
+                "colour_is_the_only_value_cue=True if that is deliberate."
             )
         if not self.randomise_values and len(self.objective_values) != self.n_objectives:
             raise ValueError(

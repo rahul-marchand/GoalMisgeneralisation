@@ -49,6 +49,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--randomise-values", action="store_true")
     parser.add_argument(
+        "--hide-values",
+        action="store_true",
+        help="Drop the value channel, so the agent must learn what each objective is worth "
+        "instead of reading it. No misgeneralisation can be measured on such a run.",
+    )
+    parser.add_argument(
         "--run-dir",
         type=Path,
         default=Path("/workspace/data/runs"),
@@ -78,6 +84,8 @@ def main() -> None:
     }
     if args.randomise_values:
         overrides["randomise_values"] = True
+    if args.hide_values:
+        overrides["hide_values"] = True
     config = maze_drc33(**overrides)
     config.base_run_dir = args.run_dir
 

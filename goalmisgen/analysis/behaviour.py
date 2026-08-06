@@ -25,6 +25,8 @@ import dataclasses
 
 import numpy as np
 
+from goalmisgen.analysis.probes import fit_logistic
+
 
 @dataclasses.dataclass(frozen=True)
 class BehaviourSummary:
@@ -154,3 +156,47 @@ def summarise(outcomes: list[dict]) -> BehaviourSummary:
         mean_return=float(np.mean([o.get("episode_return", 0.0) for o in outcomes])),
         mean_steps=float(np.mean([o.get("episode_steps", 0) for o in outcomes])),
     )
+
+
+UNREACHABLE = -1
+
+
+def value_distance_decisions(outcomes, n_features: int = 2):
+    """Per episode: how much further the richer objective was, and whether it won.
+
+    Dropped: timeouts, ties in value, and levels where an objective is walled
+    off. In each case the agent faced no trade-off to make, so the episode says
+    nothing about the rate at which it makes them.
+    """
+    gaps, took_richer, gap_in_value = [], [], []
+    for outcome in outcomes:
+        if not outcome.get("reached_objective"):
+            continue
+        values = [outcome.get(f"feature_{f}_value") for f in range(n_features)]
+        distances = [outcome.get(f"feature_{f}_distance") for f in range(n_features)]
+        if any(v is None for v in values) or any(d is None or d == UNREACHABLE for d in distances):
+            continue
+        if values[0] == values[1]:
+            continue
+
+        richer = int(np.argmax(values))
+        gaps.append(float(distances[richer] - distances[1 - richer]))
+        gap_in_value.append(abs(float(values[0]) - float(values[1])))
+        took_richer.append(float(outcome.get("reached_feature_id") == richer))
+
+    return np.array(gaps), np.array(took_richer), np.array(gap_in_value)
+
+
+def indifference_point(gaps: np.ndarray, took_richer: np.ndarray) -> float:
+    """Distance gap at which the agent is equally likely to take either.
+
+    A logistic fit rather than reading off a binned curve: the bins are uneven
+    and the crossing usually falls between two of them.
+    """
+    if len(np.unique(took_richer)) < 2:
+        return float("nan")
+    weights, mean, std = fit_logistic(gaps[:, None], took_richer, steps=4000, lr=0.5, l2=1e-6)
+    slope, bias = float(weights[0]), float(weights[1])
+    if abs(slope) < 1e-9:
+        return float("nan")
+    return float(mean[0] + std[0] * (-bias / slope))

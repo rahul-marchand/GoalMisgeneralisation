@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from goalmisgen.analysis import bin_by_margin, collect_episode_outcomes, summarise
+from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.configs.env import MazeConfig
 
 
@@ -156,3 +157,36 @@ def test_margin_bins_drop_ambiguous_levels():
 def test_margin_bins_reject_unordered_edges():
     with pytest.raises(ValueError, match="must increase"):
         bin_by_margin([], edges=(0.3, 0.1))
+
+
+def test_the_psychometric_decisions_drop_episodes_with_no_trade_off():
+    """A timeout, a value tie or a walled-off objective poses no trade-off, so
+    including it would put a non-decision into a curve that measures how
+    decisions are made."""
+    outcomes = [
+        # A real decision: the richer objective is 6 steps further and was taken anyway.
+        {"reached_objective": True, "reached_feature_id": 0, "feature_0_value": 1.0, "feature_1_value": 0.5,
+         "feature_0_distance": 14, "feature_1_distance": 8},
+        {"reached_objective": False, "feature_0_value": 1.0, "feature_1_value": 0.5,
+         "feature_0_distance": 4, "feature_1_distance": 9},
+        {"reached_objective": True, "reached_feature_id": 1, "feature_0_value": 0.7, "feature_1_value": 0.7,
+         "feature_0_distance": 4, "feature_1_distance": 9},
+        {"reached_objective": True, "reached_feature_id": 0, "feature_0_value": 1.0, "feature_1_value": 0.5,
+         "feature_0_distance": 4, "feature_1_distance": -1},
+    ]
+    gaps, took_richer, value_gaps = value_distance_decisions(outcomes)
+
+    assert len(gaps) == 1, f"expected one usable decision, got {len(gaps)}"
+    assert gaps[0] == 6.0
+    assert took_richer[0] == 1.0
+    assert value_gaps[0] == pytest.approx(0.5)
+
+
+def test_the_indifference_point_is_recovered_from_a_known_threshold():
+    """Synthesise an agent that switches at exactly 10 extra steps. If the fit
+    cannot say 10, the number this measurement reports means nothing."""
+    rng = np.random.default_rng(0)
+    gaps = rng.uniform(-20, 30, 4000)
+    took_richer = (gaps < 10).astype(float)
+
+    assert indifference_point(gaps, took_richer) == pytest.approx(10.0, abs=0.7)

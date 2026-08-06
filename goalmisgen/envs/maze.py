@@ -23,7 +23,7 @@ from goalmisgen.envs.level import Level, Position
 from goalmisgen.envs.observation import ObservationEncoder, ObservationScheme
 from goalmisgen.envs.rendering import render
 from goalmisgen.envs.sampling import LevelSampler, MazeLevelSampler
-from goalmisgen.envs.solver import MOVES, LevelSolution, solve
+from goalmisgen.envs.solver import MOVES, UNREACHABLE, LevelSolution, solve
 
 # Action index -> (row, column) delta comes from the solver, so the ground
 # truth and the environment cannot disagree about what a move is.
@@ -165,7 +165,7 @@ class MazeEnv(gym.Env):
         sub-environments, and ragged or nested values do not survive that.
         """
         optimal = self.solution.optimal_index
-        return {
+        info = {
             "optimal_index": optimal,
             "optimal_feature_id": self.level.objectives[optimal].feature_id,
             "optimal_value": self.level.objectives[optimal].value,
@@ -174,6 +174,16 @@ class MazeEnv(gym.Env):
             "is_ambiguous": self.solution.is_ambiguous,
             "level_size": self.level.shape[0],
         }
+        # Every objective's value and distance, keyed by feature rather than by
+        # index. Only the optimal one was reported, which is enough to say
+        # whether a choice was right but not to ask *how* the agent traded value
+        # against distance — that needs both sides of the comparison it faced.
+        # Unreachable objectives report -1, matching solver.UNREACHABLE.
+        for index, objective in enumerate(self.level.objectives):
+            distance = self.solution.distances[index]
+            info[f"feature_{objective.feature_id}_value"] = objective.value
+            info[f"feature_{objective.feature_id}_distance"] = UNREACHABLE if distance is None else distance
+        return info
 
     def _outcome_info(self, reached: int | None) -> dict[str, Any]:
         """What the agent actually did, for misgeneralisation metrics.

@@ -359,3 +359,26 @@ def test_the_solver_and_the_environment_agree_about_what_a_move_is():
     from goalmisgen.envs.solver import MOVES
 
     assert len(MOVES) == MazeEnv().action_space.n
+
+
+def test_info_reports_both_objectives_not_only_the_optimal_one():
+    """Asking how the agent traded value against distance needs both sides of
+    the comparison it faced, not just the side that won."""
+    from goalmisgen.envs.sampling import MazeLevelSampler
+    from goalmisgen.envs.solver import objective_distances
+
+    env = MazeEnv(
+        MazeLevelSampler(size_range=(11, 11)),
+        ObservationEncoder(max_size=11, n_features=2),
+        step_penalty=0.05,
+    )
+
+    for seed in range(20):
+        _, info = env.reset(seed=seed)
+        distances = objective_distances(env.level)
+        for index, objective in enumerate(env.level.objectives):
+            assert info[f"feature_{objective.feature_id}_value"] == objective.value
+            expected = -1 if distances[index] is None else distances[index]
+            assert info[f"feature_{objective.feature_id}_distance"] == expected, (
+                f"feature {objective.feature_id} distance disagrees with the solver"
+            )

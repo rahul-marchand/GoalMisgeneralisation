@@ -1,288 +1,255 @@
-"""Probing for a per-cell distance field.
+"""Fitting a per-cell probe and scoring it against its target's own null.
 
-The route probe asks a yes/no question — will the agent step here — and is
-scored with AUC. This asks a magnitude question: how many steps is this cell
-from the objective. That needs a regression fit and, more importantly, a
-different set of defences.
+The route probe asks a yes/no question and is scored with AUC. This asks a
+magnitude — how many steps is this cell from the objective — which needs a
+regression fit and a different defence.
 
-The defence that matters is against **straight-line distance**. On real 11x11
-levels, ``corr(bfs, manhattan) = 0.57`` and a linear model on straight-line
-distance alone explains R² = 0.33 of the true field. A probe reading nothing but
-free-space geometry — which an untrained convolutional tower supplies for free,
-since iterating a 3x3 kernel spreads information isotropically — therefore
-scores well enough to look like a finding. Pooled R² is the regression analogue
-of the pooled negatives that invalidated the first distance-band result.
+The defence is against **the target's declared confound**. For a distance field
+that is straight-line geometry: on real levels ``corr(bfs, manhattan) = 0.57``
+and a linear model on it alone explains R² = 0.33 of the true field, which is
+enough to look like a finding. Pooled R² is the regression analogue of the
+pooled negatives that invalidated the first distance-band result, so it is
+printed for context and never rested on.
 
-So the claim rests on two numbers, never on pooled R²:
+The claim rests on two numbers:
 
-**Detour R²** — accuracy restricted to cells where walls force a long way round
-(``bfs - manhattan >= tau``). Straight-line distance is *wrong* there by
-construction. Scored against the detour subset's own mean, because that subset
-has a systematically larger target and the global mean would flatter every arm.
+**Hard-cell R²** — accuracy restricted to cells where the confound is most
+wrong (``label - confound >= tau``), scored against that subset's own mean
+because the subset has a systematically larger target and the global mean would
+flatter every arm.
 
 **Stratified partial correlation** — the exact generalisation of matched
-negatives. Centre prediction and target within each integer straight-line
-distance, then correlate the residuals: whatever a geometry-only feature could
-have told you is removed by construction.
+negatives: centre prediction and label within each integer confound value, then
+correlate the residuals.
 
-Deliberately plain functions. The probe-target protocol this will eventually
-sit behind is a separate design question, and worth answering with a
-measurement in hand rather than before one.
+Nothing here knows what a maze is; that lives in
+:mod:`goalmisgen.analysis.targets`.
 """
 
 from __future__ import annotations
 
 import dataclasses
-from typing import Callable
 
 import numpy as np
 
-from goalmisgen.analysis import geometry
-from goalmisgen.analysis.probes import apply_linear, fit_ridge
+from goalmisgen.analysis import metrics
+from goalmisgen.analysis.probes import Feature, apply_linear, fit_ridge
 
-FeatureGrid = Callable[[object], np.ndarray]
-"""Maps a rollout to a ``(height, width, depth)`` grid the probe reads per cell."""
+DEGENERATE = 1e-6
+"""A channel whose spread is below this carries no information.
+
+Standardising divides by ``std + 1e-8``, so a near-constant channel is
+amplified into unit-scale noise that the penalty must then suppress. Left in,
+they weaken exactly the arms with the least signal — which are the controls.
+"""
 
 
 @dataclasses.dataclass(frozen=True)
-class FieldData:
-    """Per-cell rows, masked identically across every arm so they are comparable."""
+class CellData:
+    """Per-cell rows, masked identically across arms so they are comparable."""
 
     x: np.ndarray
     """(n, depth) features."""
 
     y: np.ndarray
-    """(n,) true shortest-path distance, in cells."""
+    """(n,) the target's label, in its own units."""
 
-    straight: np.ndarray
-    """(n, 2) manhattan and chebyshev distance from the same source."""
+    confound: np.ndarray
+    """(n, k) the target's declared null. Column 0 lower-bounds ``y``."""
 
     episode: np.ndarray
     """(n,) which rollout each row came from, for grouped resampling."""
 
     mask_fraction: float
-    """Share of free cells that survived. Unreachable cells are dropped, and on
-    these levels that is about one in six."""
+    """Share of cells that survived masking."""
+
+    dropped_columns: int
+    """Feature channels removed for carrying no variation."""
 
 
 @dataclasses.dataclass(frozen=True)
 class FieldResult:
     name: str
+    hard_r2: float
+    """The headline: R² on cells the confound gets most wrong, recalibrated."""
+
+    hard_interval: tuple[float, float]
+    hard_shape_r2: float
+    """The ordering ceiling on those cells — R² an oracle rescaling would reach."""
+
     pooled_r2: float
-    detour_r2: float
-    detour_interval: tuple[float, float]
     partial_r: float
+    partial_r_within_episode: float
+    """The same, stratified within episode as well as by confound. If this
+    collapses, the pooled figure was riding on between-maze variance."""
+
+    slope: float
+    bias: float
     mae: float
     n_samples: int
-    n_detour: int
+    n_hard: int
     depth: int
+    dropped_columns: int
     l2: float
     mask_fraction: float
-    activation_norm: float
+    feature_norm: float
     sensitivity: tuple[tuple[float, float], ...]
-    """``(tau, detour R²)`` at thresholds either side of the reported one, so it
-    is visible that the threshold was not chosen to suit the answer."""
 
 
-def distance_target(rollout, feature_id: int, n_features: int = 2):
-    """True field and its geometry-only null, for one objective.
-
-    Returns ``(labels, manhattan, chebyshev)``, each ``(height, width)`` with
-    ``NaN`` outside the reachable set.
-    """
-    observation = rollout.observation
-    geometry.check_layout(observation, n_features)
-    source = geometry.objective_cell(observation, feature_id)
-    walls = geometry.blocking_walls(observation, feature_id, n_features)
-    return (
-        geometry.bfs_field(walls, source),
-        geometry.manhattan_field(observation.shape[:2], source),
-        geometry.chebyshev_field(observation.shape[:2], source),
-    )
-
-
-def field_dataset(rollouts, grid: FeatureGrid, feature_id: int, n_features: int = 2) -> FieldData:
+def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True) -> CellData:
     """Flatten rollouts into per-cell rows.
 
-    Cells are kept when they are free and reachable. The objective's own cell is
-    dropped: its distance is zero and it is a one-hot channel in the observation,
-    so every arm would score it correctly and learn nothing. That is the same
-    trap as scoring the route probe at step 0, where the observation baseline
-    reached AUC 1.000 because the agent's cell is literally an input channel.
+    One masking rule: a row survives if its label, its confound and its features
+    are all finite. Everything the target considers unscoreable — walls,
+    unreachable cells, the objective's own cell, a whole episode that timed
+    out — it expresses as ``NaN``, so this layer needs no maze knowledge.
     """
-    xs, ys, straights, episodes = [], [], [], []
+    xs, ys, confounds, episodes = [], [], [], []
     kept = total = 0
     for index, rollout in enumerate(rollouts):
-        labels, manhattan, chebyshev = distance_target(rollout, feature_id, n_features)
-        free = geometry.free_cells(rollout.observation)
-        usable = free & np.isfinite(labels) & (labels > 0)
+        labels = target.labels(rollout)
+        confound = target.confound(rollout)
+        grid = feature(rollout)
 
-        total += int(free.sum())
+        usable = np.isfinite(labels) & np.isfinite(confound).all(axis=-1) & np.isfinite(grid).all(axis=-1)
+        total += labels.size
         kept += int(usable.sum())
+        if not usable.any():
+            continue
 
-        xs.append(grid(rollout)[usable])
+        xs.append(grid[usable])
         ys.append(labels[usable])
-        straights.append(np.stack([manhattan[usable], chebyshev[usable]], axis=1))
+        confounds.append(confound[usable])
         episodes.append(np.full(int(usable.sum()), index))
 
-    return FieldData(
-        x=np.concatenate(xs).astype(np.float64),
-        y=np.concatenate(ys).astype(np.float64),
-        straight=np.concatenate(straights).astype(np.float64),
+    if not xs:
+        raise ValueError(f"target {target.name!r} left no scoreable cells in {len(rollouts)} episodes")
+
+    x = np.concatenate(xs).astype(np.float64)
+    y = np.concatenate(ys).astype(np.float64)
+    confound = np.concatenate(confounds).astype(np.float64)
+
+    if np.any(confound[:, 0] > y + 1e-9):
+        raise ValueError(
+            f"target {target.name!r} declared a confound that exceeds its own labels; column 0 must be a "
+            "lower bound, or the hard-cell subset is meaningless"
+        )
+
+    dropped = 0
+    if drop_degenerate and x.shape[1] > 1:
+        keep = x.std(axis=0) > DEGENERATE
+        dropped = int((~keep).sum())
+        if keep.any():
+            x = x[:, keep]
+
+    return CellData(
+        x=x,
+        y=y,
+        confound=confound,
         episode=np.concatenate(episodes),
         mask_fraction=kept / max(total, 1),
+        dropped_columns=dropped,
     )
 
 
-def r2(y: np.ndarray, prediction: np.ndarray) -> float:
-    """Variance explained, against the mean of *these* rows.
+def hard_cells(data: CellData, tau: float) -> np.ndarray:
+    """Cells where the confound under-shoots the label by at least ``tau``.
 
-    Evaluating a subset against the global mean would credit an arm for the
-    subset simply having a larger target than average.
+    These are where a feature containing only the confound is *wrong* by
+    construction, so they are where a real signal has to show itself.
     """
-    if len(y) < 2:
-        return float("nan")
-    residual = float(np.sum((y - prediction) ** 2))
-    total = float(np.sum((y - y.mean()) ** 2))
-    return 1.0 - residual / total if total > 0 else float("nan")
+    return (data.y - data.confound[:, 0]) >= tau
 
 
-def detour_cells(data: FieldData, tau: float) -> np.ndarray:
-    """Cells where walls force a detour of at least ``tau`` over the straight line."""
-    return (data.y - data.straight[:, 0]) >= tau
-
-
-def stratified_correlation(prediction: np.ndarray, y: np.ndarray, stratum: np.ndarray) -> float:
-    """Correlation after centring both sides within each stratum.
-
-    Matching negatives by distance is the classification form of this: compare
-    only within groups the confound cannot separate.
-
-    Strata with a single member are dropped rather than centred to zero. A lone
-    point carries no within-stratum information, and keeping it would pad the
-    sample with rows that can only dilute the estimate.
-
-    Zero residual variance returns 0.0, not ``NaN``: it means the confound
-    accounted for everything, which is a result. ``NaN`` is reserved for having
-    no comparable rows at all.
-    """
-    p = prediction.astype(np.float64).copy()
-    t = y.astype(np.float64).copy()
-
-    usable = np.zeros(len(p), dtype=bool)
-    for value in np.unique(stratum):
-        rows = stratum == value
-        if rows.sum() < 2:
-            continue
-        p[rows] -= p[rows].mean()
-        t[rows] -= t[rows].mean()
-        usable |= rows
-
-    if usable.sum() < 2:
-        return float("nan")
-    if p[usable].std() < 1e-12 or t[usable].std() < 1e-12:
-        return 0.0
-    return float(np.corrcoef(p[usable], t[usable])[0, 1])
-
-
-def bootstrap_episodes(statistic, episode: np.ndarray, resamples: int = 200, seed: int = 0, level: float = 0.95):
-    """Resample whole episodes, never cells.
-
-    Cells in an episode share one maze and one field, so treating them as
-    independent understates the uncertainty — the same reason ``auc_interval``
-    resamples episodes.
-    """
-    unique = np.unique(episode)
-    index_by_episode = {value: np.flatnonzero(episode == value) for value in unique}
-
-    rng = np.random.default_rng(seed)
-    values = []
-    for _ in range(resamples):
-        chosen = rng.integers(0, len(unique), len(unique))
-        rows = np.concatenate([index_by_episode[unique[i]] for i in chosen])
-        value = statistic(rows)
-        if np.isfinite(value):
-            values.append(value)
-
-    if not values:
-        return float("nan"), float("nan")
-    tail = (1.0 - level) / 2.0
-    low, high = np.quantile(values, [tail, 1.0 - tail])
-    return float(low), float(high)
-
-
-def choose_l2(data: FieldData, grid=(1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3), folds: int = 4, seed: int = 0) -> float:
+def choose_l2(data: CellData, grid=(1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3, 1e4, 1e5), folds: int = 4, seed: int = 0):
     """Pick the penalty by held-out fit, grouping folds by episode.
 
-    Not a detail: a 96-dimensional arm and a 2-dimensional one under a single
-    fixed penalty get very different effective shrinkage, and the *positive*
-    control could lose to the trained arm purely from that mismatch — which
-    would read as the rig being broken.
+    Returns ``(l2, interior)``. A winner at either end of the grid was clipped
+    rather than chosen, and the caller should say so — the pilot's observation
+    arm selected the grid maximum and nobody noticed.
 
-    Chosen on pooled held-out R², deliberately not on the detour number the
-    result is reported against.
+    Selected on held-out R² of *recalibrated* predictions. Selecting on raw R²
+    rewards under-dispersion, which manufactures the very shrinkage the
+    calibration split exists to detect.
     """
     unique = np.unique(data.episode)
     assignment = np.random.default_rng(seed).permutation(len(unique)) % folds
-    fold_of = dict(zip(unique, assignment))
-    fold = np.array([fold_of[e] for e in data.episode])
+    fold = np.array([dict(zip(unique, assignment))[e] for e in data.episode])
 
-    best, best_score = grid[0], -np.inf
+    scores = []
     for l2 in grid:
-        scores = []
+        per_fold = []
         for held in range(folds):
             train, test = fold != held, fold == held
             if not train.any() or not test.any():
                 continue
             w, mean, std = fit_ridge(data.x[train], data.y[train], l2=l2)
-            scores.append(r2(data.y[test], apply_linear(data.x[test], w, mean, std)))
-        score = float(np.mean(scores)) if scores else -np.inf
-        if score > best_score:
-            best, best_score = l2, score
-    return best
+            fitted = apply_linear(data.x[train], w, mean, std)
+            scale, offset = metrics.affine_fit(data.y[train], fitted)
+            predicted = scale * apply_linear(data.x[test], w, mean, std) + offset
+            per_fold.append(metrics.r2(data.y[test], predicted))
+        scores.append(float(np.mean(per_fold)) if per_fold else -np.inf)
+
+    best = int(np.argmax(scores))
+    return grid[best], 0 < best < len(grid) - 1
 
 
 def field_probe(
     name: str,
-    train: FieldData,
-    test: FieldData,
+    train: CellData,
+    test: CellData,
     tau: float = 4.0,
     seed: int = 0,
     also: tuple[float, ...] = (2.0, 8.0),
 ) -> FieldResult:
     """Fit on ``train``, score on ``test``.
 
-    Fitted on *all* usable cells and only evaluated on detour cells. Refitting on
-    the detour subset would let the probe learn a detour-specific offset, which
-    is a different and easier question.
-    """
-    l2 = choose_l2(train, seed=seed)
-    w, mean, std = fit_ridge(train.x, train.y, l2=l2)
-    prediction = apply_linear(test.x, w, mean, std)
+    Fitted on every usable cell and evaluated on the hard subset. Refitting on
+    the subset would let the probe learn a subset-specific offset, which is an
+    easier and different question.
 
-    detour = detour_cells(test, tau)
-    interval = bootstrap_episodes(
-        lambda rows: r2(test.y[rows][detour[rows]], prediction[rows][detour[rows]]),
-        test.episode,
-        seed=seed,
+    Predictions are recalibrated by a scale and offset fitted on *train*, which
+    removes the shrinkage a penalty introduces without touching the ordering.
+    The uncalibrated decomposition is reported alongside so the shrinkage stays
+    visible rather than laundered.
+    """
+    l2, interior = choose_l2(train, seed=seed)
+    w, mean, std = fit_ridge(train.x, train.y, l2=l2)
+    scale, offset = metrics.affine_fit(train.y, apply_linear(train.x, w, mean, std))
+
+    raw = apply_linear(test.x, w, mean, std)
+    prediction = scale * raw + offset
+
+    hard = hard_cells(test, tau)
+    split = metrics.calibration(test.y[hard], raw[hard])
+    interval = metrics.bootstrap_episodes(
+        lambda rows: metrics.r2(test.y[rows][hard[rows]], prediction[rows][hard[rows]]), test.episode, seed=seed
     )
 
+    stratum = test.confound[:, 0].astype(np.int64)
     return FieldResult(
-        name=name,
-        pooled_r2=r2(test.y, prediction),
-        detour_r2=r2(test.y[detour], prediction[detour]),
-        detour_interval=interval,
-        partial_r=stratified_correlation(prediction, test.y, test.straight[:, 0].astype(np.int64)),
+        name=name if interior else f"{name} (l2 clipped)",
+        hard_r2=metrics.r2(test.y[hard], prediction[hard]),
+        hard_interval=interval,
+        hard_shape_r2=split.shape_r2,
+        pooled_r2=metrics.r2(test.y, prediction),
+        partial_r=metrics.stratified_correlation(prediction, test.y, stratum),
+        partial_r_within_episode=metrics.stratified_correlation(
+            prediction, test.y, test.episode * 1000 + stratum
+        ),
+        slope=split.slope,
+        bias=split.bias,
         mae=float(np.mean(np.abs(test.y - prediction))),
         n_samples=len(test.y),
-        n_detour=int(detour.sum()),
+        n_hard=int(hard.sum()),
         depth=test.x.shape[1],
+        dropped_columns=test.dropped_columns,
         l2=l2,
         mask_fraction=test.mask_fraction,
-        activation_norm=float(np.sqrt(np.mean(test.x**2))),
+        feature_norm=float(np.sqrt(np.mean(test.x**2))),
         sensitivity=tuple(
-            (other, r2(test.y[rows], prediction[rows]))
+            (other, metrics.r2(test.y[rows], prediction[rows]))
             for other in also
-            for rows in (detour_cells(test, other),)
+            for rows in (hard_cells(test, other),)
         ),
     )

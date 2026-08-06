@@ -67,6 +67,71 @@ def stack_layers(carry, index: int) -> np.ndarray:
     return np.concatenate(hs, axis=-1)
 
 
+@dataclasses.dataclass(frozen=True)
+class Capture:
+    """One forward pass, fully named — what produced the state being probed.
+
+    Three things are conflated if this is left implicit, and they cost very
+    differently: whose parameters compute the probed state (a GPU collection),
+    how many extra ticks run first (a GPU collection), and which grid is read
+    off the result (free). Naming the first two lets rollouts be reused across
+    every arm that shares them.
+
+    ``actor`` and ``reader`` are separate because they answer different
+    questions. With one agent acting and another's state probed, the labels are
+    held fixed while the representation varies — which is what comparing
+    checkpoints requires. Arms in one table must share an ``actor``, or their
+    labels differ and the comparison is unattributable.
+    """
+
+    name: str
+    reader: str
+    """Key into the caller's parameter registry: whose state is probed."""
+
+    actor: str = "agent"
+    """Whose actions generate the episodes, and therefore the labels."""
+
+    steps_to_think: int = 0
+
+
+class RolloutCache:
+    """Collects each distinct capture once and hands the same rollouts back.
+
+    The pilot collected four sets per thinking value where two would do, and
+    said so only in a comment. Keyed on the capture and the seed, so a table of
+    six arms over two captures costs two collections.
+    """
+
+    def __init__(self, collect):
+        self._collect = collect
+        self._cache: dict[tuple, list[Rollout]] = {}
+
+    def get(self, capture: Capture, seed: int, n_episodes: int) -> list[Rollout]:
+        key = (capture, seed, n_episodes)
+        if key not in self._cache:
+            self._cache[key] = self._collect(capture, seed, n_episodes)
+        return self._cache[key]
+
+    @property
+    def collections(self) -> int:
+        """How many rollout sets were actually gathered. Asserted in tests."""
+        return len(self._cache)
+
+
+def require_one_actor(captures) -> None:
+    """Arms compared in one table must share an actor.
+
+    Different actors mean different episodes and therefore different labels, so
+    a difference between arms could not be attributed to the representation.
+    """
+    actors = sorted({capture.actor for capture in captures})
+    if len(actors) > 1:
+        raise ValueError(
+            f"arms in one table must share an actor, got {actors}; the labels would differ and any "
+            "difference between arms would be unattributable"
+        )
+
+
 def collect_rollouts(
     envs,
     policy,

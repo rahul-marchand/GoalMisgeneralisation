@@ -15,7 +15,7 @@ import types
 import numpy as np
 import pytest
 
-from goalmisgen.analysis import fields, geometry, targets
+from goalmisgen.analysis import geometry, targets
 from goalmisgen.envs.observation import ObservationEncoder
 from goalmisgen.envs.sampling import MazeLevelSampler
 
@@ -45,14 +45,18 @@ REACHED = targets.DistanceToObjective(select=targets.reached, name="d->reached")
 UNREACHED = targets.DistanceToObjective(select=functools.partial(targets.unreached, n_features=2), name="d->unreached")
 
 
-def test_a_fixed_target_reproduces_the_pilot_labels():
-    """The keying is new; the field itself must not have changed."""
+def test_a_fixed_target_reproduces_the_field_the_pilot_measured():
+    """The keying is new; the field itself must not have changed. Compared
+    against geometry directly, which the pilot also called."""
     for rollout in make_rollouts(30):
-        old, _, _ = fields.distance_target(rollout, 0, 2)
-        new = FIXED.labels(rollout)
-        # The pilot dropped distance-0 in field_dataset; the target does it in labels.
-        np.testing.assert_array_equal(np.isfinite(new), np.isfinite(old) & (old > 0))
-        np.testing.assert_array_equal(new[np.isfinite(new)], old[np.isfinite(new)])
+        expected = geometry.bfs_field(
+            geometry.blocking_walls(rollout.observation, 0, 2), geometry.objective_cell(rollout.observation, 0)
+        )
+        expected[expected == 0] = np.nan  # the objective's own cell, dropped by both
+
+        actual = FIXED.labels(rollout)
+        np.testing.assert_array_equal(np.isfinite(actual), np.isfinite(expected))
+        np.testing.assert_array_equal(actual[np.isfinite(actual)], expected[np.isfinite(expected)])
 
 
 def test_reached_and_unreached_disagree_and_follow_the_outcome():

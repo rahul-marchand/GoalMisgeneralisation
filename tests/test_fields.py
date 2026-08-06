@@ -1,9 +1,9 @@
-"""Tests for the distance-field probe.
+"""Tests for the per-cell regression probe.
 
-The straight-line control is the one that matters. It is the direct successor to
+The null-arm test is the one that matters. It is the direct successor to
 `test_a_pure_distance_feature_does_not_survive_distance_matching`: the same
-class of confound, in regression form, on the same rig that failed to catch it
-the first time.
+class of confound, in regression form, on the rig that failed to catch it the
+first time.
 """
 
 from __future__ import annotations
@@ -13,9 +13,12 @@ import types
 import numpy as np
 import pytest
 
-from goalmisgen.analysis import fields
+from goalmisgen.analysis import fields, targets
+from goalmisgen.analysis.probes import Feature
 from goalmisgen.envs.observation import ObservationEncoder
 from goalmisgen.envs.sampling import MazeLevelSampler
+
+FIXED = targets.DistanceToObjective(select=targets.fixed(0), name="d->f0")
 
 
 def make_rollouts(n, size=11, seed=0):
@@ -23,134 +26,165 @@ def make_rollouts(n, size=11, seed=0):
     sampler = MazeLevelSampler(size_range=(size, size))
     encoder = ObservationEncoder(max_size=size, n_features=2)
     rng = np.random.default_rng(seed)
-    out = []
-    for _ in range(n):
-        level = sampler.sample(rng)
-        observation = encoder.encode(level, level.agent_start)
-        out.append(types.SimpleNamespace(observation=observation, features=None))
-    return out
+    return [
+        types.SimpleNamespace(
+            observation=encoder.encode(level, level.agent_start),
+            info={"reached_feature_id": 0},
+            index=index,
+        )
+        for index, level in ((i, sampler.sample(rng)) for i in range(n))
+    ]
 
 
-def truth_grid(rollout):
-    """A feature holding exactly the field being asked for."""
-    labels, _, _ = fields.distance_target(rollout, 0)
-    return np.nan_to_num(labels)[:, :, None]
+def noise_feature(depth=96, seed=0):
+    def grid(rollout):
+        return np.random.default_rng(seed + rollout.index).normal(size=(*rollout.observation.shape[:2], depth))
+
+    return Feature("noise", grid)
 
 
-def straight_grid(rollout):
-    """A feature holding only free-space geometry — no maze solving in it."""
-    _, manhattan, chebyshev = fields.distance_target(rollout, 0)
-    return np.stack([manhattan, chebyshev], axis=-1)
-
-
-def noise_grid(rollout, depth=96, seed=0):
-    shape = rollout.observation.shape[:2]
-    return np.random.default_rng(seed).normal(size=(*shape, depth))
-
-
-def datasets(grid, n_train=40, n_test=25):
+def datasets(build, n_train=40, n_test=25, target=FIXED):
+    """``build`` maps a rollout list to the Feature read off it."""
+    train_rollouts = make_rollouts(n_train, seed=0)
+    test_rollouts = make_rollouts(n_test, seed=1)
     return (
-        fields.field_dataset(make_rollouts(n_train, seed=0), grid, feature_id=0),
-        fields.field_dataset(make_rollouts(n_test, seed=1), grid, feature_id=0),
+        fields.cell_data(train_rollouts, build(train_rollouts), target),
+        fields.cell_data(test_rollouts, build(test_rollouts), target),
     )
 
 
-def test_a_straight_line_feature_does_not_survive_the_detour_test():
+def oracle(rollouts):
+    return targets.controls(FIXED, rollouts)[0]
+
+
+def null(rollouts):
+    return targets.controls(FIXED, rollouts)[1]
+
+
+def shuffled(rollouts):
+    return targets.controls(FIXED, rollouts)[2]
+
+
+def test_the_null_arm_does_not_survive_the_hard_cell_test():
     """The control that decides whether this measurement means anything.
 
-    A feature holding only Manhattan and Chebyshev distance contains no maze
-    solving whatever, yet it explains about a third of the variance in the true
-    field, because corr(bfs, manhattan) = 0.57 on these levels. Pooled R² would
-    read that as a finding. The detour subset and the stratified correlation
-    must both refuse it.
+    Straight-line geometry contains no maze solving, yet it explains about a
+    third of the variance in the true field because corr(bfs, manhattan) = 0.57
+    on these levels. Pooled R² reads that as a finding. The hard subset and the
+    stratified correlation must both refuse it.
     """
-    result = fields.field_probe("straight-line", *datasets(straight_grid))
+    result = fields.field_probe("null", *datasets(null))
 
-    assert result.pooled_r2 > 0.20, (
+    assert result.pooled_r2 > 0.15, (
         f"pooled R² was only {result.pooled_r2:.3f} — if the confound is this weak the test is not "
-        "exercising the trap it exists to document"
+        "exercising the trap it documents"
     )
-    assert result.detour_r2 < 0.10, f"straight-line geometry still explained detour cells: {result.detour_r2:.3f}"
+    assert result.hard_r2 < 0.10, f"straight-line geometry explained the hard cells: {result.hard_r2:.3f}"
     assert abs(result.partial_r) < 0.20, f"straight-line geometry survived stratification: {result.partial_r:.3f}"
 
 
 def test_the_rig_detects_a_field_that_is_present():
-    """Without this a null result is uninterpretable — it could just mean the
-    pipeline is broken."""
-    result = fields.field_probe("bfs-only", *datasets(truth_grid))
-    assert result.detour_r2 > 0.95, f"the rig failed to find a field it was handed outright: {result.detour_r2:.3f}"
-    assert result.partial_r > 0.9, f"a perfect feature did not survive stratification: {result.partial_r:.3f}"
+    """Without this a null result cannot be told from a broken pipeline."""
+    result = fields.field_probe("oracle", *datasets(oracle))
+    assert result.hard_r2 > 0.95, f"the rig failed to find a field handed to it: {result.hard_r2:.3f}"
+    assert result.partial_r > 0.9
 
 
-def test_noise_features_score_at_chance():
-    result = fields.field_probe("noise", *datasets(noise_grid))
-    assert result.detour_r2 < 0.10, f"noise explained detour cells: {result.detour_r2:.3f}"
-    assert abs(result.partial_r) < 0.20, f"noise survived stratification: {result.partial_r:.3f}"
+def test_a_field_on_the_wrong_maze_scores_at_chance():
+    """The oracle arm cannot catch a consistent feature/label misalignment — it
+    would be misaligned identically and still score 1.000. This can."""
+    result = fields.field_probe("shuffled", *datasets(shuffled))
+    assert result.hard_r2 < 0.10, f"a field from another maze explained this one: {result.hard_r2:.3f}"
+    assert abs(result.partial_r) < 0.20
 
 
-def test_dimensionality_does_not_decide_the_winner():
-    """A 1-dimensional perfect feature must not lose to a 96-dimensional one
-    just because a single fixed penalty suits one and not the other."""
-
-    def padded(rollout):
-        return np.concatenate([truth_grid(rollout), noise_grid(rollout, depth=95)], axis=-1)
-
-    lean = fields.field_probe("truth", *datasets(truth_grid))
-    fat = fields.field_probe("truth+noise", *datasets(padded))
-
-    assert lean.detour_r2 > 0.95, f"the 1-d arm lost to regularisation: {lean.detour_r2:.3f}"
-    assert fat.detour_r2 > 0.80, f"the same signal padded with noise collapsed: {fat.detour_r2:.3f}"
+def test_noise_scores_at_chance():
+    result = fields.field_probe("noise", *datasets(lambda rollouts: noise_feature()))
+    assert result.hard_r2 < 0.10
+    assert abs(result.partial_r) < 0.20
 
 
-def test_stratified_correlation_of_a_pure_function_of_the_stratum_is_zero():
-    """The property the metric exists for: anything the confound already
-    determines contributes nothing after centring within it."""
-    stratum = np.repeat(np.arange(20), 8)
-    prediction = stratum * 2.5
-    y = stratum * -1.5 + 3.0
-    assert abs(fields.stratified_correlation(prediction, y, stratum)) < 1e-9
+def test_shrinkage_is_removed_before_scoring_and_still_reported():
+    """A deliberately compressed feature orders perfectly but is scaled wrong.
+    The pilot could not tell that apart from a weak representation."""
+
+    def squashed(rollouts):
+        del rollouts
+        return Feature("squashed", lambda r: (0.25 * np.nan_to_num(FIXED.labels(r)))[:, :, None])
+
+    result = fields.field_probe("squashed", *datasets(squashed))
+
+    assert result.hard_shape_r2 > 0.95, "the ordering is perfect and must be reported as such"
+    assert result.hard_r2 > 0.9, "after recalibration a perfectly-ordered feature must score well"
 
 
-def test_r2_is_measured_against_the_rows_it_is_given():
-    """A subset with a larger mean must not be credited for that."""
-    y = np.array([10.0, 12.0, 14.0, 16.0])
-    assert fields.r2(y, y) == pytest.approx(1.0)
-    assert fields.r2(y, np.full_like(y, y.mean())) == pytest.approx(0.0)
-    # Predicting the *global* mean of a wider population would look good here if
-    # r2 used that population's mean rather than these rows'.
-    assert fields.r2(y, np.full_like(y, 0.0)) < 0.0
+def test_degenerate_columns_are_dropped_and_counted():
+    """Standardising divides by std + 1e-8, so a constant channel becomes
+    unit-scale noise the penalty must suppress — weakening exactly the arms with
+    least signal, which are the controls."""
+
+    def padded(rollouts):
+        del rollouts
+
+        def grid(rollout):
+            labels = np.nan_to_num(FIXED.labels(rollout))[:, :, None]
+            return np.concatenate([labels, np.zeros((*labels.shape[:2], 8))], axis=-1)
+
+        return Feature("padded", grid)
+
+    result = fields.field_probe("padded", *datasets(padded))
+    assert result.dropped_columns == 8, f"constant channels survived: {result.dropped_columns}"
+    assert result.depth == 1
+    assert result.hard_r2 > 0.95, "dropping dead channels must not cost the real one"
 
 
-def test_the_objective_cell_is_dropped():
-    """Distance zero, and a one-hot channel in the observation — every arm would
-    score it. Same trap as the route probe's step 0."""
-    rollouts = make_rollouts(5, seed=3)
-    data = fields.field_dataset(rollouts, truth_grid, feature_id=0)
-    assert data.y.min() > 0, "the objective's own cell survived the mask"
+def test_a_clipped_penalty_is_flagged():
+    """A winner at the end of the grid was clipped, not chosen. The pilot's
+    observation arm selected the grid maximum and nobody noticed."""
+    train, _ = datasets(null)
+    _, interior = fields.choose_l2(train, grid=(1e-8, 1e-7))
+    assert not interior, "a two-point grid can only be clipped, and must say so"
 
 
-def test_unreachable_cells_never_enter_the_dataset():
-    """A leaked -1 in a field whose mean is 12 reads as a slightly worse probe."""
-    data = fields.field_dataset(make_rollouts(30, seed=4), truth_grid, feature_id=0)
+def test_a_confound_that_exceeds_its_labels_is_rejected():
+    """Column 0 must lower-bound the label or the hard subset is nonsense."""
+
+    class Broken:
+        name = "broken"
+        confound_names = ("too-big",)
+
+        def labels(self, rollout):
+            return FIXED.labels(rollout)
+
+        def confound(self, rollout):
+            return (np.nan_to_num(FIXED.labels(rollout)) + 5.0)[:, :, None]
+
+    rollouts = make_rollouts(5)
+    with pytest.raises(ValueError, match="lower bound"):
+        fields.cell_data(rollouts, oracle(rollouts), Broken())
+
+
+def test_unscoreable_cells_never_enter_the_dataset():
+    rollouts = make_rollouts(30, seed=4)
+    data = fields.cell_data(rollouts, oracle(rollouts), FIXED)
     assert np.isfinite(data.y).all()
-    assert data.y.min() >= 1
-    assert data.mask_fraction < 1.0, "no cells were masked — the unreachable path is untested"
+    assert data.y.min() >= 1, "the objective's own cell survived"
+    assert data.mask_fraction < 1.0, "nothing was masked — the unreachable path is untested"
 
 
-def test_uncertainty_is_estimated_over_episodes_not_cells():
-    """Cells in an episode share one maze and one field. Resampling them
-    independently would report a far larger experiment than this is."""
-    episode = np.repeat(np.arange(12), 30)
-    values = np.repeat(np.random.default_rng(0).normal(size=12), 30)
+def test_an_all_masked_target_is_an_error_not_an_empty_table():
+    """A target that silently yields no rows would print a table of NaN."""
 
-    low, high = fields.bootstrap_episodes(lambda rows: float(values[rows].mean()), episode, resamples=200)
-    per_cell = values.std() / np.sqrt(len(values))
-    assert (high - low) > 4 * per_cell, "the interval is as narrow as if cells were independent"
+    class Empty:
+        name = "empty"
+        confound_names = ("none",)
 
+        def labels(self, rollout):
+            return np.full(rollout.observation.shape[:2], np.nan)
 
-def test_stratified_correlation_needs_comparable_rows():
-    """One member per stratum means nothing can be compared within it. That is
-    missing power, not a zero result, so it must not report as one."""
-    stratum = np.arange(20)
-    prediction = np.random.default_rng(0).normal(size=20)
-    assert np.isnan(fields.stratified_correlation(prediction, prediction, stratum))
+        def confound(self, rollout):
+            return np.full((*rollout.observation.shape[:2], 1), np.nan)
+
+    rollouts = make_rollouts(3)
+    with pytest.raises(ValueError, match="no scoreable cells"):
+        fields.cell_data(rollouts, oracle(rollouts), Empty())

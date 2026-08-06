@@ -141,3 +141,31 @@ def test_the_scoring_layer_does_not_know_about_mazes():
 
     leaked = [name for name in imported if "envs" in name or "geometry" in name]
     assert not leaked, f"the scoring layer imported environment knowledge: {leaked}"
+
+
+def test_a_capture_is_collected_once_however_many_arms_read_it():
+    """Reading a different grid off the same rollouts is free; collecting them
+    is not. The pilot gathered four sets per think value where two would do."""
+    from goalmisgen.analysis.activations import Capture, RolloutCache
+
+    calls = []
+    cache = RolloutCache(lambda capture, seed, n: calls.append((capture.name, seed)) or [f"{capture.name}:{seed}"])
+
+    trained = Capture("trained", reader="agent")
+    untrained = Capture("untrained", reader="random")
+    for _ in range(5):
+        cache.get(trained, seed=0, n_episodes=8)
+    cache.get(untrained, seed=0, n_episodes=8)
+    cache.get(trained, seed=9999, n_episodes=8)
+
+    assert cache.collections == 3, f"expected 3 distinct collections, made {len(calls)}"
+
+
+def test_arms_in_one_table_must_share_an_actor():
+    """Different actors mean different episodes and different labels, so any
+    difference between arms would be unattributable."""
+    from goalmisgen.analysis.activations import Capture, require_one_actor
+
+    require_one_actor([Capture("a", reader="x"), Capture("b", reader="y")])
+    with pytest.raises(ValueError, match="share an actor"):
+        require_one_actor([Capture("a", reader="x"), Capture("b", reader="y", actor="other")])

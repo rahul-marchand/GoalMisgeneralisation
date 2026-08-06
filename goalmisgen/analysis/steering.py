@@ -115,3 +115,27 @@ def verify(direction: Direction, weights: np.ndarray, mean: np.ndarray, std: np.
     before = apply_linear(baseline, weights, mean, std)
     after = apply_linear(baseline + direction.scaled(alpha), weights, mean, std)
     return float(after[0] - before[0])
+
+
+def from_contrast(name: str, high: np.ndarray, low: np.ndarray, weights: np.ndarray, std: np.ndarray) -> Direction:
+    """Mean activation where the quantity is large, minus where it is small.
+
+    This is what the steering literature actually uses, and it differs from a
+    probe's weight vector in a way that matters. Ridge finds the *minimum-norm*
+    direction that predicts, which is free to point almost anywhere the network
+    does not vary — it can decode perfectly while aiming somewhere the network
+    never goes. A difference of means lies in the data manifold by construction:
+    it is a direction the network is observed to travel along when the quantity
+    changes.
+
+    The probe is still used, but only to calibrate: the returned direction is
+    scaled so one unit of it moves the decoded value by one.
+    """
+    raw = np.asarray(high).mean(axis=0) - np.asarray(low).mean(axis=0)
+    per_unit = float((weights[:-1] / std) @ raw)
+    if abs(per_unit) < 1e-12:
+        raise ValueError(
+            f"the contrast for {name!r} moves the decoded value by {per_unit:.2e} per unit, so it cannot be "
+            "calibrated; the two groups are not separated along the probed quantity"
+        )
+    return Direction(name, raw / per_unit)

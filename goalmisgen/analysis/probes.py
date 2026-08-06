@@ -46,6 +46,26 @@ class Feature:
         return self.grid(rollout)
 
 
+def layer_slice(feature: Feature, index: int, n_layers: int) -> Feature:
+    """One layer's share of a per-cell state that concatenates several.
+
+    Which layer a probe reads is not a detail when the question is causal. A
+    DRC's actor sees only the *last* recurrent layer's hidden state, so a
+    direction spread evenly over all of them aims most of itself at components
+    the policy never reads.
+    """
+
+    def sliced(rollout) -> np.ndarray:
+        grid = feature(rollout)
+        depth = grid.shape[-1]
+        if depth % n_layers:
+            raise ValueError(f"{depth} channels do not divide into {n_layers} layers")
+        width = depth // n_layers
+        return grid[..., index * width : (index + 1) * width]
+
+    return Feature(f"{feature.name}[layer {index}]", sliced)
+
+
 @dataclasses.dataclass(frozen=True)
 class ProbeResult:
     """How well a linear readout recovers the label, and how to beat chance."""

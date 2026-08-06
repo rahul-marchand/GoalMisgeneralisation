@@ -192,19 +192,19 @@ def collect_rollouts(
             probe_carry, _, _, _ = get_action(
                 features_params, probe_carry, observations, starts, key, temperature=0.0
             )
-        for _ in range(probe_steps_to_think):
-            probe_carry, _, _, _ = get_action(
-                features_params, probe_carry, observations, starts, key, temperature=0.0
-            )
-
-        # Capture the state the agent will actually act from, including any
-        # intervention. Steering the arithmetic is easy; showing the shift
-        # survives nine gated recurrent updates is the part that decides
-        # whether a null result means "ignored" or "did not stick".
+        # Applied *before* the extra passes, so probe_steps_to_think measures
+        # how much of the displacement survives them. Steering the arithmetic is
+        # easy; showing the shift outlives nine gated recurrent updates is what
+        # decides whether a behavioural null means "ignored" or "did not stick".
         if steer_delta is not None:
             from goalmisgen.analysis.steering import apply_to_carry
 
             probe_carry = apply_to_carry(probe_carry, steer_delta)
+
+        for _ in range(probe_steps_to_think):
+            probe_carry, _, _, _ = get_action(
+                features_params, probe_carry, observations, starts, key, temperature=0.0
+            )
 
         initial_carry = jax.tree_util.tree_map(np.asarray, probe_carry)
         initial_obs = np.asarray(observations)

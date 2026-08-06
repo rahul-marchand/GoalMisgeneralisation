@@ -18,7 +18,7 @@ dependency, and a per-cell binary readout does not need one.
 from __future__ import annotations
 
 import dataclasses
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence
 
 import numpy as np
 
@@ -27,6 +27,23 @@ from goalmisgen.envs.observation import WALL_CHANNEL
 ProbeSource = Literal["features", "observation"]
 """Which per-cell grid a probe reads. Mistyping a plain string silently
 probed the observation and reported a plausible AUC."""
+
+
+@dataclasses.dataclass(frozen=True)
+class Feature:
+    """A named per-cell grid the probe reads: ``(height, width, depth)``.
+
+    Named because every arm of an experiment is identified by one, and an
+    unnamed callable in a results table is unreadable. Free to evaluate, unlike
+    a :class:`~goalmisgen.analysis.activations.Capture`, which costs a rollout —
+    the two are separate for that reason.
+    """
+
+    name: str
+    grid: Callable[[object], np.ndarray]
+
+    def __call__(self, rollout) -> np.ndarray:
+        return self.grid(rollout)
 
 
 @dataclasses.dataclass(frozen=True)

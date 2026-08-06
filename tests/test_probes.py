@@ -10,7 +10,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.probes import auc_interval, cell_dataset, probe, probe_by_distance, roc_auc
+from goalmisgen.analysis.probes import (
+    apply_linear,
+    auc_interval,
+    cell_dataset,
+    fit_ridge,
+    probe,
+    probe_by_distance,
+    roc_auc,
+)
 from goalmisgen.envs.solver import distance_field
 
 
@@ -178,3 +186,42 @@ def test_uncertainty_is_estimated_over_episodes_not_cells():
     # Identical rollouts differ only by noise, so a wider sample must not widen
     # the interval without bound - this catches resampling the wrong axis.
     assert high - low < 0.5
+
+
+def test_ridge_recovers_a_known_linear_map():
+    """With a weak penalty and no noise, the fit must return the map it was given."""
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(400, 5))
+    truth = np.array([2.0, -1.0, 0.5, 0.0, 3.0])
+    y = x @ truth + 7.0
+
+    w, mean, std = fit_ridge(x, y, l2=1e-8)
+    np.testing.assert_allclose(apply_linear(x, w, mean, std), y, atol=1e-6)
+
+
+def test_ridge_leaves_the_target_in_its_own_units():
+    """Predictions are read as distances in cells, so a fit that standardised the
+    target would silently rescale every error. Rescaling the target must rescale
+    the predictions with it."""
+    rng = np.random.default_rng(1)
+    x = rng.normal(size=(200, 3))
+    y = 10.0 + x[:, 0] * 4.0
+
+    plain = apply_linear(x, *fit_ridge(x, y, l2=1e-8))
+    scaled = apply_linear(x, *fit_ridge(x, 100.0 * y + 5.0, l2=1e-8))
+
+    np.testing.assert_allclose(plain, y, atol=1e-6)
+    np.testing.assert_allclose(scaled, 100.0 * y + 5.0, rtol=1e-6)
+
+
+def test_ridge_does_not_shrink_the_intercept():
+    """A heavy penalty must flatten the slope toward zero while the prediction
+    still sits at the target's mean, not at zero."""
+    rng = np.random.default_rng(2)
+    x = rng.normal(size=(200, 3))
+    y = 25.0 + x[:, 0]
+
+    w, mean, std = fit_ridge(x, y, l2=1e6)
+    prediction = apply_linear(x, w, mean, std)
+    assert abs(prediction.mean() - 25.0) < 0.1, "the intercept was penalised"
+    assert prediction.std() < 0.05, "a heavy penalty should have flattened the slope"

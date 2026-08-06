@@ -81,11 +81,15 @@ def cell_dataset(rollouts, source: ProbeSource = "features", mask_walls: bool = 
     return x, y
 
 
+def _design(x: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    """Standardised inputs with a bias column appended."""
+    return np.hstack([(x - mean) / std, np.ones((len(x), 1))])
+
+
 def fit_logistic(x: np.ndarray, y: np.ndarray, steps: int = 400, lr: float = 0.5, l2: float = 1e-3):
     """Logistic regression by gradient descent on standardised inputs."""
     mean, std = x.mean(0), x.std(0) + 1e-8
-    z = (x - mean) / std
-    z = np.hstack([z, np.ones((len(z), 1))])
+    z = _design(x, mean, std)
 
     w = np.zeros(z.shape[1])
     for _ in range(steps):
@@ -96,8 +100,31 @@ def fit_logistic(x: np.ndarray, y: np.ndarray, steps: int = 400, lr: float = 0.5
 
 
 def apply_logistic(x: np.ndarray, w, mean, std) -> np.ndarray:
-    z = np.hstack([(x - mean) / std, np.ones((len(x), 1))])
-    return 1.0 / (1.0 + np.exp(-z @ w))
+    return 1.0 / (1.0 + np.exp(-_design(x, mean, std) @ w))
+
+
+def fit_ridge(x: np.ndarray, y: np.ndarray, l2: float = 1.0):
+    """Ridge regression in closed form, for probes with a continuous target.
+
+    ``fit_logistic`` uses gradient descent only because the logistic loss has no
+    closed form; least squares does, and on a matrix this small solving it
+    exactly is both faster and one fewer thing to tune.
+
+    The target is left in its own units — distances stay in cells, so a mean
+    absolute error is directly readable — and the bias is not penalised, so
+    shrinkage cannot bias predictions toward zero.
+    """
+    mean, std = x.mean(0), x.std(0) + 1e-8
+    z = _design(x, mean, std)
+
+    penalty = l2 * np.eye(z.shape[1])
+    penalty[-1, -1] = 0.0  # never shrink the intercept
+    w = np.linalg.solve(z.T @ z + penalty, z.T @ y)
+    return w, mean, std
+
+
+def apply_linear(x: np.ndarray, w, mean, std) -> np.ndarray:
+    return _design(x, mean, std) @ w
 
 
 def roc_auc(y: np.ndarray, scores: np.ndarray) -> float:

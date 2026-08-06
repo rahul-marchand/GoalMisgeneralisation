@@ -45,7 +45,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_episode_outcomes, collect_rollouts, fields, steering, targets
+from goalmisgen.analysis import collect_episode_outcomes, collect_rollouts, fields, geometry, steering, targets
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import Feature, apply_linear, fit_ridge, layer_slice
 from goalmisgen.configs.env import MazeConfig
@@ -68,6 +68,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-envs", type=int, default=64)
     parser.add_argument("--correlation", type=float, default=1.0)
     parser.add_argument("--alphas", type=float, nargs="+", default=[-8, -4, 0, 4, 8])
+    parser.add_argument(
+        "--differential",
+        action="store_true",
+        help="Push the two objectives' fields apart instead of shifting one. A uniform offset to a "
+        "single field may be invisible to a comparison, the way it is invisible to gradient descent; "
+        "moving the two in opposite directions changes the contrast between them by 2*alpha.",
+    )
+    parser.add_argument(
+        "--at-objectives",
+        action="store_true",
+        help="Apply the shift only at the two objective cells rather than everywhere, in case the "
+        "comparison reads specific locations and a global offset washes out.",
+    )
     parser.add_argument("--randomise-values", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
@@ -148,7 +161,7 @@ def main() -> None:
     cosine = float(probe.delta @ contrast.delta / (probe.unit_norm * contrast.unit_norm))
     print(f"contrast vs probe direction: cosine {cosine:.3f}, norms {contrast.unit_norm:.4f} / {probe.unit_norm:.4f}\n")
 
-    other_data, other_weights, _, other_std = probe_for(1)
+    other_data, other_weights, other_mean, other_std = probe_for(1)
     other_far = other_data.y >= np.quantile(other_data.y, 0.75)
     other_near = other_data.y <= np.quantile(other_data.y, 0.25)
     other = steering.from_contrast(
@@ -161,7 +174,27 @@ def main() -> None:
     u_data, u_weights, _, u_std = probe_for(0, untrained_params)
     u_far, u_near = u_data.y >= np.quantile(u_data.y, 0.75), u_data.y <= np.quantile(u_data.y, 0.25)
 
+    # Pushing the fields apart: objective 0 further, objective 1 nearer, so the
+    # difference the comparison would read moves by twice alpha.
+    apart = steering.Direction("differential (f0 up, f1 down)", contrast.delta - other.delta)
+
+    # The two directions are not orthogonal, so the cross-effects have to be
+    # measured rather than assumed. Steering one field always moves the other a
+    # little; if that leak is large the differential arm is not doing what its
+    # name says.
+    print(f"{'direction':>18}{'moves d->f0':>13}{'moves d->f1':>13}")
+    for label, built in (("contrast f0", contrast), ("contrast f1", other), ("differential", apart)):
+        on_zero = built.scaled(1.0)[None, :]
+        moved_0 = float(apply_linear(on_zero, weights, mean, std) - apply_linear(np.zeros_like(on_zero), weights, mean, std))
+        moved_1 = float(
+            apply_linear(on_zero, other_weights, other_mean, other_std)
+            - apply_linear(np.zeros_like(on_zero), other_weights, other_mean, other_std)
+        )
+        print(f"{label:>18}{moved_0:>13.3f}{moved_1:>13.3f}")
+    print()
+
     directions = [
+        ("differential", apart),
         ("contrast (d->f0)", contrast),
         ("probe (d->f0)", steering.matched("probe (d->f0)", probe, contrast)),
         ("random", steering.matched_random("random", contrast, seed=args.seed)),
@@ -183,11 +216,23 @@ def main() -> None:
     # a hung job rather than a slow one. `delta` is an array argument, not a
     # closure, so changing alpha does not force a recompile.
     @jax.jit
-    def steered_action(carry, observations, starts, delta):
+    def steered_action(carry, observations, starts, delta, where):
+        """``where`` is a (batch, h, w, 1) mask: which cells the shift lands on."""
         carry, readout = policy.apply(params, carry, observations, starts, method=_tower)
-        hidden = policy.apply(params, readout + delta, method=_mlp)
+        hidden = policy.apply(params, readout + delta * where, method=_mlp)
         logits, _ = policy.apply(params, hidden, method=_actor)
         return carry, jnp.argmax(logits, axis=1)
+
+
+    def objective_mask(observations) -> np.ndarray:
+        """Ones at the two objectives' cells, zero elsewhere.
+
+        Built from the feature channels of the batched NCHW observation, so it
+        follows the objectives rather than assuming a fixed position.
+        """
+        obs = np.asarray(observations)
+        marks = obs[:, geometry.FIRST_FEATURE_CHANNEL : geometry.FIRST_FEATURE_CHANNEL + N_FEATURES]
+        return (marks.max(axis=1) > 0.5).astype(np.float32)[..., None]
 
 
 
@@ -202,7 +247,8 @@ def main() -> None:
         delta = jnp.zeros(depth) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))
 
         def act(observations, starts):
-            state["carry"], action = steered_action(state["carry"], observations, starts, delta)
+            where = jnp.asarray(objective_mask(observations)) if args.at_objectives else jnp.float32(1.0)
+            state["carry"], action = steered_action(state["carry"], observations, starts, delta, where)
             return np.asarray(action)
 
         outcomes = collect_episode_outcomes(envs, act, args.episodes, seed=args.seed)

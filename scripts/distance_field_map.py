@@ -18,8 +18,8 @@ from pathlib import Path
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_rollouts, fields, geometry
-from goalmisgen.analysis.probes import apply_linear, fit_ridge
+from goalmisgen.analysis import collect_rollouts, fields, targets
+from goalmisgen.analysis.probes import Feature
 from goalmisgen.configs.env import MazeConfig
 
 N_FEATURES = 2
@@ -66,23 +66,29 @@ def main() -> None:
     def rollouts(seed: int, episodes: int):
         return collect_rollouts(env_config(seed).make(), policy, train_state.params, episodes, seed=seed)
 
-    activations = operator.attrgetter("features")
-    train = fields.field_dataset(rollouts(0, args.train_episodes), activations, args.feature, N_FEATURES)
-    l2 = fields.choose_l2(train)
-    weights, mean, std = fit_ridge(train.x, train.y, l2=l2)
+    activations = Feature("activations", operator.attrgetter("features"))
+    target = targets.DistanceToObjective(targets.fixed(args.feature), name=f"d->f{args.feature}", n_features=N_FEATURES)
+
+    examples = rollouts(9999, args.examples)
+    train = fields.cell_data(rollouts(0, args.train_episodes), activations, target)
+    test = fields.cell_data(examples, activations, target)
+    _, prediction, l2, _ = fields.fit_predict(train, test)
     print(f"fitted on {len(train.y):,} cells, l2={l2:g}")
 
     truth, predicted, straight, observations = [], [], [], []
-    for rollout in rollouts(9999, args.examples):
-        labels, manhattan, _ = fields.distance_target(rollout, args.feature, N_FEATURES)
-        usable = geometry.free_cells(rollout.observation) & np.isfinite(labels) & (labels > 0)
+    cursor = 0
+    for rollout in examples:
+        labels = target.labels(rollout)
+        confound = target.confound(rollout)
+        usable = np.isfinite(labels) & np.isfinite(confound).all(axis=-1)
 
         field = np.full(labels.shape, np.nan)
-        field[usable] = apply_linear(rollout.features[usable].astype(np.float64), weights, mean, std)
+        field[usable] = prediction[cursor : cursor + int(usable.sum())]
+        cursor += int(usable.sum())
 
         truth.append(np.where(usable, labels, np.nan))
         predicted.append(field)
-        straight.append(np.where(usable, manhattan, np.nan))
+        straight.append(np.where(usable, confound[:, :, 0], np.nan))
         observations.append(rollout.observation)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

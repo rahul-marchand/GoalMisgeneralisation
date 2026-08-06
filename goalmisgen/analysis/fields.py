@@ -66,6 +66,14 @@ class CellData:
     dropped_columns: int
     """Feature channels removed for carrying no variation."""
 
+    annotation: np.ndarray | None = None
+    """(n,) an arbitrary per-cell label carried through the same mask.
+
+    Whatever a subgroup analysis needs to split on — whether the agent walked
+    the cell, how far off its route it lies — recovered in row order, which
+    reconstructing it afterwards could not guarantee.
+    """
+
 
 @dataclasses.dataclass(frozen=True)
 class FieldResult:
@@ -96,7 +104,7 @@ class FieldResult:
     sensitivity: tuple[tuple[float, float], ...]
 
 
-def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True) -> CellData:
+def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True, annotate=None) -> CellData:
     """Flatten rollouts into per-cell rows.
 
     One masking rule: a row survives if its label, its confound and its features
@@ -104,7 +112,7 @@ def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True) 
     unreachable cells, the objective's own cell, a whole episode that timed
     out — it expresses as ``NaN``, so this layer needs no maze knowledge.
     """
-    xs, ys, confounds, episodes = [], [], [], []
+    xs, ys, confounds, episodes, notes = [], [], [], [], []
     kept = total = 0
     for index, rollout in enumerate(rollouts):
         labels = target.labels(rollout)
@@ -121,6 +129,8 @@ def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True) 
         ys.append(labels[usable])
         confounds.append(confound[usable])
         episodes.append(np.full(int(usable.sum()), index))
+        if annotate is not None:
+            notes.append(np.asarray(annotate(rollout))[usable])
 
     if not xs:
         raise ValueError(f"target {target.name!r} left no scoreable cells in {len(rollouts)} episodes")
@@ -149,6 +159,7 @@ def cell_data(rollouts, feature: Feature, target, drop_degenerate: bool = True) 
         episode=np.concatenate(episodes),
         mask_fraction=kept / max(total, 1),
         dropped_columns=dropped,
+        annotation=np.concatenate(notes) if notes else None,
     )
 
 

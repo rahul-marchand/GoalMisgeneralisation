@@ -1,0 +1,27 @@
+commit f1b9308
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --episodes 2048
+checkpoint cp_140206080  (update 27384)
+choice direction from 358 gap-matched pairs, raw norm 1.3303
+typical readout norm at the agent's cell 1.975; scales below are absolute norms
+unsteered indifference 7.78  (took feature 0 76.4%, reached 100.0%)
+     direction  scale  indifference   shift   took f0  reached
+        choice   -0.3          7.75   -0.02     76.3%   100.0%
+        choice   -0.1          7.76   -0.02     76.3%   100.0%
+        choice   -0.1          7.78    0.00     76.4%   100.0%
+        choice    0.0          7.78    0.00     76.4%   100.0%
+        choice    0.1          7.83    0.06     76.5%   100.0%
+        choice    0.1          7.85    0.07     76.6%   100.0%
+        choice    0.3          7.81    0.04     76.5%   100.0%
+        random   -0.3          7.75   -0.03     76.3%   100.0%
+        random   -0.1          7.77   -0.00     76.4%   100.0%
+        random   -0.1          7.76   -0.02     76.3%   100.0%
+        random    0.0          7.78    0.00     76.4%   100.0%
+        random    0.1          7.83    0.05     76.5%   100.0%
+        random    0.1          7.85    0.07     76.6%   100.0%
+        random    0.3          7.80    0.02     76.4%   100.0%
+Only rows where the agent still reaches objectives (>= 95%) are interpretable. Below that
+the perturbation is destroying the policy rather than steering it, and every direction
+including random does the same. Inside that band: if the choice direction moves the
+threshold and random does not, steering works here and the four distance nulls are real.
+If both are flat inside the band, no steering result so far is interpretable.
+DONECHOICE

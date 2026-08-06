@@ -390,6 +390,58 @@ def fig_example_plan():
     save(fig, "fig5_example_plan")
 
 
+# ---------------------------------------------------------------- figure 6
+def fig_distance_field():
+    """What the probe recovers of the distance-to-objective field.
+
+    The pilot reports a partial correlation of 0.71 against a detour R² of only
+    0.23 — the probe orders cells correctly while missing their magnitude. That
+    is a statement about shape, so it needs a picture. The error column is where
+    to look: if the field were a completed flood fill the error would be flat
+    noise, and it is not.
+    """
+    data = np.load(DATA / "distance_fields.npz")
+    truth, predicted, obs = data["truth"], data["predicted"], data["observations"]
+
+    # Levels spanning a range of true distances, so the far end is represented.
+    reach = np.nanmax(truth.reshape(len(truth), -1), axis=1)
+    chosen = np.argsort(-reach)[:3]
+
+    diverging = mpl.colors.LinearSegmentedColormap.from_list("error", [ORANGE, "#e6e5e0", BLUE]).with_extremes(
+        bad="#d8d6d0"
+    )
+    sequential = mpl.colormaps["Blues"].with_extremes(bad="#d8d6d0")
+
+    fig, axes = plt.subplots(3, 3, figsize=(6.6, 6.6))
+    for row, index in enumerate(chosen):
+        error = predicted[index] - truth[index]
+        limit = float(np.nanmax(np.abs(error)))
+        panels = (
+            (truth[index], sequential, None, "true"),
+            (predicted[index], sequential, None, "probe"),
+            (error, diverging, limit, "probe − true"),
+        )
+        for column, (grid, ramp, limit_value, label) in enumerate(panels):
+            ax = axes[row][column]
+            if limit_value is None:
+                image = ax.imshow(np.ma.masked_invalid(grid), cmap=ramp, vmin=0, vmax=np.nanmax(truth[index]))
+            else:
+                image = ax.imshow(np.ma.masked_invalid(grid), cmap=ramp, vmin=-limit_value, vmax=limit_value)
+            objective = np.argwhere(obs[index][:, :, 2 + int(data["feature"])] > 0.5)[0]
+            ax.plot(objective[1], objective[0], "*", ms=12, color=ORANGE, mec=SURFACE, mew=0.8)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if row == 0:
+                ax.set_title(label, color=INK2, fontsize=9, pad=4)
+            for spine in ax.spines.values():
+                spine.set_color(MUTED)
+                spine.set_linewidth(0.6)
+            fig.colorbar(image, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(labelsize=6, color=MUTED)
+
+    fig.text(0.5, 0.06, "★ the objective the field is measured to", ha="center", fontsize=8, color=INK2)
+    save(fig, "fig6_distance_field")
+
+
 if __name__ == "__main__":
     print("writing figures to", OUT)
     fig_task()
@@ -397,3 +449,4 @@ if __name__ == "__main__":
     fig_margin()
     fig_dynamics()
     fig_example_plan()
+    fig_distance_field()

@@ -1,0 +1,54 @@
+### 009 value representation, clean11
+--- all layers
+/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+commit 2615230
+argv   /workspace/data/runs/clean11/local-files/cp_130191360 --levels /workspace/data/levels11rv --randomise-values --correlation 0.5
+checkpoint cp_130191360  (update 25428)
+feature 0 is worth 0.25 to 1.00 across 512 episodes
+reading all layers
+            site           arm  correlation            95% CI     MAE
+  objective cell       trained        0.936    [0.923, 0.946]   0.059
+  objective cell     untrained        0.306    [0.225, 0.396]   0.180
+  objective cell   observation        1.000    [1.000, 1.000]   0.000
+  objective cell      shuffled        0.191    [0.102, 0.268]   0.181
+      agent cell       trained        0.373    [0.301, 0.451]   0.168
+      agent cell     untrained       -0.053   [-0.131, 0.013]   0.191
+      agent cell   observation          nan        [nan, nan]   0.188
+      agent cell      shuffled        0.049   [-0.044, 0.135]   0.193
+          pooled       trained        0.625    [0.581, 0.668]   0.138
+          pooled     untrained        0.240    [0.155, 0.316]   0.182
+          pooled   observation       -0.053   [-0.139, 0.034]   0.188
+          pooled      shuffled        0.077   [-0.021, 0.162]   0.191
+The objective cell is a reference, not a result: the encoder writes the value there,
+so the observation arm gets it too. The agent cell is the one that matters — value has
+to reach where the policy acts before it can be compared with anything.
+--- --last-layer-only
+/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+commit 2615230
+argv   /workspace/data/runs/clean11/local-files/cp_130191360 --levels /workspace/data/levels11rv --randomise-values --correlation 0.5 --last-layer-only
+checkpoint cp_130191360  (update 25428)
+feature 0 is worth 0.25 to 1.00 across 512 episodes
+reading the last layer only
+            site           arm  correlation            95% CI     MAE
+  objective cell       trained        0.761    [0.724, 0.787]   0.113
+  objective cell     untrained        0.029   [-0.063, 0.130]   0.188
+  objective cell   observation        1.000    [1.000, 1.000]   0.000
+  objective cell      shuffled        0.100    [0.007, 0.187]   0.186
+      agent cell       trained        0.169    [0.081, 0.249]   0.184
+      agent cell     untrained       -0.051   [-0.125, 0.029]   0.191
+      agent cell   observation          nan        [nan, nan]   0.188
+      agent cell      shuffled       -0.044   [-0.137, 0.028]   0.191
+          pooled       trained        0.498    [0.442, 0.568]   0.155
+          pooled     untrained        0.027   [-0.059, 0.113]   0.187
+          pooled   observation       -0.053   [-0.139, 0.034]   0.188
+          pooled      shuffled        0.076   [-0.009, 0.165]   0.188
+The objective cell is a reference, not a result: the encoder writes the value there,
+so the observation arm gets it too. The agent cell is the one that matters — value has
+to reach where the policy acts before it can be compared with anything.
+ANALYSISDONE

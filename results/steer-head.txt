@@ -1,0 +1,41 @@
+### 008 steering at the head
+commit 2615230
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --episodes 2048
+checkpoint cp_140206080  (update 27384)
+last-layer probe on 9,743 cells, correlation 0.559
+contrast vs probe direction: cosine 0.414, norms 0.0382 / 0.0158
+unsteered indifference 7.78 extra steps  (took richer 76.4%, reached 100.0%)
+baseline reproduces experiment 006, so the split forward pass is the agent
+         direction  alpha  indifference   shift  took richer  reached
+  contrast (d->f0)     -8          7.88    0.10        76.6%   100.0%
+  contrast (d->f0)     -4          7.87    0.09        76.6%   100.0%
+  contrast (d->f0)      0          7.78    0.00        76.4%   100.0%
+  contrast (d->f0)      4          7.81    0.03        76.5%   100.0%
+  contrast (d->f0)      8          7.79    0.01        76.4%   100.0%
+                  slope -0.006
+     probe (d->f0)     -8          7.78    0.00        76.4%   100.0%
+     probe (d->f0)     -4          7.83    0.06        76.5%   100.0%
+     probe (d->f0)      0          7.78    0.00        76.4%   100.0%
+     probe (d->f0)      4          7.83    0.05        76.5%   100.0%
+     probe (d->f0)      8          7.85    0.07        76.6%   100.0%
+                  slope +0.003
+            random     -8          7.73   -0.04        76.3%   100.0%
+            random     -4          7.77   -0.00        76.4%   100.0%
+            random      0          7.78    0.00        76.4%   100.0%
+            random      4          7.85    0.07        76.6%   100.0%
+            random      8          7.82    0.04        76.5%   100.0%
+                  slope +0.006
+   other objective     -8          7.84    0.06        76.5%   100.0%
+   other objective     -4          7.85    0.08        76.6%   100.0%
+   other objective      0          7.78    0.00        76.4%   100.0%
+   other objective      4          7.76   -0.02        76.3%   100.0%
+   other objective      8          7.77   -0.00        76.4%   100.0%
+                  slope -0.006
+         untrained     -8          7.85    0.07        76.6%   100.0%
+         untrained     -4          7.81    0.03        76.5%   100.0%
+         untrained      0          7.78    0.00        76.4%   100.0%
+         untrained      4          7.85    0.07        76.6%   100.0%
+         untrained      8          7.79    0.01        76.4%   100.0%
+                  slope -0.002
+A slope of -1 means the field is the compared quantity. The random and untrained
+directions must stay flat, and the other objective's must carry the opposite sign.

@@ -1,53 +1,41 @@
-commit c0d1da6
+commit 2bb9582
 argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --think 0 4
 checkpoint cp_140206080  (update 27384)
-     capture      target                       arm  hard R2            95% CI   shape  partial  within    MAE  dim  drop  n_hard
-   trained@0     reached               activations   -0.351  [-0.436, -0.272]   0.035    0.348   0.393   5.17   96     0  10,717
-   trained@0     reachedoracle:d->reached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  10,717
-   trained@0     reached  null:manhattan+chebyshev   -0.291  [-0.368, -0.215]   0.091    0.046   0.070   5.31    2     0  10,717
-   trained@0     reachedshuffled:d->reached (l2 clipped)   -0.661  [-0.728, -0.604]   0.000    0.010  -0.005   6.72    1     0  10,717
-                        controls ok (oracle passes, null and shuffled fail)
-   trained@0   unreached               activations   -0.425  [-0.515, -0.338]   0.081    0.410   0.447   5.70   96     0  11,443
-   trained@0   unreachedoracle:d->unreached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,443
-   trained@0   unreached  null:manhattan+chebyshev   -0.474  [-0.549, -0.403]   0.057    0.067   0.097   5.81    2     0  11,443
-   trained@0   unreachedshuffled:d->unreached (l2 clipped)   -0.697  [-0.757, -0.647]   0.001   -0.003  -0.004   7.20    1     0  11,443
-                        controls ok (oracle passes, null and shuffled fail)
-   trained@0    feature0               activations    0.250    [0.209, 0.293]   0.273    0.705   0.739   3.50   96     0  11,193
-   trained@0    feature0 oracle:d->f0 (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,193
-   trained@0    feature0  null:manhattan+chebyshev   -0.337  [-0.414, -0.264]   0.085    0.054   0.075   5.51    2     0  11,193
-   trained@0    feature0            shuffled:d->f0   -0.653  [-0.722, -0.601]   0.001    0.024   0.007   6.95    1     0  11,193
-                        controls ok (oracle passes, null and shuffled fail)
-            reached − unreached hard R²: [-0.016, +0.174]   no detectable difference   (trained@0)
- untrained@0     reached  activations (l2 clipped)   -0.639  [-0.706, -0.580]   0.003    0.029   0.048   6.60   96     0  10,717
- untrained@0     reachedoracle:d->reached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  10,717
- untrained@0     reached  null:manhattan+chebyshev   -0.291  [-0.368, -0.215]   0.091    0.046   0.070   5.31    2     0  10,717
- untrained@0     reachedshuffled:d->reached (l2 clipped)   -0.661  [-0.728, -0.604]   0.000    0.010  -0.005   6.72    1     0  10,717
-                        controls ok (oracle passes, null and shuffled fail)
- untrained@0   unreached  activations (l2 clipped)   -0.695  [-0.761, -0.644]   0.000    0.024   0.030   6.99   96     0  11,443
- untrained@0   unreachedoracle:d->unreached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,443
- untrained@0   unreached  null:manhattan+chebyshev   -0.474  [-0.549, -0.403]   0.057    0.067   0.097   5.81    2     0  11,443
- untrained@0   unreachedshuffled:d->unreached (l2 clipped)   -0.697  [-0.757, -0.647]   0.001   -0.003  -0.004   7.20    1     0  11,443
-                        controls ok (oracle passes, null and shuffled fail)
- untrained@0    feature0  activations (l2 clipped)   -0.602  [-0.669, -0.547]   0.006    0.041   0.060   6.64   96     0  11,193
- untrained@0    feature0 oracle:d->f0 (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,193
- untrained@0    feature0  null:manhattan+chebyshev   -0.337  [-0.414, -0.264]   0.085    0.054   0.075   5.51    2     0  11,193
- untrained@0    feature0            shuffled:d->f0   -0.653  [-0.722, -0.601]   0.001    0.024   0.007   6.95    1     0  11,193
-                        controls ok (oracle passes, null and shuffled fail)
-            reached − unreached hard R²: [-0.009, +0.115]   no detectable difference   (untrained@0)
-   trained@4     reached               activations   -0.333  [-0.423, -0.256]   0.031    0.344   0.371   5.26   96     0  10,717
-   trained@4     reachedoracle:d->reached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  10,717
-   trained@4     reached  null:manhattan+chebyshev   -0.291  [-0.368, -0.215]   0.091    0.046   0.070   5.31    2     0  10,717
-   trained@4     reachedshuffled:d->reached (l2 clipped)   -0.661  [-0.728, -0.604]   0.000    0.010  -0.005   6.72    1     0  10,717
-                        controls ok (oracle passes, null and shuffled fail)
-   trained@4   unreached               activations   -0.518  [-0.603, -0.436]   0.038    0.288   0.293   6.37   96     0  11,443
-   trained@4   unreachedoracle:d->unreached (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,443
-   trained@4   unreached  null:manhattan+chebyshev   -0.474  [-0.549, -0.403]   0.057    0.067   0.097   5.81    2     0  11,443
-   trained@4   unreachedshuffled:d->unreached (l2 clipped)   -0.697  [-0.757, -0.647]   0.001   -0.003  -0.004   7.20    1     0  11,443
-                        controls ok (oracle passes, null and shuffled fail)
-   trained@4    feature0               activations    0.189    [0.139, 0.236]   0.220    0.669   0.698   3.77   96     0  11,193
-   trained@4    feature0 oracle:d->f0 (l2 clipped)    1.000    [1.000, 1.000]   1.000    1.000   1.000   0.00    1     0  11,193
-   trained@4    feature0  null:manhattan+chebyshev   -0.337  [-0.414, -0.264]   0.085    0.054   0.075   5.51    2     0  11,193
-   trained@4    feature0            shuffled:d->f0   -0.653  [-0.722, -0.601]   0.001    0.024   0.007   6.95    1     0  11,193
-                        controls ok (oracle passes, null and shuffled fail)
-            reached − unreached hard R²: [+0.085, +0.281]   the field is target-specific   (trained@4)
+     capture    target                       arm  partial  within hard shape  hard R2    MAE  dim  drop  n_hard
+   trained@0     d->f0               activations    0.705   0.739      0.273    0.250   3.50   96     0  11,193
+   trained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  11,193
+   trained@0     d->f0  null:manhattan+chebyshev    0.054   0.075      0.085   -0.337   5.51    2     0  11,193
+   trained@0     d->f0            shuffled:d->f0    0.024   0.007      0.001   -0.653   6.95    1     0  11,193
+                      controls ok (oracle passes, null and shuffled fail)
+   trained@0     d->f1               activations    0.394   0.456      0.089   -0.290   5.37   96     0  10,967
+   trained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  10,967
+   trained@0     d->f1  null:manhattan+chebyshev    0.056   0.093      0.058   -0.439   5.63    2     0  10,967
+   trained@0     d->f1shuffled:d->f1 (l2 clipped)    0.011   0.002      0.000   -0.703   6.98    1     0  10,967
+                      controls ok (oracle passes, null and shuffled fail)
+            own partial r +0.652 (19,919 cells)   other partial r +0.576 (19,962 cells)
+            own - other: [+0.032, +0.115]   the field is sharper for the objective it chose   (trained@0)
+ untrained@0     d->f0  activations (l2 clipped)    0.041   0.060      0.006   -0.602   6.64   96     0  11,193
+ untrained@0     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  11,193
+ untrained@0     d->f0  null:manhattan+chebyshev    0.054   0.075      0.085   -0.337   5.51    2     0  11,193
+ untrained@0     d->f0            shuffled:d->f0    0.024   0.007      0.001   -0.653   6.95    1     0  11,193
+                      controls ok (oracle passes, null and shuffled fail)
+ untrained@0     d->f1  activations (l2 clipped)    0.025   0.025      0.001   -0.668   6.72   96     0  10,967
+ untrained@0     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  10,967
+ untrained@0     d->f1  null:manhattan+chebyshev    0.056   0.093      0.058   -0.439   5.63    2     0  10,967
+ untrained@0     d->f1shuffled:d->f1 (l2 clipped)    0.011   0.002      0.000   -0.703   6.98    1     0  10,967
+                      controls ok (oracle passes, null and shuffled fail)
+            own partial r +0.046 (19,919 cells)   other partial r +0.040 (19,962 cells)
+            own - other: [-0.025, +0.037]   no detectable difference   (untrained@0)
+   trained@4     d->f0               activations    0.669   0.698      0.220    0.189   3.77   96     0  11,193
+   trained@4     d->f0 oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  11,193
+   trained@4     d->f0  null:manhattan+chebyshev    0.054   0.075      0.085   -0.337   5.51    2     0  11,193
+   trained@4     d->f0            shuffled:d->f0    0.024   0.007      0.001   -0.653   6.95    1     0  11,193
+                      controls ok (oracle passes, null and shuffled fail)
+   trained@4     d->f1               activations    0.241   0.271      0.040   -0.515   6.28   96     0  10,967
+   trained@4     d->f1 oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00    1     0  10,967
+   trained@4     d->f1  null:manhattan+chebyshev    0.056   0.093      0.058   -0.439   5.63    2     0  10,967
+   trained@4     d->f1shuffled:d->f1 (l2 clipped)    0.011   0.002      0.000   -0.703   6.98    1     0  10,967
+                      controls ok (oracle passes, null and shuffled fail)
+            own partial r +0.616 (19,919 cells)   other partial r +0.426 (19,962 cells)
+            own - other: [+0.136, +0.245]   the field is sharper for the objective it chose   (trained@4)
 DONE005

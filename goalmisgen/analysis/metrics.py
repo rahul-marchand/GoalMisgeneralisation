@@ -215,26 +215,34 @@ def bootstrap_episodes(statistic, episode: np.ndarray, resamples: int = 200, see
     return float(low), float(high)
 
 
+def select_rows(episode: np.ndarray, chosen: np.ndarray) -> np.ndarray:
+    """Row indices belonging to ``chosen`` episode ids, repeats included."""
+    rows_of = {value: np.flatnonzero(episode == value) for value in np.unique(episode)}
+    return np.concatenate([rows_of[value] for value in chosen if value in rows_of])
+
+
 def bootstrap_paired(
-    statistic_a, statistic_b, episode: np.ndarray, resamples: int = 200, seed: int = 0, level: float = 0.95
+    statistic_a, statistic_b, episodes: np.ndarray, resamples: int = 200, seed: int = 0, level: float = 0.95
 ):
-    """Interval for ``a - b``, computed on a *common* resample.
+    """Interval for ``a - b`` over a common resample of *episodes*.
 
     Two overlapping confidence intervals do not mean two quantities are equal.
     Sharing the resample cancels the between-episode variance both statistics
-    carry, so the interval on the difference is far tighter than either
-    interval alone — which is what makes a comparison decisive rather than
-    suggestive.
+    carry, so the interval on the difference is far tighter than either alone —
+    which is what makes a comparison decisive rather than suggestive.
+
+    Each statistic maps an array of episode ids to a float and looks up its own
+    rows, so the two may be measured over different cell sets. They are whenever
+    two targets mask differently, which is exactly the reached-versus-unreached
+    case this exists for.
     """
-    unique = np.unique(episode)
-    rows_of = {value: np.flatnonzero(episode == value) for value in unique}
+    unique = np.unique(episodes)
     rng = np.random.default_rng(seed)
 
     values = []
     for _ in range(resamples):
-        chosen = rng.integers(0, len(unique), len(unique))
-        rows = np.concatenate([rows_of[unique[i]] for i in chosen])
-        difference = statistic_a(rows) - statistic_b(rows)
+        chosen = unique[rng.integers(0, len(unique), len(unique))]
+        difference = statistic_a(chosen) - statistic_b(chosen)
         if np.isfinite(difference):
             values.append(difference)
 

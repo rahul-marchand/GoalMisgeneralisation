@@ -111,10 +111,11 @@ def test_paired_bootstrap_is_tighter_than_comparing_two_intervals():
     shared = np.repeat(rng.normal(size=40) * 5.0, 10)
     a, b = shared + 1.0, shared
 
-    stat_a = lambda rows: float(a[rows].mean())  # noqa: E731
-    stat_b = lambda rows: float(b[rows].mean())  # noqa: E731
+    rows_of = lambda ids: metrics.select_rows(episode, ids)  # noqa: E731
+    stat_a = lambda ids: float(a[rows_of(ids)].mean())  # noqa: E731
+    stat_b = lambda ids: float(b[rows_of(ids)].mean())  # noqa: E731
 
-    low_a, high_a = metrics.bootstrap_episodes(stat_a, episode)
+    low_a, high_a = metrics.bootstrap_episodes(lambda rows: float(a[rows].mean()), episode)
     low_d, high_d = metrics.bootstrap_paired(stat_a, stat_b, episode)
 
     assert (high_d - low_d) < 0.2 * (high_a - low_a), "pairing failed to cancel the shared variance"

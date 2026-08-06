@@ -194,6 +194,19 @@ def choose_l2(data: CellData, grid=(1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3, 1e4, 1
     return grid[best], 0 < best < len(grid) - 1
 
 
+def fit_predict(train: CellData, test: CellData, seed: int = 0) -> tuple[np.ndarray, np.ndarray, float, bool]:
+    """Predictions on ``test``, raw and recalibrated, plus the chosen penalty.
+
+    Exposed separately because a paired comparison between two targets needs the
+    predictions themselves, not a summary of them.
+    """
+    l2, interior = choose_l2(train, seed=seed)
+    w, mean, std = fit_ridge(train.x, train.y, l2=l2)
+    scale, offset = metrics.affine_fit(train.y, apply_linear(train.x, w, mean, std))
+    raw = apply_linear(test.x, w, mean, std)
+    return raw, scale * raw + offset, l2, interior
+
+
 def field_probe(
     name: str,
     train: CellData,
@@ -213,13 +226,7 @@ def field_probe(
     The uncalibrated decomposition is reported alongside so the shrinkage stays
     visible rather than laundered.
     """
-    l2, interior = choose_l2(train, seed=seed)
-    w, mean, std = fit_ridge(train.x, train.y, l2=l2)
-    scale, offset = metrics.affine_fit(train.y, apply_linear(train.x, w, mean, std))
-
-    raw = apply_linear(test.x, w, mean, std)
-    prediction = scale * raw + offset
-
+    raw, prediction, l2, interior = fit_predict(train, test, seed=seed)
     hard = hard_cells(test, tau)
     split = metrics.calibration(test.y[hard], raw[hard])
     interval = metrics.bootstrap_episodes(

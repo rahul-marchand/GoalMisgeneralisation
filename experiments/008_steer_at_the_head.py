@@ -41,6 +41,7 @@ import sys
 from pathlib import Path
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
@@ -168,21 +169,35 @@ def main() -> None:
     ]
 
     # ------------------------------------------------------------- steering
+    # One jitted function for the whole split forward pass. Calling the three
+    # pieces separately and unjitted costs full tracing overhead on every
+    # environment step, which is two orders of magnitude slower and looks like
+    # a hung job rather than a slow one. `delta` is an array argument, not a
+    # closure, so changing alpha does not force a recompile.
+    @jax.jit
+    def steered_action(carry, observations, starts, delta):
+        carry, _ = policy.apply(params, carry, observations, starts, method=_tower)
+        # pyright types apply()'s return as a variable dict; at runtime this is
+        # the LSTMState list the tower returned.
+        readout = carry[LAST_LAYER].h + delta  # type: ignore[index, union-attr]
+        hidden = policy.apply(params, readout, method=_mlp)
+        logits, _ = policy.apply(params, hidden, method=_actor)
+        return carry, jnp.argmax(logits, axis=1)
+
+    width = None
+
     def measure(direction, alpha: float):
+        nonlocal width
         envs = env_config(args.seed, args.split).make()
         key = jax.random.PRNGKey(args.seed)
         state = {"carry": policy.apply(params, key, envs.observation_space.shape, method=policy.initialize_carry)}
-        delta = None if direction is None or alpha == 0 else jax.numpy.asarray(direction.scaled(alpha))
+        if width is None:
+            width = state["carry"][LAST_LAYER].h.shape[-1]
+        delta = jnp.zeros(width) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))
 
         def act(observations, starts):
-            carry, _ = policy.apply(params, state["carry"], observations, starts, method=_tower)
-            state["carry"] = carry
-
-            readout = carry[LAST_LAYER].h
-            if delta is not None:
-                readout = readout + delta
-            logits, _ = policy.apply(params, policy.apply(params, readout, method=_mlp), method=_actor)
-            return np.asarray(jax.numpy.argmax(logits, axis=1))
+            state["carry"], action = steered_action(state["carry"], observations, starts, delta)
+            return np.asarray(action)
 
         outcomes = collect_episode_outcomes(envs, act, args.episodes, seed=args.seed)
         gaps, took_richer, _ = value_distance_decisions(outcomes)

@@ -1,0 +1,30 @@
+### does the intervention reach the network at all?
+commit f806085
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --episodes 512 --alphas -200 -50 0 50 200
+checkpoint cp_140206080  (update 27384)
+steering 1 cell costs an activation change of norm 0.0137
+unsteered indifference 7.43 extra steps
+    schedule         direction  alpha  indifference   shift  took richer  reached
+  every step    d->f0 (richer)   -200          7.70    0.27        74.7%    98.6%
+  every step    d->f0 (richer)    -50          7.22   -0.21        73.2%   100.0%
+  every step    d->f0 (richer)      0          7.43    0.00        73.8%   100.0%
+  every step    d->f0 (richer)     50          7.58    0.15        74.2%   100.0%
+  every step    d->f0 (richer)    200          7.27   -0.16        74.2%    91.6%
+            slope -0.001 cells of threshold per cell of steering
+        once    d->f0 (richer)   -200          7.70    0.27        74.7%    98.6%
+        once    d->f0 (richer)    -50          7.22   -0.21        73.2%   100.0%
+        once    d->f0 (richer)      0          7.43    0.00        73.8%   100.0%
+        once    d->f0 (richer)     50          7.58    0.15        74.2%   100.0%
+        once    d->f0 (richer)    200          7.25   -0.18        73.8%    92.6%
+            slope -0.001 cells of threshold per cell of steering
+            CONTROLS (every step)
+  every step            random   -200          7.08   -0.35        74.2%    76.6%
+  every step            random    200          6.12   -1.31        68.2%    90.2%
+  every step   other objective   -200          7.33   -0.10        74.7%    84.8%
+  every step   other objective    200          6.63   -0.80        72.6%    84.0%
+  every step         untrained   -200          6.08   -1.35        70.1%    84.2%
+  every step         untrained    200          6.81   -0.62        71.4%    89.5%
+A slope of -1 would mean the field is the compared quantity. Measured -0.001 when steered at every step and -0.001 when steered once.
+The random control must be flat and the other-objective control must have the opposite sign;
+if either fails, the perturbation is disturbing the network rather than steering a quantity.
+DONESANITY

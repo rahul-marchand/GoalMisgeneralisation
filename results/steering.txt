@@ -1,0 +1,29 @@
+commit f806085
+argv   /workspace/data/runs/clean11fv/local-files/cp_140206080 --levels /workspace/data/levels11 --episodes 2048
+checkpoint cp_140206080  (update 27384)
+steering 1 cell costs an activation change of norm 0.0137
+unsteered indifference 7.78 extra steps
+    schedule         direction  alpha  indifference   shift  took richer  reached
+  every step    d->f0 (richer)     -6          7.78    0.00        76.4%   100.0%
+  every step    d->f0 (richer)     -3          7.78    0.00        76.4%   100.0%
+  every step    d->f0 (richer)      0          7.78    0.00        76.4%   100.0%
+  every step    d->f0 (richer)      3          7.80    0.02        76.4%   100.0%
+  every step    d->f0 (richer)      6          7.81    0.03        76.5%   100.0%
+            slope +0.003 cells of threshold per cell of steering
+        once    d->f0 (richer)     -6          7.78    0.00        76.4%   100.0%
+        once    d->f0 (richer)     -3          7.78    0.00        76.4%   100.0%
+        once    d->f0 (richer)      0          7.78    0.00        76.4%   100.0%
+        once    d->f0 (richer)      3          7.80    0.02        76.4%   100.0%
+        once    d->f0 (richer)      6          7.81    0.03        76.5%   100.0%
+            slope +0.003 cells of threshold per cell of steering
+            CONTROLS (every step)
+  every step            random     -6          7.79    0.02        76.4%   100.0%
+  every step            random      6          7.76   -0.02        76.3%   100.0%
+  every step   other objective     -6          7.81    0.03        76.5%   100.0%
+  every step   other objective      6          7.78    0.00        76.4%   100.0%
+  every step         untrained     -6          7.81    0.03        76.5%   100.0%
+  every step         untrained      6          7.78    0.00        76.4%   100.0%
+A slope of -1 would mean the field is the compared quantity. Measured +0.003 when steered at every step and +0.003 when steered once.
+The random control must be flat and the other-objective control must have the opposite sign;
+if either fails, the perturbation is disturbing the network rather than steering a quantity.
+DONESTEER

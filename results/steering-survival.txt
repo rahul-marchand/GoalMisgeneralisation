@@ -1,0 +1,11 @@
+probe fitted on 7,297 cells; 1 cell costs norm 0.0139
+steps = extra forward passes after the displacement was applied
+   alpha   steps  decoded shift  fraction kept
+       6       0           6.00           1.00
+      25       0          25.00           1.00
+       6       1           0.02           0.00
+      25       1           0.08           0.00
+       6       2          -0.00          -0.00
+      25       2          -0.02          -0.00
+       6       4          -0.00          -0.00
+      25       4          -0.01          -0.00

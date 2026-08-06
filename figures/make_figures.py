@@ -442,6 +442,64 @@ def fig_distance_field():
     save(fig, "fig6_distance_field")
 
 
+# ---------------------------------------------------------------- figure 7
+def fig_distance_accuracy():
+    """How well the agent knows the distance, in cells rather than in R².
+
+    Three questions a correlation cannot answer. How far out is it typically?
+    Does it get worse with distance? And does it get worse where the maze
+    actually matters — where walls force a detour and straight-line distance is
+    the wrong answer?
+    """
+    data = np.load(DATA / "distance_fields.npz")
+    true, predicted, straight = data["all_true"], data["all_predicted"], data["all_straight"]
+    error = predicted - true
+    detour = true - straight
+
+    fig, axes = plt.subplots(1, 3, figsize=(10.4, 3.2))
+
+    # Calibration: does the predicted distance track the real one?
+    edges = np.arange(1, true.max() + 3, 3.0)
+    centres, means, spread = [], [], []
+    for low, high in zip(edges, edges[1:]):
+        rows = (true >= low) & (true < high)
+        if rows.sum() < 30:
+            continue
+        centres.append(float(true[rows].mean()))
+        means.append(float(predicted[rows].mean()))
+        spread.append(float(predicted[rows].std()))
+    limit = max(centres) + 3
+    axes[0].plot([0, limit], [0, limit], color=MUTED, lw=1, ls=(0, (4, 3)), zorder=1)
+    axes[0].errorbar(centres, means, yerr=spread, fmt="-o", color=BLUE, lw=2, ms=5, capsize=3, zorder=3)
+    axes[0].set_xlabel("true distance (cells)")
+    axes[0].set_ylabel("probe's estimate (cells)")
+    axes[0].set_xlim(0, limit)
+    axes[0].set_ylim(0, limit)
+    axes[0].grid(zorder=0)
+    axes[0].annotate("perfect", (limit * 0.72, limit * 0.79), fontsize=7.5, color=MUTED, rotation=38)
+
+    # Typical error, and whether it grows with distance.
+    for values, label, colour in ((true, "by true distance", BLUE), (detour, "by detour size", ORANGE)):
+        bins = np.arange(values.min(), values.max() + 2, 2.0)
+        xs, ys = [], []
+        for low, high in zip(bins, bins[1:]):
+            rows = (values >= low) & (values < high)
+            if rows.sum() < 30:
+                continue
+            xs.append(float(values[rows].mean()))
+            ys.append(float(np.abs(error[rows]).mean()))
+        axis = axes[1] if colour == BLUE else axes[2]
+        axis.plot(xs, ys, "-o", color=colour, lw=2, ms=5, zorder=3)
+        axis.axhline(float(np.abs(error).mean()), color=MUTED, lw=1, ls=(0, (4, 3)), zorder=1)
+        axis.set_xlabel(label.replace("by ", "") + " (cells)")
+        axis.set_ylabel("mean error (cells)")
+        axis.grid(zorder=0)
+        axis.annotate(f"overall {np.abs(error).mean():.1f}", (xs[0], np.abs(error).mean()),
+                      textcoords="offset points", xytext=(4, 5), fontsize=7.5, color=MUTED)
+
+    save(fig, "fig7_distance_accuracy")
+
+
 if __name__ == "__main__":
     print("writing figures to", OUT)
     fig_task()
@@ -450,3 +508,4 @@ if __name__ == "__main__":
     fig_dynamics()
     fig_example_plan()
     fig_distance_field()
+    fig_distance_accuracy()

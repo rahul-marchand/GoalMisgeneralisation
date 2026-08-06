@@ -32,7 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--split", type=str, default="test")
     parser.add_argument("--train-episodes", type=int, default=256)
-    parser.add_argument("--examples", type=int, default=12)
+    parser.add_argument("--examples", type=int, default=12, help="Mazes drawn in full.")
+    parser.add_argument("--score-episodes", type=int, default=512, help="Episodes behind the accuracy breakdown.")
     parser.add_argument("--num-envs", type=int, default=32)
     parser.add_argument("--correlation", type=float, default=1.0)
     parser.add_argument("--feature", type=int, default=0)
@@ -69,11 +70,19 @@ def main() -> None:
     activations = Feature("activations", operator.attrgetter("features"))
     target = targets.DistanceToObjective(targets.fixed(args.feature), name=f"d->f{args.feature}", n_features=N_FEATURES)
 
-    examples = rollouts(9999, args.examples)
     train = fields.cell_data(rollouts(0, args.train_episodes), activations, target)
+
+    # The whole scoring set, so accuracy can be read in cells and broken down by
+    # distance and by detour size. A handful of drawn mazes shows the shape of
+    # the error; only the full set says how big it is.
+    scoring = rollouts(9999, args.score_episodes)
+    scored = fields.cell_data(scoring, activations, target)
+    _, all_predictions, l2, _ = fields.fit_predict(train, scored)
+    print(f"fitted on {len(train.y):,} cells, l2={l2:g}; scored on {len(scored.y):,}")
+
+    examples = scoring[: args.examples]
     test = fields.cell_data(examples, activations, target)
-    _, prediction, l2, _ = fields.fit_predict(train, test)
-    print(f"fitted on {len(train.y):,} cells, l2={l2:g}")
+    _, prediction, _, _ = fields.fit_predict(train, test)
 
     truth, predicted, straight, observations = [], [], [], []
     cursor = 0
@@ -100,6 +109,11 @@ def main() -> None:
         observations=np.stack(observations),
         feature=args.feature,
         checkpoint=str(args.checkpoint),
+        # Flat arrays over every scored cell, for the accuracy breakdown.
+        all_true=scored.y,
+        all_predicted=all_predictions,
+        all_straight=scored.confound[:, 0],
+        all_episode=scored.episode,
     )
     print(f"wrote {args.out}  ({len(truth)} episodes)")
 

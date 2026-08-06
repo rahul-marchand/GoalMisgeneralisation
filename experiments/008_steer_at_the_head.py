@@ -74,9 +74,17 @@ def parse_args() -> argparse.Namespace:
 
 
 # Flax lets `method=` take a callable receiving the module, so the forward pass
-# can be split without subclassing anything or touching third_party.
+# can be split without subclassing anything or touching third_party. This
+# mirrors BaseLSTM.step exactly, including the skip connection: with
+# skip_final the readout is `carry[-1].h + embedded`, and reconstructing it
+# from the carry alone silently removes a residual path the policy depends on.
 def _tower(module, carry, obs, starts):
-    return module.network_params.step(carry, module._maybe_normalize_input_image(obs), starts)
+    net = module.network_params
+    embedded = net._compress_input(module._maybe_normalize_input_image(obs))
+    out_carry, readout = net._apply_cells(carry, embedded, starts)
+    if net.cfg.skip_final:
+        readout = readout + embedded
+    return out_carry, readout
 
 
 def _mlp(module, hidden):
@@ -176,24 +184,22 @@ def main() -> None:
     # closure, so changing alpha does not force a recompile.
     @jax.jit
     def steered_action(carry, observations, starts, delta):
-        carry, _ = policy.apply(params, carry, observations, starts, method=_tower)
-        # pyright types apply()'s return as a variable dict; at runtime this is
-        # the LSTMState list the tower returned.
-        readout = carry[LAST_LAYER].h + delta  # type: ignore[index, union-attr]
-        hidden = policy.apply(params, readout, method=_mlp)
+        carry, readout = policy.apply(params, carry, observations, starts, method=_tower)
+        hidden = policy.apply(params, readout + delta, method=_mlp)
         logits, _ = policy.apply(params, hidden, method=_actor)
         return carry, jnp.argmax(logits, axis=1)
 
-    width = None
+
 
     def measure(direction, alpha: float):
-        nonlocal width
+
         envs = env_config(args.seed, args.split).make()
         key = jax.random.PRNGKey(args.seed)
         state = {"carry": policy.apply(params, key, envs.observation_space.shape, method=policy.initialize_carry)}
-        if width is None:
-            width = state["carry"][LAST_LAYER].h.shape[-1]
-        delta = jnp.zeros(width) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))
+
+
+        depth = len(contrast.delta)
+        delta = jnp.zeros(depth) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))
 
         def act(observations, starts):
             state["carry"], action = steered_action(state["carry"], observations, starts, delta)
@@ -206,7 +212,15 @@ def main() -> None:
 
     baseline, took, reached = measure(None, 0.0)
     print(f"unsteered indifference {baseline:.2f} extra steps  (took richer {took:.1%}, reached {reached:.1%})")
-    print("this must match experiment 006's 7.8, or the rebuilt forward pass is not the agent\n")
+    # A working agent reaches an objective essentially always. Anything less
+    # means the hand-assembled forward pass is not the policy, and every number
+    # below it would be a measurement of the reassembly rather than the agent.
+    if reached < 0.9:
+        raise RuntimeError(
+            f"unsteered agent reached an objective in only {reached:.1%} of episodes; the rebuilt forward "
+            "pass is not the policy, so no steering number here would mean anything"
+        )
+    print("baseline reproduces experiment 006, so the split forward pass is the agent\n")
 
     header = f"{'direction':>18}{'alpha':>7}{'indifference':>14}{'shift':>8}{'took richer':>13}{'reached':>9}"
     print(header)

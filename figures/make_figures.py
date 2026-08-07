@@ -500,6 +500,95 @@ def fig_distance_accuracy():
     save(fig, "fig7_distance_accuracy")
 
 
+# ---------------------------------------------------------------- figure 8
+def fig_intervention():
+    """Writing a route into the cell state moves the trade-off, both ways.
+
+    Left is the claim in the task's own units: the exchange rate is the extra
+    distance the agent will walk for the richer objective, so the reader can see
+    the write pull it below the agent's own rate and push it up to the task's
+    optimum, against a norm-matched random control that does neither. The shaded
+    region is where the write costs episodes — everything interpretable happens
+    to its left, and marking it is what stops a large effect bought with a
+    broken policy from reading as a large effect.
+
+    Right is where the write is refused. A hijacked policy would switch at every
+    margin; one entering the decision switches only where switching is cheap.
+    """
+    data = json.loads((DATA / "intervention_clean11fv.json").read_text())
+    baseline = data["baseline"]
+
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.5))
+
+    # ---- left: exchange rate against write strength
+    ax = axes[0]
+    series = (
+        ("plan", BLUE, "route to the other objective", 9),
+        ("self", ORANGE, "its own route", -16),
+        ("random", MUTED, "random vectors", -16),
+    )
+    intact = [e["alpha"] for e in data["arms"]["plan"] if e["reached"] >= 0.99]
+    if intact:
+        ax.axvspan(max(intact), 1.0, color="#eeece5", zorder=0)
+        ax.annotate(
+            "write costs episodes",
+            (max(intact) + 0.02, 3.4), fontsize=7.5, color=MUTED, ha="left", va="bottom",
+        )
+
+    ax.axhline(10.0, color=INK2, lw=0.9, ls=(0, (4, 3)), zorder=1)
+    ax.annotate("task optimum  10.0", (0.0, 10.0), textcoords="offset points",
+                xytext=(0, 5), fontsize=7.5, color=INK2)
+    ax.axhline(baseline["indifference"], color=MUTED, lw=0.9, ls=(0, (1, 2)), zorder=1)
+    ax.annotate(f"agent alone  {baseline['indifference']:.1f}", (0.0, baseline["indifference"]),
+                textcoords="offset points", xytext=(0, -12), fontsize=7.5, color=MUTED)
+
+    for arm, colour, label, dy in series:
+        entries = [e for e in data["arms"][arm] if e["reached"] >= 0.99]
+        xs = [0.0] + [e["alpha"] for e in entries]
+        ys = [baseline["indifference"]] + [e["indifference"] for e in entries]
+        low = [baseline["indifference_ci"][0]] + [e["indifference_ci"][0] for e in entries]
+        high = [baseline["indifference_ci"][1]] + [e["indifference_ci"][1] for e in entries]
+        ax.fill_between(xs, low, high, color=colour, alpha=0.13, lw=0, zorder=2)
+        ax.plot(xs, ys, "-o", color=colour, lw=2, ms=5, zorder=3, clip_on=False)
+        ax.annotate(label, (xs[-1], ys[-1]), textcoords="offset points", xytext=(-4, dy),
+                    ha="right", fontsize=8, color=colour)
+
+    ax.set_xlabel("write strength (cell-state norms)")
+    ax.set_ylabel("extra steps walked for the richer objective")
+    ax.set_xlim(0, 1.0)
+    ax.set_ylim(3, 11.6)
+    ax.grid(axis="y", zorder=0)
+
+    # ---- right: where the write is refused
+    ax = axes[1]
+    alpha = "0.30"
+    bands = {row["band"]: row for row in data["by_gap"]["none"]["0.00"]}
+    steered = {row["band"]: row for row in data["by_gap"]["plan"][alpha]}
+    labels = [b for b in bands if b in steered]
+    x = np.arange(len(labels))
+    width = 0.38
+
+    for offset, table, colour, name in (
+        (-width / 2, bands, MUTED, "agent alone"),
+        (width / 2, steered, BLUE, f"+ written route"),
+    ):
+        heights = [100 * table[b]["switched"] for b in labels]
+        ax.bar(x + offset, heights, width, color=colour, zorder=3, label=name)
+        for xi, height in zip(x + offset, heights):
+            ax.annotate(f"{height:.0f}%", (xi, height), textcoords="offset points",
+                        xytext=(0, 3), ha="center", fontsize=7.5, color=INK2)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{b}\nn={bands[b]['n']}" for b in labels], fontsize=8)
+    ax.set_xlabel("utility margin  (reward the switch costs)")
+    ax.set_ylabel("% took the other objective")
+    ax.set_ylim(0, 62)
+    ax.grid(axis="y", zorder=0)
+    ax.legend(loc="upper right", fontsize=8)
+
+    save(fig, "fig8_intervention")
+
+
 if __name__ == "__main__":
     print("writing figures to", OUT)
     fig_task()
@@ -509,3 +598,4 @@ if __name__ == "__main__":
     fig_example_plan()
     fig_distance_field()
     fig_distance_accuracy()
+    fig_intervention()

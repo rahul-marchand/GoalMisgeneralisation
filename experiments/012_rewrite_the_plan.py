@@ -612,6 +612,11 @@ def main() -> None:
     )
     baseline, baseline_records = run("plan", directions, 0.0)
     print(row("none", 0.0, baseline))
+    # Carried in the same structure as every other arm so a figure can plot the
+    # unsteered agent beside the steered one. Reconstructing it from whichever
+    # arm happens to be a no-op at the smallest alpha is how a figure ends up
+    # asserting something no run measured.
+    by_arm: dict[str, list[dict]] = {"none": [{"alpha": 0.0, **baseline, "records": baseline_records}]}
     if baseline["reached"] < 0.9:
         raise RuntimeError(f"unsteered agent reached only {baseline['reached']:.1%}; the rollout loop is not the policy")
 
@@ -623,7 +628,6 @@ def main() -> None:
         ("random", random_directions),
         ("shuffled", directions),
     )
-    by_arm: dict[str, list[dict]] = {}
     for arm, table in arms:
         for alpha in args.alphas:
             if alpha == 0.0:

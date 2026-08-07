@@ -69,6 +69,7 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
 from goalmisgen.analysis import collect_rollouts, geometry, metrics, plans, steering
+from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import (
     apply_multinomial,
     class_directions,
@@ -352,6 +353,10 @@ def measure(
                     "reached_feature_id": final.get("reached_feature_id"),
                     "steps": int(steps_taken[index]),
                     "edited_cells": 0 if edit is None else len(edit),
+                    # Kept whole so the exchange rate can be refitted per arm: the
+                    # switch rate is a percentage, the exchange rate is in steps, and
+                    # only the second is comparable to the agent's unsteered 7.8.
+                    "info": final,
                 }
             )
     return records
@@ -369,15 +374,43 @@ def outcome_arrays(records: list[dict]) -> tuple[np.ndarray, np.ndarray]:
     return switched, reached
 
 
+def exchange_rate(records: list[dict], resamples: int = 200, seed: int = 0) -> tuple[float, float, float]:
+    """The distance gap at which the agent stops preferring the richer objective.
+
+    In steps, which is what makes it comparable to the unsteered 7.8 and to the
+    task's own optimum of 10.0. A switch rate is a percentage of a population
+    that the intervention itself reshapes; this is a property of the decision.
+    """
+    gaps, took_richer, _ = value_distance_decisions([r["info"] for r in records])
+    point = indifference_point(gaps, took_richer)
+
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(resamples):
+        chosen = rng.integers(0, len(gaps), len(gaps)) if len(gaps) else np.array([], dtype=int)
+        if not len(chosen):
+            continue
+        resampled = indifference_point(gaps[chosen], took_richer[chosen])
+        if np.isfinite(resampled):
+            values.append(resampled)
+    if not values:
+        return point, float("nan"), float("nan")
+    low, high = np.quantile(values, [0.025, 0.975])
+    return point, float(low), float(high)
+
+
 def summarise(records: list[dict], seed: int = 0) -> dict:
-    """Switch rate with an interval, reach rate, and how many cells were touched."""
+    """Switch rate and exchange rate, both with intervals, plus the damage measures."""
     switched, reached = outcome_arrays(records)
     low, high = metrics.bootstrap_rate(switched, reached, seed=seed)
+    point, point_low, point_high = exchange_rate(records, seed=seed)
     return {
         "n": len(records),
         "reached": float(reached.mean()) if records else float("nan"),
         "switched": float(switched.sum() / max(reached.sum(), 1)),
         "switched_ci": [low, high],
+        "indifference": point,
+        "indifference_ci": [point_low, point_high],
         "steps": float(np.mean([r["steps"] for r in records])) if records else float("nan"),
         "cells": float(np.mean([r["edited_cells"] for r in records])) if records else float("nan"),
     }
@@ -520,14 +553,16 @@ def main() -> None:
 
     def row(label: str, alpha: float, summary: dict) -> str:
         interval = f"[{summary['switched_ci'][0]:.3f},{summary['switched_ci'][1]:.3f}]"
+        point = f"[{summary['indifference_ci'][0]:.1f},{summary['indifference_ci'][1]:.1f}]"
         return (
             f"{label:>10}{alpha:>7.2f}{summary['switched']:>11.1%}{interval:>16}"
-            f"{summary['reached']:>10.1%}{summary['steps']:>8.1f}{summary['cells']:>7.1f}{summary['n']:>6}"
+            f"{summary['indifference']:>14.2f}{point:>14}"
+            f"{summary['reached']:>10.1%}{summary['steps']:>8.1f}{summary['n']:>6}"
         )
 
     print(
         f"\n{'arm':>10}{'alpha':>7}{'switched':>11}{'95% CI':>16}"
-        f"{'reached':>10}{'steps':>8}{'cells':>7}{'n':>6}"
+        f"{'exchange':>14}{'95% CI':>14}{'reached':>10}{'steps':>8}{'n':>6}"
     )
     baseline, baseline_records = run("plan", directions, 0.0)
     print(row("none", 0.0, baseline))
@@ -588,7 +623,12 @@ def main() -> None:
             )
     print(
         "An interval excluding zero is a real shift. 'vs self' is the strongest form of the comparison:\n"
-        "identical machinery, identical cells, identical norm, pointed the other way."
+        "identical machinery, identical cells, identical norm, pointed the other way.\n\n"
+        "'exchange' is the extra distance the agent will walk for the richer objective before giving\n"
+        "up on it, in steps, fitted the same way as the unsteered psychometric curve. The task's own\n"
+        "optimum is 10.0 and this agent sits at 7.8, so a write that moves this number is moving the\n"
+        "trade-off itself rather than winning individual episodes — and it is in units that say by\n"
+        "how much, which no switch rate does."
     )
 
     if args.per_layer and len(directions) > 1:

@@ -1,7 +1,7 @@
 ---
 date: 202607241500
 title: 4YP Experiment 1 - Toy Model Building
-status: stage 1 complete
+status: stage 2 complete, stage 3 in progress
 tags: [4yp, experiment]
 ---
 
@@ -52,6 +52,9 @@ The four runs referred to in initial runs below:
 | `maze11` | 11×11 | 1.0 | fixed | 150M |
 | `clean11fv` | 11×11 | 0.5 | fixed | 150M |
 | `clean11` | 11×11 | 0.5 | randomised | 130M |
+| `novalue11` | 11×11 | 1.0 | **no value channel** | 150M |
+
+`novalue11` is new in stage 3 and is explained there.
 
 ## Initial Runs
 
@@ -174,6 +177,184 @@ rather than warns. Metrics split ordering from calibration exactly
 - Everything is **correlational**. Nothing has been intervened on.
 - The value-vs-amplitude alternative above.
 - n=1 seed; only the control agent — the proxy agent has not been probed.
+
+## Stage 3 — trying to intervene (2026-08-07)
+
+Sense-check question: **can we change what the agent wants?**
+
+Stage 2 is entirely correlational. The point of this project is a mechanism that
+can be *intervened* on, so this stage is about turning a decodable quantity into
+a causal one. It has not worked yet, and most of what follows is about why.
+
+### Five nulls, and the control that threw them away
+
+The obvious move: the probe gives weights `w` decoding distance-to-objective in
+cells, so it also gives a direction — the smallest change to the activations
+that moves the decoded value by α cells. Add it during a rollout and ask whether
+the agent's threshold moves. A slope of 1 would mean the field *is* the compared
+quantity.
+
+Measured slope: **−0.001 cells of threshold per cell of steering**, applied every
+step and applied once. Four more variants (differential, local, at-objectives,
+global) gave the same.
+
+Before writing that up I ran the control that decides whether any of it is
+readable (`010`). Build a direction from the agent's **own choices** — mean
+activation on episodes where it took objective 0 minus episodes where it took
+objective 1, matched on the distance gap — and steer with that. If a direction
+built from behaviour cannot move behaviour, nothing will.
+
+| direction | scale | indifference | shift | reached |
+|---|---|---|---|---|
+| unsteered | 0 | 7.78 | — | 100% |
+| choice | 0.3 | 7.81 | +0.04 | 100% |
+| choice | 0.1 | 7.85 | +0.07 | 100% |
+| **random** | 0.1 | 7.85 | **+0.07** | 100% |
+| random | 0.3 | 7.80 | +0.02 | 100% |
+
+Identical. And above this band (~0.3 of the readout norm) every direction
+including random destroys the policy — `reached` falls to 5–11%. So the response
+is bimodal: 15% of the readout does nothing, 50% breaks it, nothing in between.
+
+**So all five nulls are facts about the method, not the network.** They constrain
+nothing about whether the distance field drives the choice. Worth saying plainly
+because the tempting write-up — "the field is decodable but unused" — would have
+been a real-sounding negative result built on an intervention that cannot move
+anything. (I tested and refuted the obvious explanation, that a LayerNorm was
+absorbing the perturbation: this config uses `IdentityNorm`.)
+
+### An agent that never saw a value learned the same exchange rate
+
+Separate thread, and the one clean success of the stage. If value has to be
+*internalised* rather than read off a channel, it becomes a real target for
+intervention. So: train at ρ=1.0 with the value channel **removed** — four
+observation channels, colour the only cue, feature 0 always worth 1.0 and
+feature 1 always 0.5. The agent has to learn the exchange rate as a constant of
+the world.
+
+| | `clean11fv` (sees values) | `novalue11` (never did) |
+|---|---|---|
+| indifference | 7.8 [7.7, 8.0] | **7.8 [7.6, 7.9]** |
+| implied step penalty | 0.064 | 0.064 |
+| task's true rate | 10.0 | 10.0 |
+
+The same trade-off to the same decimal, including the same 28% over-weighting of
+distance. And it is graded rather than a fixed rule: it takes the cheaper
+objective in 23.6% of episodes, exactly when it is near enough.
+
+### The choice is already decided before the agent moves
+
+Probe the *decision itself* rather than a quantity feeding it: which objective
+will this episode end at, read off the state at t=0, before any action. Fitted on
+`valid`, scored on `test`, 512 episodes.
+
+| site | `novalue11` | `clean11fv` |
+|---|---|---|
+| pooled over all cells | **0.928** [.899, .948] | **0.905** [.879, .929] |
+| objective cells | 0.826 | 0.845 |
+| agent's own cell | 0.773 | 0.787 |
+| untrained, same shape | 0.47–0.53 | 0.46–0.57 |
+| **observation (control)** | **0.500** | **0.500** |
+| shuffled labels | 0.30–0.50 | 0.32–0.43 |
+
+Three things. The observation arm is at **exactly 0.500 at every site** — a 1×1
+probe cannot compute a distance, so it cannot work out which objective is worth
+taking however fully the level determines it; the whole gap is computation the
+network did. The signal is strongest **pooled** and weakest at the agent's own
+cell, so the decision is distributed over the maze rather than a local verdict.
+And the no-value agent decodes at least as well as the value-reading one, so
+nothing is lost by making value internal. Feature 0 is taken 72.5% of the time,
+so always-guessing scores 0.5, not 0.72.
+
+### What the planning paper actually does differently
+
+Given that the intervention site was the problem, I went back to
+[arXiv:2504.01871](https://arxiv.org/abs/2504.01871) and the
+[write-up](https://tuphs28.github.io/projects/interpplanning/) properly. The
+intervention is `g'_{x,y} ← g_{x,y} + w_k`: add the probe's class weight vector
+to the **cell state**, at **chosen squares**. We had matched it on essentially no
+axis.
+
+| | Bush | us |
+|---|---|---|
+| site | cell state `c`, inside the recurrence | tower readout, one Dense layer from the actor |
+| concept | 5-way discrete per square (UP/DOWN/LEFT/RIGHT/NEVER) | continuous scalar (distance in cells) |
+| extent | many squares at once, coherently | one cell, or a constant at *every* cell |
+| schedule | every step, held until the agent complies | once, and every step |
+| levels | handcrafted, alternative unambiguous | 2,048 random |
+| success | "solved it the intended suboptimal way", 94.6–98.8% vs 4–37% random | shift in a psychometric threshold |
+
+Three of those look load-bearing:
+
+**Site.** `c` is the layer's persistent memory, carried across ticks and steps.
+`h` is recomputed from the gates each tick. The readout we were editing has *no
+recurrence downstream of it at all*. Our one earlier attempt at the recurrent
+state hit `h`, and the displacement was 100% erased by a single forward pass.
+
+**Shape of the edit.** Our steering added a constant to every cell of every
+layer — a uniform offset to the field. A distance field that is uniformly +5
+everywhere has the **same argmin and the same gradient**. If the policy reads the
+field's shape, that null was guaranteed before it was run. Bush's edits are local
+and mutually consistent: a different plan, not a rescaled one.
+
+**Discrete vs continuous.** "This square is NEVER on the route" is a coherent
+thing to write. "This cell is 3 away when its neighbours say 8" describes no
+maze, so the network is handed a contradiction and sensibly ignores it.
+
+### Replicating it here — running now
+
+Our mazes are **perfect** (exactly one path between any two cells), so the
+paper's *shortcut* intervention has nothing to divert onto. The *directional*
+intervention ports exactly, and lands on the question this project is about:
+
+> write the route to the objective the agent is **not** taking, and see whether
+> it goes there.
+
+The concept is the route as five classes per cell — four moves or NEVER. The edit
+writes the new route's directions and writes NEVER along the route it replaces,
+into `c`, at every layer, before every step. Target is the objective an optimal
+agent would *not* take, so the α=0 row is the agent's own 4% error rate. Controls
+at identical norms and identical cells: `random` (fixed random unit vectors),
+`shuffled` (a real plan, wrong maze), and `self` — the same edit pointing where
+the agent was already going, which is what separates steering from damage.
+
+Two things fell out of building it that are worth reporting on their own.
+
+**`g + w_k` does not reliably make the probe read class k.** Adding a class's
+weight vector raises its logit, but a rival class whose vector correlates with it
+and is longer rises faster — and then wins at *every* magnitude, with no α that
+rescues it. On a 4-class synthetic probe, one class in four was unreachable this
+way up to α=1000. So the direction used here maximises the *minimum* margin over
+all rival classes instead, `max_δ min_j (v_k − v_j)·δ` at unit norm — the
+minimum-norm point of the convex hull of the differences. Every class then
+becomes writable, and a class that genuinely cannot be written (its vector inside
+the cone of the others) now raises rather than silently doing nothing.
+
+**The write is verified against its own claim.** Before any behavioural number,
+the experiment reports the fraction of held-out cells where writing a class's
+direction actually makes the probe read that class, per α. An α whose write
+accuracy is low is not testing the hypothesis.
+
+Registered before running:
+
+- plan direction switches the objective, and `self`/`random`/`shuffled` do not →
+  intervention works here, and the whole probe→steer route is open
+- plan does no better than shuffled → the edit is disruption, and additive
+  intervention is inert in this architecture at every site we can reach
+
+Results pending.
+
+### Not established
+
+- Still **nothing causal**. Five nulls, all uninterpretable; the sixth attempt is
+  in flight.
+- The value-vs-amplitude alternative from stage 2 — needs `clean11`, not run.
+- `novalue11` has not been probed for a *value* representation, and at ρ=1.0 with
+  fixed values there is no varying value to regress against. Its value term is
+  definitionally internal but so far only visible behaviourally.
+- The proxy agent `maze11` still has not been probed for distance, value or
+  target. Deliberate — nail the control setup first.
+- n=1 seed throughout.
 
 ## Going Forwards
 

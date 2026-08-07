@@ -57,6 +57,7 @@ many cells just as hard, and should change nothing.
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from functools import partial
@@ -67,7 +68,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
-from goalmisgen.analysis import collect_rollouts, geometry, plans, steering
+from goalmisgen.analysis import collect_rollouts, geometry, metrics, plans, steering
 from goalmisgen.analysis.probes import (
     apply_multinomial,
     class_directions,
@@ -121,6 +122,12 @@ def parse_args() -> argparse.Namespace:
         help="What each feature is worth, when the observation does not carry it.",
     )
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--json",
+        type=Path,
+        default=None,
+        help="Also write every arm here, so a figure is drawn from a file this script produced.",
+    )
     return parser.parse_args()
 
 
@@ -182,31 +189,45 @@ def utility_gap(observation: np.ndarray, fixed: list[float] | None) -> float:
 # ----------------------------------------------------------------------
 
 
-def plan_edit(observation: np.ndarray, target: int, replaced: int) -> dict[tuple[int, int], int] | None:
+def plan_edit(
+    observation: np.ndarray,
+    target: int,
+    replaced: int,
+    write_route: bool = True,
+    erase_old: bool = True,
+) -> dict[tuple[int, int], int] | None:
     """Which class to write at which cell: the new route, and NEVER on the old.
 
     ``None`` if the target cannot be reached. Only cells that carry information
     are touched — the route to write and the route to erase. Writing NEVER at
     every off-route cell instead would perturb most of the maze, which measures
     how much damage the policy tolerates rather than whether it follows a plan.
+
+    The two halves separate because they are different claims. Erasing the old
+    route says "not that way" and needs no plan at all; writing the new one says
+    "this way". If erasing alone moves the agent, the edit is working as a
+    blockade and the directional concept is doing nothing — which would be worth
+    knowing before calling any of this a plan.
     """
-    wanted = plans.planned_directions(observation, target, N_FEATURES)
-    if wanted is None:
-        return None
-
     edit: dict[tuple[int, int], int] = {}
-    for row, col in np.argwhere((wanted >= 0) & (wanted < plans.NEVER)):
-        edit[(int(row), int(col))] = int(wanted[row, col])
 
-    old = plans.planned_directions(observation, replaced, N_FEATURES)
-    if old is not None:
+    if write_route:
+        wanted = plans.planned_directions(observation, target, N_FEATURES)
+        if wanted is None:
+            return None
+        for row, col in np.argwhere((wanted >= 0) & (wanted < plans.NEVER)):
+            edit[(int(row), int(col))] = int(wanted[row, col])
+
+    if erase_old:
+        old = plans.planned_directions(observation, replaced, N_FEATURES)
+        if old is None:
+            return None if not edit else edit
         for row, col in np.argwhere((old >= 0) & (old < plans.NEVER)):
-            cell = (int(row), int(col))
             # A cell shared by both routes keeps its new direction: the agent
             # walks it either way, so erasing it would contradict the plan we
             # are writing rather than the one we are replacing.
-            edit.setdefault(cell, plans.NEVER)
-    return edit
+            edit.setdefault((int(row), int(col)), plans.NEVER)
+    return edit or None
 
 
 def build_deltas(
@@ -274,13 +295,16 @@ def measure(
         optimal = [optimal_objective(frame, fixed_values) for frame in frames]
         gaps = [utility_gap(frame, fixed_values) for frame in frames]
 
+        write_route = arm != "erase"
+        erase_old = arm not in ("route", "self-route")
         edits: list[dict[tuple[int, int], int] | None] = []
         for frame, best in zip(frames, optimal):
             if best is None:
                 edits.append(None)
                 continue
-            target = 1 - best
-            edits.append(plan_edit(frame, target if arm != "self" else best, best if arm != "self" else target))
+            # "self" points the same machinery where the agent was already going.
+            pointed_at, replaced = (best, 1 - best) if arm.startswith("self") else (1 - best, best)
+            edits.append(plan_edit(frame, pointed_at, replaced, write_route, erase_old))
         if arm == "shuffled":
             edits = [edits[index] for index in derange(n_envs, seed + batch)]
 
@@ -333,14 +357,27 @@ def measure(
     return records
 
 
-def summarise(records: list[dict]) -> dict:
-    """Switch rate, reach rate, and how many cells the edit touched."""
-    reached = [r for r in records if r["reached"]]
-    switched = [r for r in reached if r["reached_feature_id"] == r["target"]]
+def outcome_arrays(records: list[dict]) -> tuple[np.ndarray, np.ndarray]:
+    """Per-episode ``(switched, reached)`` booleans, aligned across arms.
+
+    Alignment holds because every arm runs the same seeds and drops the same
+    episodes — the ones where the two objectives tie — so record ``i`` is the
+    same maze in every table. That is what licenses the paired interval.
+    """
+    reached = np.array([bool(r["reached"]) for r in records])
+    switched = np.array([bool(r["reached"]) and r["reached_feature_id"] == r["target"] for r in records])
+    return switched, reached
+
+
+def summarise(records: list[dict], seed: int = 0) -> dict:
+    """Switch rate with an interval, reach rate, and how many cells were touched."""
+    switched, reached = outcome_arrays(records)
+    low, high = metrics.bootstrap_rate(switched, reached, seed=seed)
     return {
         "n": len(records),
-        "reached": len(reached) / max(len(records), 1),
-        "switched": len(switched) / max(len(reached), 1),
+        "reached": float(reached.mean()) if records else float("nan"),
+        "switched": float(switched.sum() / max(reached.sum(), 1)),
+        "switched_ci": [low, high],
         "steps": float(np.mean([r["steps"] for r in records])) if records else float("nan"),
         "cells": float(np.mean([r["edited_cells"] for r in records])) if records else float("nan"),
     }
@@ -479,37 +516,79 @@ def main() -> None:
             envs, policy, params, get_action, args.batches, args.seed, table, alpha * typical,
             arm, fixed_values, channels,
         )
-        return summarise(records), records
+        return summarise(records, seed=args.seed), records
 
-    print(f"\n{'arm':>10}{'alpha':>7}{'switched':>11}{'reached':>10}{'steps':>8}{'cells':>7}{'n':>6}")
-    baseline, baseline_records = run("plan", directions, 0.0)
+    def row(label: str, alpha: float, summary: dict) -> str:
+        interval = f"[{summary['switched_ci'][0]:.3f},{summary['switched_ci'][1]:.3f}]"
+        return (
+            f"{label:>10}{alpha:>7.2f}{summary['switched']:>11.1%}{interval:>16}"
+            f"{summary['reached']:>10.1%}{summary['steps']:>8.1f}{summary['cells']:>7.1f}{summary['n']:>6}"
+        )
+
     print(
-        f"{'none':>10}{0.0:>7.2f}{baseline['switched']:>11.1%}{baseline['reached']:>10.1%}"
-        f"{baseline['steps']:>8.1f}{baseline['cells']:>7.1f}{baseline['n']:>6}"
+        f"\n{'arm':>10}{'alpha':>7}{'switched':>11}{'95% CI':>16}"
+        f"{'reached':>10}{'steps':>8}{'cells':>7}{'n':>6}"
     )
+    baseline, baseline_records = run("plan", directions, 0.0)
+    print(row("none", 0.0, baseline))
     if baseline["reached"] < 0.9:
         raise RuntimeError(f"unsteered agent reached only {baseline['reached']:.1%}; the rollout loop is not the policy")
 
+    arms = (
+        ("plan", directions),
+        ("self", directions),
+        ("route", directions),
+        ("erase", directions),
+        ("random", random_directions),
+        ("shuffled", directions),
+    )
     by_arm: dict[str, list[dict]] = {}
-    for arm, table in (("plan", directions), ("self", directions), ("random", random_directions), ("shuffled", directions)):
+    for arm, table in arms:
         for alpha in args.alphas:
             if alpha == 0.0:
                 continue
             summary, records = run(arm, table, alpha)
-            print(
-                f"{arm:>10}{alpha:>7.2f}{summary['switched']:>11.1%}{summary['reached']:>10.1%}"
-                f"{summary['steps']:>8.1f}{summary['cells']:>7.1f}{summary['n']:>6}"
-            )
+            print(row(arm, alpha, summary))
             by_arm.setdefault(arm, []).append({"alpha": alpha, **summary, "records": records})
         print()
 
     print(
         "'switched' is the fraction of episodes ending at the objective an optimal agent would NOT take,\n"
         "among those that ended at an objective at all. The alpha=0 row is the agent's own error rate.\n"
+        "'route' writes only the new directions, 'erase' only NEVER along the old route: if erase alone\n"
+        "does the work, the edit is a blockade and the directional concept is carrying nothing.\n"
         "Only rows keeping 'reached' near the baseline are interpretable: below that the write is\n"
         "destroying the policy, and 'self' — the same edit pointing where the agent was already going —\n"
-        "is what separates the two. If plan beats self, random and shuffled at matched norms, the plan\n"
-        "is being read as a plan."
+        "is what separates the two."
+    )
+
+    # Every arm ran the same seeds over the same mazes, so the difference can be
+    # taken on a common resample. Two overlapping intervals are not evidence of
+    # no difference, and at these rates they overlap constantly.
+    baseline_switched, baseline_reached = outcome_arrays(baseline_records)
+    print(f"\n{'arm':>10}{'alpha':>7}{'vs baseline':>13}{'95% CI':>18}{'vs self':>10}{'95% CI':>18}")
+    for arm in ("plan", "route", "erase", "shuffled", "random"):
+        for entry in by_arm.get(arm, []):
+            switched, reached = outcome_arrays(entry["records"])
+            change, low, high = metrics.bootstrap_rate_difference(
+                switched, reached, baseline_switched, baseline_reached, seed=args.seed
+            )
+            against_self = ""
+            twin = next((e for e in by_arm.get("self", []) if e["alpha"] == entry["alpha"]), None)
+            if twin is not None and arm != "self":
+                other_switched, other_reached = outcome_arrays(twin["records"])
+                gap, gap_low, gap_high = metrics.bootstrap_rate_difference(
+                    switched, reached, other_switched, other_reached, seed=args.seed
+                )
+                against_self = f"{gap:>10.1%}" + f"{f'[{gap_low:+.3f},{gap_high:+.3f}]':>18}"
+            print(
+                f"{arm:>10}{entry['alpha']:>7.2f}{change:>13.1%}"
+                + f"{f'[{low:+.3f},{high:+.3f}]':>18}"
+                + against_self
+            )
+    print(
+        "An interval excluding zero is a real shift. 'vs self' is the strongest form of the comparison:\n"
+        "identical machinery, identical cells, identical norm, pointed the other way."
     )
 
     if args.per_layer and len(directions) > 1:
@@ -543,6 +622,38 @@ def main() -> None:
         "when it is cheap and refused when it is expensive is being weighed against something; one\n"
         "that is followed regardless is overwriting the decision rather than entering it."
     )
+
+
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(
+                {
+                    "commit": commit,
+                    "checkpoint": str(args.checkpoint),
+                    "update": update,
+                    "episodes": args.batches * args.num_envs,
+                    "typical_cell_state_norm": typical,
+                    "baseline": {k: v for k, v in baseline.items() if k != "records"},
+                    "arms": {
+                        arm: [{k: v for k, v in entry.items() if k != "records"} for entry in entries]
+                        for arm, entries in by_arm.items()
+                    },
+                    "by_gap": {
+                        arm: {
+                            f"{entry['alpha']:.2f}": [
+                                {"band": label, "n": count, "switched": rate}
+                                for label, count, rate in switch_by_gap(entry["records"])
+                            ]
+                            for entry in entries
+                        }
+                        for arm, entries in by_arm.items()
+                    },
+                },
+                indent=2,
+            )
+        )
+        print(f"\nwrote {args.json}")
 
 
 if __name__ == "__main__":

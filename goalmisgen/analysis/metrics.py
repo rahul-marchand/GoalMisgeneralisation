@@ -251,3 +251,63 @@ def bootstrap_paired(
     tail = (1.0 - level) / 2.0
     low, high = np.quantile(values, [tail, 1.0 - tail])
     return float(low), float(high)
+
+
+def bootstrap_rate(
+    successes: np.ndarray, eligible: np.ndarray, resamples: int = 2000, seed: int = 0, level: float = 0.95
+) -> tuple[float, float]:
+    """Interval for ``successes.sum() / eligible.sum()``, resampling episodes.
+
+    Both arrays are indexed by episode. ``eligible`` is a denominator that moves
+    with the resample rather than a fixed count, which matters when an arm can
+    make an episode ineligible: an intervention that stops the agent finishing
+    shrinks its own denominator, and holding that fixed would report a rate over
+    a population the resample did not draw.
+    """
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(resamples):
+        chosen = rng.integers(0, len(successes), len(successes))
+        denominator = eligible[chosen].sum()
+        if denominator:
+            values.append(successes[chosen].sum() / denominator)
+    if not values:
+        return float("nan"), float("nan")
+    tail = (1.0 - level) / 2.0
+    low, high = np.quantile(values, [tail, 1.0 - tail])
+    return float(low), float(high)
+
+
+def bootstrap_rate_difference(
+    successes_a: np.ndarray,
+    eligible_a: np.ndarray,
+    successes_b: np.ndarray,
+    eligible_b: np.ndarray,
+    resamples: int = 2000,
+    seed: int = 0,
+    level: float = 0.95,
+) -> tuple[float, float, float]:
+    """Interval for ``rate_a - rate_b`` when both are measured on the same episodes.
+
+    Returns ``(difference, low, high)``. Sharing the resample cancels the
+    between-level variance both rates carry — two arms run on the same seed see
+    the same mazes, so an episode that is easy to switch is easy under both, and
+    pairing removes that shared noise. Two overlapping intervals are not evidence
+    of no difference; this is.
+    """
+    if not (len(successes_a) == len(eligible_a) == len(successes_b) == len(eligible_b)):
+        raise ValueError("paired rates must be measured over the same episodes, in the same order")
+
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(resamples):
+        chosen = rng.integers(0, len(successes_a), len(successes_a))
+        first, second = eligible_a[chosen].sum(), eligible_b[chosen].sum()
+        if first and second:
+            values.append(successes_a[chosen].sum() / first - successes_b[chosen].sum() / second)
+    observed = successes_a.sum() / max(eligible_a.sum(), 1) - successes_b.sum() / max(eligible_b.sum(), 1)
+    if not values:
+        return float(observed), float("nan"), float("nan")
+    tail = (1.0 - level) / 2.0
+    low, high = np.quantile(values, [tail, 1.0 - tail])
+    return float(observed), float(low), float(high)

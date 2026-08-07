@@ -170,3 +170,50 @@ def test_arms_in_one_table_must_share_an_actor():
     require_one_actor([Capture("a", reader="x"), Capture("b", reader="y")])
     with pytest.raises(ValueError, match="share an actor"):
         require_one_actor([Capture("a", reader="x"), Capture("b", reader="y", actor="other")])
+
+
+def test_a_rate_interval_covers_the_truth_and_narrows_with_data():
+    rng = np.random.default_rng(0)
+    eligible = np.ones(2000, dtype=bool)
+
+    small = rng.random(100) < 0.3
+    low, high = metrics.bootstrap_rate(small, eligible[:100], seed=0)
+    assert low < 0.3 < high
+
+    large = rng.random(2000) < 0.3
+    wide_low, wide_high = metrics.bootstrap_rate(large, eligible, seed=0)
+    assert wide_low < 0.3 < wide_high
+    assert wide_high - wide_low < high - low
+
+
+def test_a_moving_denominator_is_resampled_with_its_numerator():
+    """An arm that stops the agent finishing shrinks its own denominator. Holding
+    that fixed reports a rate over a population the resample did not draw."""
+    successes = np.array([True, True, False, False, False, False])
+    eligible = np.array([True, True, True, False, False, False])
+    low, high = metrics.bootstrap_rate(successes, eligible, seed=1)
+    assert 0.0 <= low <= 2 / 3 <= high <= 1.0
+
+
+def test_pairing_is_tighter_than_two_separate_intervals():
+    """The comparison this exists for: arms run on the same levels share the
+    between-level variance, and cancelling it is what makes a difference
+    decisive rather than suggestive."""
+    rng = np.random.default_rng(2)
+    difficulty = rng.random(600)  # shared across arms: the same mazes
+    eligible = np.ones(600, dtype=bool)
+    first = rng.random(600) < difficulty * 0.8
+    second = rng.random(600) < difficulty * 0.8 - 0.05
+
+    observed, low, high = metrics.bootstrap_rate_difference(first, eligible, second, eligible, seed=0)
+    assert low < observed < high
+
+    a_low, a_high = metrics.bootstrap_rate(first, eligible, seed=0)
+    b_low, b_high = metrics.bootstrap_rate(second, eligible, seed=0)
+    assert high - low < (a_high - a_low) + (b_high - b_low)
+
+
+def test_paired_rates_must_line_up_episode_for_episode():
+    ones = np.ones(4, dtype=bool)
+    with pytest.raises(ValueError, match="same episodes"):
+        metrics.bootstrap_rate_difference(ones, ones, ones[:3], ones[:3])

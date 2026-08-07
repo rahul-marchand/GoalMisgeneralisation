@@ -96,8 +96,10 @@ def parse_args() -> argparse.Namespace:
         "--alphas",
         type=float,
         nargs="+",
-        default=[0.0, 0.5, 1.0, 2.0, 4.0],
-        help="Norm of the written vector, as a multiple of the typical per-cell cell-state norm.",
+        default=[0.0, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0],
+        help="Norm of the written vector, as a multiple of the typical per-cell cell-state norm. "
+        "The probe reads the written class from about 0.2 upward and the policy starts losing "
+        "episodes around 0.75, so the interpretable band is narrow and worth sampling finely.",
     )
     parser.add_argument("--layers", type=int, nargs="+", default=[0, 1, 2], help="Which layers to write to.")
     parser.add_argument(
@@ -458,7 +460,7 @@ def main() -> None:
             class_write_accuracy(x_test, weights, mean, std, directions[layer], alpha * typical)
             for layer, (weights, mean, std, x_test) in sorted(fitted.items())
         ]
-        print(f"{alpha:>7.1f}" + "".join(f"{rate:>10.3f}" for rate in rates))
+        print(f"{alpha:>7.2f}" + "".join(f"{rate:>10.3f}" for rate in rates))
     print(
         "Fraction of held-out cells where writing a class's direction makes the probe read that class.\n"
         "An alpha whose write accuracy is low is not testing the hypothesis: the network is being handed\n"
@@ -482,7 +484,7 @@ def main() -> None:
     print(f"\n{'arm':>10}{'alpha':>7}{'switched':>11}{'reached':>10}{'steps':>8}{'cells':>7}{'n':>6}")
     baseline, baseline_records = run("plan", directions, 0.0)
     print(
-        f"{'none':>10}{0.0:>7.1f}{baseline['switched']:>11.1%}{baseline['reached']:>10.1%}"
+        f"{'none':>10}{0.0:>7.2f}{baseline['switched']:>11.1%}{baseline['reached']:>10.1%}"
         f"{baseline['steps']:>8.1f}{baseline['cells']:>7.1f}{baseline['n']:>6}"
     )
     if baseline["reached"] < 0.9:
@@ -495,7 +497,7 @@ def main() -> None:
                 continue
             summary, records = run(arm, table, alpha)
             print(
-                f"{arm:>10}{alpha:>7.1f}{summary['switched']:>11.1%}{summary['reached']:>10.1%}"
+                f"{arm:>10}{alpha:>7.2f}{summary['switched']:>11.1%}{summary['reached']:>10.1%}"
                 f"{summary['steps']:>8.1f}{summary['cells']:>7.1f}{summary['n']:>6}"
             )
             by_arm.setdefault(arm, []).append({"alpha": alpha, **summary, "records": records})
@@ -510,6 +512,22 @@ def main() -> None:
         "is being read as a plan."
     )
 
+    if args.per_layer and len(directions) > 1:
+        # The paper reports intervention success per layer, and it is the one
+        # place a DRC's depth is legible: if a single layer carries the plan the
+        # policy reads, writing to it alone should be enough.
+        print(f"\n{'layer':>10}{'alpha':>7}{'switched':>11}{'reached':>10}{'steps':>8}{'n':>6}")
+        for layer in sorted(directions):
+            for alpha in args.alphas:
+                if alpha == 0.0:
+                    continue
+                summary, _ = run("plan", {layer: directions[layer]}, alpha)
+                print(
+                    f"{layer:>10}{alpha:>7.2f}{summary['switched']:>11.1%}"
+                    f"{summary['reached']:>10.1%}{summary['steps']:>8.1f}{summary['n']:>6}"
+                )
+            print()
+
     for arm in ("plan", "self", "random", "shuffled"):
         for entry in by_arm.get(arm, []):
             if entry["reached"] < 0.9 * baseline["reached"]:
@@ -517,9 +535,14 @@ def main() -> None:
             table = switch_by_gap(entry["records"])
             if not table:
                 continue
-            print(f"\n{arm} at alpha {entry['alpha']:.1f}, switch rate by utility given up:")
+            print(f"\n{arm} at alpha {entry['alpha']:.2f}, switch rate by utility given up:")
             for label, count, rate in table:
                 print(f"  {label:>12}{count:>7}{rate:>9.1%}")
+    print(
+        "\nThe gap is what the agent is being asked to give up, in reward. A plan that is followed\n"
+        "when it is cheap and refused when it is expensive is being weighed against something; one\n"
+        "that is followed regardless is overwriting the decision rather than entering it."
+    )
 
 
 if __name__ == "__main__":

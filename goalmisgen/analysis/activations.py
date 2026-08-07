@@ -28,7 +28,15 @@ class Rollout:
     """One episode: what the network held at t=0, and what the agent then did."""
 
     features: np.ndarray
-    """(height, width, n_features) - per-cell activation vector at t=0."""
+    """(height, width, n_layers * channels) - per-cell hidden state at t=0."""
+
+    cell_state: np.ndarray
+    """(height, width, n_layers * channels) - per-cell ConvLSTM cell state at t=0.
+
+    Captured alongside ``features`` rather than in a separate pass because the
+    two come from one forward pass; collecting them apart would cost a second
+    rollout and risk the two describing different episodes.
+    """
 
     observation: np.ndarray
     """(height, width, channels) - the same moment's input, for baseline probes."""
@@ -56,15 +64,25 @@ class Rollout:
     """Episode outcome and ground truth, from the environment's final info."""
 
 
-def stack_layers(carry, index: int) -> np.ndarray:
-    """Concatenate the hidden state of every layer for one environment.
+def stack_layers(carry, index: int, state: str = "h") -> np.ndarray:
+    """Concatenate one recurrent variable across every layer, for one environment.
 
-    Uses ``h`` rather than ``c``: ``h`` is what the layer exposes to the next
-    layer and to the head, so it is the state the rest of the network can
-    actually read. Returns (height, width, n_layers * channels).
+    ``h`` is what the layer exposes to the next layer and to the head, so it is
+    the state the rest of the network can read, and it is what a probe asking
+    "is this information available" should look at.
+
+    ``c`` is the cell state — the layer's persistent memory, carried across
+    ticks and across environment steps rather than recomputed from the gates
+    each time. It is the site the planning-interpretability interventions write
+    to, and the distinction is causal rather than cosmetic: an edit to ``h`` is
+    overwritten by the next tick, an edit to ``c`` is something the recurrence
+    has to carry.
+
+    Returns (height, width, n_layers * channels).
     """
-    hs = [np.asarray(layer.h)[index] for layer in carry]
-    return np.concatenate(hs, axis=-1)
+    if state not in ("h", "c"):
+        raise ValueError(f"state must be 'h' or 'c', got {state!r}")
+    return np.concatenate([np.asarray(getattr(layer, state))[index] for layer in carry], axis=-1)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -273,7 +291,8 @@ def collect_rollouts(
                 continue
             rollouts.append(
                 Rollout(
-                    features=stack_layers(initial_carry, index),
+                    features=stack_layers(initial_carry, index, "h"),
+                    cell_state=stack_layers(initial_carry, index, "c"),
                     observation=np.moveaxis(initial_obs[index], 0, -1),
                     visited=visited[index],
                     visit_step=visit_step[index],

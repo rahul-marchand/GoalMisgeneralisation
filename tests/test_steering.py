@@ -182,3 +182,39 @@ def test_layer_slicing_refuses_an_uneven_split():
     whole = Feature("whole", lambda rollout: np.zeros((2, 2, 7)))
     with pytest.raises(ValueError, match="do not divide"):
         layer_slice(whole, 0, 3)(None)
+
+
+def test_writing_a_plan_touches_the_cell_state_and_leaves_the_hidden_state_alone():
+    """The distinction is the entire reason this function exists. An edit to ``h``
+    is recomputed from the gates on the next tick; an edit to ``c`` is memory the
+    recurrence has to carry."""
+    carry = [FakeLayer(c=np.zeros((2, 4, 4, 3)), h=np.ones((2, 4, 4, 3))) for _ in range(3)]
+    deltas = [np.full((2, 4, 4, 3), value, dtype=np.float64) for value in (1.0, 2.0, 3.0)]
+
+    steered = steering.write_to_cell_state(carry, deltas)
+    for layer, expected in zip(steered, (1.0, 2.0, 3.0)):
+        assert (layer.c == expected).all()
+        assert (layer.h == 1.0).all()
+
+
+def test_a_plan_written_at_one_cell_stays_at_that_cell():
+    """A spatial edit that leaked across cells would be the uniform offset the
+    earlier steering used, which a field-reading policy is provably free to
+    ignore."""
+    carry = [FakeLayer(c=np.zeros((1, 5, 5, 2)), h=np.zeros((1, 5, 5, 2)))]
+    delta = np.zeros((1, 5, 5, 2))
+    delta[0, 2, 3] = [1.0, -1.0]
+
+    steered = steering.write_to_cell_state(carry, [delta])
+    assert (steered[0].c[0, 2, 3] == [1.0, -1.0]).all()
+    assert steered[0].c.sum() == 0.0  # +1 and -1 at one cell, nothing anywhere else
+
+
+def test_a_misshapen_plan_raises_rather_than_broadcasting():
+    """NumPy would happily broadcast a (channels,) delta across every cell, which
+    is silently the wrong intervention rather than an error."""
+    carry = [FakeLayer(c=np.zeros((1, 5, 5, 2)), h=np.zeros((1, 5, 5, 2)))]
+    with pytest.raises(ValueError, match="cannot be added"):
+        steering.write_to_cell_state(carry, [np.zeros(2)])
+    with pytest.raises(ValueError, match="deltas for"):
+        steering.write_to_cell_state(carry, [np.zeros((1, 5, 5, 2))] * 2)

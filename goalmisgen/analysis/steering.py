@@ -139,3 +139,31 @@ def from_contrast(name: str, high: np.ndarray, low: np.ndarray, weights: np.ndar
             "calibrated; the two groups are not separated along the probed quantity"
         )
     return Direction(name, raw / per_unit)
+
+
+def write_to_cell_state(carry, deltas):
+    """Add a per-cell grid to each layer's ConvLSTM **cell state**.
+
+    ``deltas`` is one array per layer, shaped ``(n_envs, height, width,
+    channels)`` — a spatial edit, not a constant. That is the difference between
+    this and :func:`apply_to_carry`, and it is the whole reason this exists.
+
+    :func:`apply_to_carry` adds the same vector at every cell, which for a field
+    is a uniform offset: the argmin and the gradient are unchanged, so a policy
+    reading the field's *shape* is provably unaffected and the null it produces
+    is guaranteed in advance. Writing a plan means writing different things at
+    different cells.
+
+    The cell state rather than the hidden state, for the same causal reason: the
+    hidden state is recomputed from the gates on the next tick, so an edit to it
+    is erased by the next forward pass, while ``c`` is the layer's persistent
+    memory and an edit there is something the recurrence has to carry.
+    """
+    if len(deltas) != len(carry):
+        raise ValueError(f"{len(deltas)} deltas for {len(carry)} layers")
+    steered = []
+    for layer, delta in zip(carry, deltas):
+        if delta.shape != layer.c.shape:
+            raise ValueError(f"delta shaped {delta.shape} cannot be added to a cell state shaped {layer.c.shape}")
+        steered.append(layer.replace(c=layer.c + delta))
+    return steered

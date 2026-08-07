@@ -50,6 +50,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--correlation", type=float, default=1.0)
     parser.add_argument("--step-penalty", type=float, default=0.05, help="The rate the task actually charges.")
     parser.add_argument("--randomise-values", action="store_true")
+    parser.add_argument(
+        "--hide-values",
+        action="store_true",
+        help="Match a run trained without a value channel; its observations have one channel fewer.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
 

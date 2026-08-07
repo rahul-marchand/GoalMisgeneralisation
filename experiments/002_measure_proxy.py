@@ -76,6 +76,8 @@ def main() -> None:
             max_size=args.max_size,
             feature_value_correlation=correlation,
             randomise_values=args.randomise_values,
+            value_encoding="none" if args.hide_values else "at_objective",
+            colour_is_the_only_value_cue=args.hide_values,
             level_dataset=args.levels,
             **({"dataset_split": args.split} if args.levels else {}),
             asynchronous=False,

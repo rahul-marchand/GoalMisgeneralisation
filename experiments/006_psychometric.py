@@ -55,11 +55,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Match a run trained without a value channel; its observations have one channel fewer.",
     )
-    parser.add_argument(
-        "--hide-values",
-        action="store_true",
-        help="Match a run trained without a value channel; its observations have one channel fewer.",
-    )
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
 

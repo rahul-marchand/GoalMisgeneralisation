@@ -12,8 +12,12 @@ import pytest
 
 from goalmisgen.analysis.probes import (
     apply_linear,
+    apply_multinomial,
     auc_interval,
     cell_dataset,
+    class_directions,
+    class_write_accuracy,
+    fit_multinomial,
     fit_ridge,
     probe,
     probe_by_distance,
@@ -225,3 +229,69 @@ def test_ridge_does_not_shrink_the_intercept():
     prediction = apply_linear(x, w, mean, std)
     assert abs(prediction.mean() - 25.0) < 0.1, "the intercept was penalised"
     assert prediction.std() < 0.05, "a heavy penalty should have flattened the slope"
+
+
+def test_a_written_class_actually_wins_the_argmax():
+    """The intervention's claim, checked. Raising class k's logit is not the same
+    as making k the prediction: a rival whose weight vector correlates with k's
+    and is longer wins at every magnitude, so "add w_k" can be a no-op no scale
+    rescues. The direction here is the one that maximises the margin over all
+    rivals, and this asserts it does."""
+    rng = np.random.default_rng(0)
+    scale = rng.uniform(0.2, 5.0, 8)
+    centres = rng.normal(size=(4, 8)) * 3
+    y = rng.integers(0, 4, 2000)
+    x = (centres[y] + rng.normal(size=(2000, 8))) * scale
+
+    weights, mean, std = fit_multinomial(x, y, 4)
+    assert (apply_multinomial(x, weights, mean, std).argmax(1) == y).mean() > 0.9
+
+    directions, margins = class_directions(weights, std)
+    np.testing.assert_allclose(np.linalg.norm(directions, axis=1), 1.0)
+    assert (margins > 0).all()
+    assert class_write_accuracy(x, weights, mean, std, directions, magnitude=30.0) == 1.0
+
+
+def test_the_reported_margin_is_the_margin_actually_achieved():
+    """An approximate solver reported positive margins for directions whose true
+    margin against one rival was negative — a direction that does nothing, with a
+    number beside it saying otherwise. The reported value has to be checkable
+    against the thing it describes."""
+    rng = np.random.default_rng(3)
+    y = rng.integers(0, 5, 3000)
+    x = rng.normal(size=(3000, 10)) * rng.uniform(0.2, 5.0, 10)
+    x += np.eye(5, 10)[y] * 4
+
+    weights, mean, std = fit_multinomial(x, y, 5)
+    effective = (weights[:-1] / std[:, None]).T
+    directions, margins = class_directions(weights, std)
+
+    for index in range(5):
+        rivals = effective[index] - np.delete(effective, index, axis=0)
+        assert (rivals @ directions[index]).min() == pytest.approx(margins[index], abs=1e-9)
+
+
+def test_an_unwritable_class_raises():
+    """A class whose weight vector sits inside the cone of the others cannot be
+    written by any additive edit. Silently returning a direction for it would
+    make a null result look like the network ignoring the intervention."""
+    # Weights are (depth + 1, n_classes): three dimensions, a bias row, four
+    # classes. The fourth class sits exactly at the centroid of the other three,
+    # so no direction raises it above all of them.
+    weights = np.zeros((4, 4))
+    weights[:3, :3] = np.eye(3)
+    weights[:3, 3] = weights[:3, :3].mean(axis=1)
+    with pytest.raises(ValueError, match="cannot be written"):
+        class_directions(weights, np.ones(3))
+
+
+def test_multinomial_does_not_shrink_a_rare_class_out_of_existence():
+    """The bias row is unpenalised for the same reason ridge's intercept is: a
+    NEVER class holding 80% of cells would otherwise swallow the four directions."""
+    rng = np.random.default_rng(1)
+    y = np.concatenate([np.zeros(1900), np.ones(100)]).astype(int)
+    x = np.concatenate([rng.normal(size=(1900, 4)), rng.normal(size=(100, 4)) + 6])
+
+    weights, mean, std = fit_multinomial(x, y, 2)
+    predicted = apply_multinomial(x, weights, mean, std).argmax(1)
+    assert predicted[y == 1].mean() > 0.9

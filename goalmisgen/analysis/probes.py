@@ -18,6 +18,7 @@ dependency, and a per-cell binary readout does not need one.
 from __future__ import annotations
 
 import dataclasses
+import itertools
 from typing import Callable, Literal, Sequence
 
 import numpy as np
@@ -286,3 +287,139 @@ def probe(train, test, source: ProbeSource = "features") -> ProbeResult:
         n_samples=len(y_test),
         n_features=x_test.shape[1],
     )
+
+
+def fit_multinomial(x: np.ndarray, y: np.ndarray, n_classes: int, steps: int = 600, lr: float = 0.5, l2: float = 1e-3):
+    """Softmax regression by gradient descent, for a per-cell class label.
+
+    The multi-class twin of :func:`fit_logistic`, and it exists for the same
+    reason that one does: a per-cell readout does not justify a dependency.
+
+    Returns weights of shape ``(depth + 1, n_classes)`` — the last row is the
+    bias, unpenalised, so a rare class is not shrunk toward never being
+    predicted.
+    """
+    mean, std = x.mean(0), x.std(0) + 1e-8
+    z = _design(x, mean, std)
+    one_hot = np.eye(n_classes)[y.astype(np.int64)]
+
+    w = np.zeros((z.shape[1], n_classes))
+    for _ in range(steps):
+        logits = z @ w
+        logits -= logits.max(axis=1, keepdims=True)  # softmax is shift-invariant; this keeps exp finite
+        probabilities = np.exp(logits)
+        probabilities /= probabilities.sum(axis=1, keepdims=True)
+
+        penalty = l2 * np.vstack([w[:-1], np.zeros((1, n_classes))])
+        w -= lr * (z.T @ (probabilities - one_hot) / len(y) + penalty)
+    return w, mean, std
+
+
+def apply_multinomial(x: np.ndarray, w, mean, std) -> np.ndarray:
+    """Class probabilities, ``(n_samples, n_classes)``."""
+    logits = _design(x, mean, std) @ w
+    logits -= logits.max(axis=1, keepdims=True)
+    probabilities = np.exp(logits)
+    return probabilities / probabilities.sum(axis=1, keepdims=True)
+
+
+def _max_margin_direction(differences: np.ndarray) -> tuple[np.ndarray, float]:
+    """Unit vector maximising ``min_j differences[j] . delta``, and that minimum.
+
+    The optimum is the minimum-norm point of the convex hull, so candidates come
+    from enumerating the hull's faces — on each, the equality-constrained
+    problem ``min lam^T G lam, sum lam = 1`` has a closed form. Exponentiated
+    gradient was tried first and was wrong in the worst available way: it
+    returned directions whose reported margin was positive while the true margin
+    against one rival was negative, so the edit did nothing and the number
+    beside it said otherwise.
+
+    Every candidate is then scored on the **actual** objective and the best is
+    returned. That is not belt-and-braces: a face whose Gram matrix is singular
+    is exactly the case where a class is unwritable, and it is also the case the
+    closed form cannot solve, so trusting the algebra would skip the evidence
+    and report a comfortable margin from some other face.
+    """
+    count = len(differences)
+    if count > 12:
+        raise ValueError(f"face enumeration is exponential; {count} rival classes is too many")
+
+    gram = differences @ differences.T
+    best_direction, best_margin = None, -np.inf
+    for size in range(1, count + 1):
+        for face in itertools.combinations(range(count), size):
+            ones = np.ones(size)
+            weights, *_ = np.linalg.lstsq(gram[np.ix_(face, face)], ones, rcond=None)
+            total = ones @ weights
+            if total <= 0:
+                continue
+            point = (weights / total) @ differences[list(face)]
+            norm = float(np.linalg.norm(point))
+            if norm < 1e-12:
+                continue
+            direction = point / norm
+            margin = float((differences @ direction).min())
+            if margin > best_margin:
+                best_direction, best_margin = direction, margin
+    if best_direction is None:
+        raise ValueError("no candidate direction: every face of the hull collapsed to the origin")
+    return best_direction, best_margin
+
+
+def class_directions(w: np.ndarray, std: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Unit vectors in raw activation space that make each class win, and by how much.
+
+    Returns ``(directions, margins)``, both indexed by class.
+
+    Two corrections to the obvious construction, and the second is not a detail.
+
+    The probe is fitted on **standardised** inputs, so a row of ``w`` is not a
+    direction in the space the activations live in: the logit for class ``k`` is
+    ``w_k . (x - mean) / std``, whose gradient with respect to ``x`` is
+    ``w_k / std``. Adding ``w_k`` itself steers a differently scaled space and
+    still produces a plausible number.
+
+    And adding ``w_k / std`` — the planning-interpretability paper's ``g + w_k``,
+    corrected for scaling — **does not reliably make the probe read class k**. It
+    raises class ``k``'s logit, but it can raise another class's faster: if
+    ``v_j . v_k > |v_k|^2`` for some other class, then ``j`` wins at every
+    magnitude, and no scale rescues it. On a four-class synthetic problem one
+    class in four was unreachable this way at any alpha up to 1000.
+
+    So the direction here maximises the *minimum* margin over all rival classes,
+    ``max_delta min_j (v_k - v_j) . delta`` at unit norm, whose solution is the
+    minimum-norm point of the convex hull of the differences. The margin it
+    achieves comes back with it, in logits per unit of activation norm: a margin
+    at or below zero means ``v_k`` lies inside the cone of the others and the
+    class cannot be written by *any* additive edit — which is worth crashing on
+    rather than steering past.
+    """
+    effective = (w[:-1] / std[:, None]).T
+
+    directions, margins = [], []
+    for index in range(len(effective)):
+        direction, margin = _max_margin_direction(effective[index] - np.delete(effective, index, axis=0))
+        if margin <= 1e-9:
+            raise ValueError(
+                f"class {index} cannot be written by any additive edit: its weight vector lies inside "
+                f"the cone of the others, so some rival class wins at every magnitude"
+            )
+        directions.append(direction)
+        margins.append(margin)
+    return np.stack(directions), np.array(margins)
+
+
+def class_write_accuracy(x: np.ndarray, w, mean, std, directions: np.ndarray, magnitude: float) -> float:
+    """Fraction of cells where writing a class's direction makes the probe read it.
+
+    The intervention's arithmetic, checked against the intervention's claim. The
+    scalar-steering work had :func:`~goalmisgen.analysis.steering.verify` for
+    exactly this reason: an off-by-one in the layer split produced a plausible
+    number rather than a crash. Averaged over classes so a rare class cannot be
+    hidden by a common one.
+    """
+    rates = []
+    for index, direction in enumerate(directions):
+        predicted = apply_multinomial(x + magnitude * direction, w, mean, std).argmax(1)
+        rates.append(float((predicted == index).mean()))
+    return float(np.mean(rates))

@@ -160,3 +160,50 @@ def test_class_names_line_up_with_the_moves():
     assert plans.CLASS_NAMES[: len(MOVES)] == ("up", "down", "left", "right")
     assert MOVES == ((-1, 0), (1, 0), (0, -1), (0, 1))
     assert plans.NEVER == len(MOVES)
+
+
+def test_a_detour_leaves_the_direct_route_on_its_first_move():
+    """Compliance has to be visible in the first action. A detour whose opening
+    move matches the direct route cannot distinguish following the written plan
+    from ordinary play."""
+    checked = 0
+    for _, observation in sampled(60):
+        start = geometry.agent_cell(observation)
+        for feature in range(2):
+            found = plans.detour_plan(observation, feature, n_features=2)
+            if found is None:
+                continue
+            edit, detour = found
+            direct = plans.planned_directions(observation, feature, n_features=2)
+            assert direct is not None
+            assert edit[start] != direct[start]
+            assert edit[start] != plans.NEVER
+            checked += 1
+    assert checked > 50, f"only {checked} levels offered a detour"
+
+
+def test_the_detour_route_is_walkable_and_ends_at_the_detour_cell():
+    for _, observation in sampled(40):
+        start = geometry.agent_cell(observation)
+        for feature in range(2):
+            found = plans.detour_plan(observation, feature, n_features=2)
+            if found is None:
+                continue
+            edit, detour = found
+            grid = np.full(observation.shape[:2], plans.UNSCOREABLE, dtype=np.int64)
+            for cell, label in edit.items():
+                grid[cell] = label
+            assert walk(grid, start) == detour
+
+
+def test_the_detour_cell_is_off_the_direct_route():
+    """Otherwise the agent visits it by doing exactly what it would have done."""
+    for _, observation in sampled(40):
+        for feature in range(2):
+            found = plans.detour_plan(observation, feature, n_features=2)
+            if found is None:
+                continue
+            _, detour = found
+            direct = plans.planned_directions(observation, feature, n_features=2)
+            assert direct is not None
+            assert direct[detour] == plans.NEVER

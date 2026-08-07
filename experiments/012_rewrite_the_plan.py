@@ -77,6 +77,7 @@ from goalmisgen.analysis.probes import (
     fit_multinomial,
 )
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.envs.observation import AGENT_CHANNEL
 
 N_FEATURES = 2
 N_LAYERS = 3
@@ -123,6 +124,14 @@ def parse_args() -> argparse.Namespace:
         help="What each feature is worth, when the observation does not carry it.",
     )
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--mode",
+        choices=("switch", "detour"),
+        default="switch",
+        help="switch: write the route to the objective the agent is not taking, which asks it to "
+        "give up reward. detour: write a worse route to the SAME objective, which costs only the "
+        "step penalty and is the paper's question rather than ours.",
+    )
     parser.add_argument(
         "--json",
         type=Path,
@@ -277,6 +286,7 @@ def measure(
     arm: str,
     fixed_values: list[float] | None,
     channels: int,
+    mode: str = "switch",
 ) -> list[dict]:
     """Run episodes writing a plan into the cell state before every step.
 
@@ -297,14 +307,27 @@ def measure(
         gaps = [utility_gap(frame, fixed_values) for frame in frames]
 
         write_route = arm != "erase"
-        erase_old = arm not in ("route", "self-route")
+        erase_old = arm != "route"
         edits: list[dict[tuple[int, int], int] | None] = []
+        detour_cells: list[tuple[int, int] | None] = []
         for frame, best in zip(frames, optimal):
             if best is None:
                 edits.append(None)
+                detour_cells.append(None)
                 continue
+            if mode == "detour":
+                # Success is measured against the detour whatever the arm writes,
+                # so every arm is scored on the same cell for the same level.
+                found = plans.detour_plan(frame, best, N_FEATURES)
+                detour_cells.append(None if found is None else found[1])
+                if arm == "self" or found is None:
+                    edits.append(plan_edit(frame, best, 1 - best, write_route, erase_old=False))
+                else:
+                    edits.append(found[0])
+                continue
+            detour_cells.append(None)
             # "self" points the same machinery where the agent was already going.
-            pointed_at, replaced = (best, 1 - best) if arm.startswith("self") else (1 - best, best)
+            pointed_at, replaced = (best, 1 - best) if arm == "self" else (1 - best, best)
             edits.append(plan_edit(frame, pointed_at, replaced, write_route, erase_old))
         if arm == "shuffled":
             edits = [edits[index] for index in derange(n_envs, seed + batch)]
@@ -319,6 +342,7 @@ def measure(
         steps_taken = np.zeros(n_envs, dtype=np.int64)
 
         budget = getattr(envs, "max_episode_steps", None) or 512
+        took_detour = np.zeros(n_envs, dtype=bool)
         for _ in range(budget + 1):
             if magnitude != 0.0:
                 carry = steering.write_to_cell_state(carry, deltas)
@@ -327,6 +351,16 @@ def measure(
             steps_taken[~done] += 1
 
             just_done = np.logical_or(terminated, truncated) & ~done
+            # Read the agent's cell only on envs that were live for this whole
+            # step: gymnasium has already autoreset the ones that just finished,
+            # so their frame belongs to the next level entirely.
+            live_frames = np.asarray(observations)
+            for index in range(n_envs):
+                cell = detour_cells[index]
+                if cell is None or done[index] or just_done[index]:
+                    continue
+                if live_frames[index, AGENT_CHANNEL, cell[0], cell[1]] > 0.5:
+                    took_detour[index] = True
             if just_done.any():
                 reported = info.get("final_info")
                 for index in np.flatnonzero(just_done):
@@ -353,6 +387,8 @@ def measure(
                     "reached_feature_id": final.get("reached_feature_id"),
                     "steps": int(steps_taken[index]),
                     "edited_cells": 0 if edit is None else len(edit),
+                    "took_detour": bool(took_detour[index]),
+                    "has_detour": detour_cells[index] is not None,
                     # Kept whole so the exchange rate can be refitted per arm: the
                     # switch rate is a percentage, the exchange rate is in steps, and
                     # only the second is comparable to the agent's unsteered 7.8.
@@ -362,14 +398,22 @@ def measure(
     return records
 
 
-def outcome_arrays(records: list[dict]) -> tuple[np.ndarray, np.ndarray]:
-    """Per-episode ``(switched, reached)`` booleans, aligned across arms.
+def outcome_arrays(records: list[dict], mode: str = "switch") -> tuple[np.ndarray, np.ndarray]:
+    """Per-episode ``(success, eligible)`` booleans, aligned across arms.
 
     Alignment holds because every arm runs the same seeds and drops the same
     episodes — the ones where the two objectives tie — so record ``i`` is the
     same maze in every table. That is what licenses the paired interval.
+
+    In detour mode an episode is eligible only if the level offered a detour to
+    write, and success is stepping on the cell it pointed at. Scoring the
+    levels without one as failures would count "there was nothing to ask for"
+    as "it refused".
     """
     reached = np.array([bool(r["reached"]) for r in records])
+    if mode == "detour":
+        eligible = np.array([bool(r["reached"]) and bool(r.get("has_detour")) for r in records])
+        return np.array([bool(r.get("took_detour")) for r in records]) & eligible, eligible
     switched = np.array([bool(r["reached"]) and r["reached_feature_id"] == r["target"] for r in records])
     return switched, reached
 
@@ -399,15 +443,16 @@ def exchange_rate(records: list[dict], resamples: int = 200, seed: int = 0) -> t
     return point, float(low), float(high)
 
 
-def summarise(records: list[dict], seed: int = 0) -> dict:
-    """Switch rate and exchange rate, both with intervals, plus the damage measures."""
-    switched, reached = outcome_arrays(records)
-    low, high = metrics.bootstrap_rate(switched, reached, seed=seed)
+def summarise(records: list[dict], seed: int = 0, mode: str = "switch") -> dict:
+    """Success rate and exchange rate, both with intervals, plus the damage measures."""
+    switched, eligible = outcome_arrays(records, mode)
+    reached = np.array([bool(r["reached"]) for r in records])
+    low, high = metrics.bootstrap_rate(switched, eligible, seed=seed)
     point, point_low, point_high = exchange_rate(records, seed=seed)
     return {
         "n": len(records),
         "reached": float(reached.mean()) if records else float("nan"),
-        "switched": float(switched.sum() / max(reached.sum(), 1)),
+        "switched": float(switched.sum() / max(eligible.sum(), 1)),
         "switched_ci": [low, high],
         "indifference": point,
         "indifference_ci": [point_low, point_high],
@@ -547,9 +592,9 @@ def main() -> None:
     def run(arm: str, table: dict[int, np.ndarray], alpha: float) -> tuple[dict, list[dict]]:
         records = measure(
             envs, policy, params, get_action, args.batches, args.seed, table, alpha * typical,
-            arm, fixed_values, channels,
+            arm, fixed_values, channels, args.mode,
         )
-        return summarise(records, seed=args.seed), records
+        return summarise(records, seed=args.seed, mode=args.mode), records
 
     def row(label: str, alpha: float, summary: dict) -> str:
         interval = f"[{summary['switched_ci'][0]:.3f},{summary['switched_ci'][1]:.3f}]"
@@ -560,8 +605,9 @@ def main() -> None:
             f"{summary['reached']:>10.1%}{summary['steps']:>8.1f}{summary['n']:>6}"
         )
 
+    outcome = "followed" if args.mode == "detour" else "switched"
     print(
-        f"\n{'arm':>10}{'alpha':>7}{'switched':>11}{'95% CI':>16}"
+        f"\n{'arm':>10}{'alpha':>7}{outcome:>11}{'95% CI':>16}"
         f"{'exchange':>14}{'95% CI':>14}{'reached':>10}{'steps':>8}{'n':>6}"
     )
     baseline, baseline_records = run("plan", directions, 0.0)
@@ -600,18 +646,18 @@ def main() -> None:
     # Every arm ran the same seeds over the same mazes, so the difference can be
     # taken on a common resample. Two overlapping intervals are not evidence of
     # no difference, and at these rates they overlap constantly.
-    baseline_switched, baseline_reached = outcome_arrays(baseline_records)
+    baseline_switched, baseline_reached = outcome_arrays(baseline_records, args.mode)
     print(f"\n{'arm':>10}{'alpha':>7}{'vs baseline':>13}{'95% CI':>18}{'vs self':>10}{'95% CI':>18}")
     for arm in ("plan", "route", "erase", "shuffled", "random"):
         for entry in by_arm.get(arm, []):
-            switched, reached = outcome_arrays(entry["records"])
+            switched, reached = outcome_arrays(entry["records"], args.mode)
             change, low, high = metrics.bootstrap_rate_difference(
                 switched, reached, baseline_switched, baseline_reached, seed=args.seed
             )
             against_self = ""
             twin = next((e for e in by_arm.get("self", []) if e["alpha"] == entry["alpha"]), None)
             if twin is not None and arm != "self":
-                other_switched, other_reached = outcome_arrays(twin["records"])
+                other_switched, other_reached = outcome_arrays(twin["records"], args.mode)
                 gap, gap_low, gap_high = metrics.bootstrap_rate_difference(
                     switched, reached, other_switched, other_reached, seed=args.seed
                 )
@@ -635,7 +681,7 @@ def main() -> None:
         # The paper reports intervention success per layer, and it is the one
         # place a DRC's depth is legible: if a single layer carries the plan the
         # policy reads, writing to it alone should be enough.
-        print(f"\n{'layer':>10}{'alpha':>7}{'switched':>11}{'reached':>10}{'steps':>8}{'n':>6}")
+        print(f"\n{'layer':>10}{'alpha':>7}{outcome:>11}{'reached':>10}{'steps':>8}{'n':>6}")
         for layer in sorted(directions):
             for alpha in args.alphas:
                 if alpha == 0.0:
@@ -647,7 +693,7 @@ def main() -> None:
                 )
             print()
 
-    for arm in ("plan", "self", "random", "shuffled"):
+    for arm in ("plan", "self", "random", "shuffled") if args.mode == "switch" else ():
         for entry in by_arm.get(arm, []):
             if entry["reached"] < 0.9 * baseline["reached"]:
                 continue
@@ -657,11 +703,12 @@ def main() -> None:
             print(f"\n{arm} at alpha {entry['alpha']:.2f}, switch rate by utility given up:")
             for label, count, rate in table:
                 print(f"  {label:>12}{count:>7}{rate:>9.1%}")
-    print(
-        "\nThe gap is what the agent is being asked to give up, in reward. A plan that is followed\n"
-        "when it is cheap and refused when it is expensive is being weighed against something; one\n"
-        "that is followed regardless is overwriting the decision rather than entering it."
-    )
+    if args.mode == "switch":
+        print(
+            "\nThe gap is what the agent is being asked to give up, in reward. A plan that is followed\n"
+            "when it is cheap and refused when it is expensive is being weighed against something; one\n"
+            "that is followed regardless is overwriting the decision rather than entering it."
+        )
 
 
     if args.json is not None:
@@ -670,6 +717,7 @@ def main() -> None:
             json.dumps(
                 {
                     "commit": commit,
+                    "mode": args.mode,
                     "checkpoint": str(args.checkpoint),
                     "update": update,
                     "episodes": args.batches * args.num_envs,

@@ -110,3 +110,69 @@ def planned_directions(observation: np.ndarray, feature_id: int, n_features: int
 def class_counts(labels: np.ndarray) -> dict[str, int]:
     """How many cells fall in each class, for reporting the class balance."""
     return {name: int((labels == index).sum()) for index, name in enumerate(CLASS_NAMES)}
+
+
+def detour_plan(
+    observation: np.ndarray, feature_id: int, n_features: int = 2
+) -> tuple[dict[tuple[int, int], int], Position] | None:
+    """A route to the same objective that deliberately walks the wrong way first.
+
+    Returns the cells to write and the cell whose visit counts as success, or
+    ``None`` if the level offers no detour.
+
+    This is the closest thing our mazes allow to the planning-interpretability
+    paper's shortcut intervention, and it exists to separate two questions the
+    objective-switch experiment runs together. Asking the agent to change
+    objective asks it to give up reward, so a refusal is a fact about its value
+    comparison. Asking it to reach the *same* objective by a worse path costs
+    only the step penalty, so a refusal is a fact about whether the plan is read
+    at all — which is the paper's question, and the only one its ~95% is
+    comparable to.
+
+    Perfect mazes have exactly one route between any two cells, so a detour must
+    leave the route and come back. The write covers the outbound leg only: by
+    the time the agent reaches the detour cell the plan is stale, but success is
+    already decided, and writing the return leg would need two directions at
+    every shared cell.
+    """
+    walls = geometry.blocking_walls(observation, feature_id, n_features)
+    start = geometry.agent_cell(observation)
+    direct = shortest_path(walls, start, geometry.objective_cell(observation, feature_id))
+    if direct is None or len(direct) < 2:
+        return None
+
+    from goalmisgen.envs.solver import distance_field
+
+    distances = distance_field(walls, start)
+    on_route = set(direct)
+    first_step = _direction(start, direct[1])
+
+    # A detour worth writing starts by moving somewhere the direct route does
+    # not, so the very first action separates compliance from ordinary play.
+    best: tuple[int, Position] | None = None
+    for row, col in np.argwhere((distances > 0) & ~walls):
+        cell = (int(row), int(col))
+        if cell in on_route:
+            continue
+        leg = shortest_path(walls, start, cell)
+        if leg is None or len(leg) < 2 or _direction(start, leg[1]) == first_step:
+            continue
+        # The shortest such detour: a long one is a harder ask for reasons that
+        # have nothing to do with whether the plan was read.
+        if best is None or len(leg) < best[0]:
+            best = (len(leg), cell)
+    if best is None:
+        return None
+
+    detour = best[1]
+    leg = shortest_path(walls, start, detour)
+    assert leg is not None
+    edit: dict[tuple[int, int], int] = {}
+    for current, following in zip(leg, leg[1:]):
+        step = _direction(current, following)
+        if step is None:
+            raise RuntimeError(f"detour step {current} -> {following} is not a legal move")
+        edit[current] = step
+    for cell in direct[:-1]:
+        edit.setdefault(cell, NEVER)
+    return edit, detour

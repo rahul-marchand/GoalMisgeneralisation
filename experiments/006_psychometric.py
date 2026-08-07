@@ -55,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Match a run trained without a value channel; its observations have one channel fewer.",
     )
+    parser.add_argument(
+        "--hide-values",
+        action="store_true",
+        help="Match a run trained without a value channel; its observations have one channel fewer.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args()
 
@@ -71,6 +76,8 @@ def main() -> None:
         max_size=args.size,
         feature_value_correlation=args.correlation,
         randomise_values=args.randomise_values,
+        value_encoding="none" if args.hide_values else "at_objective",
+        colour_is_the_only_value_cue=args.hide_values,
         level_dataset=args.levels,
         asynchronous=False,
         seed=args.seed,

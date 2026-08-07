@@ -522,40 +522,45 @@ def fig_intervention():
 
     # ---- left: exchange rate against write strength
     ax = axes[0]
+    INTACT = 0.98
     series = (
-        ("plan", BLUE, "route to the other objective", 9),
-        ("self", ORANGE, "its own route", -16),
-        ("random", MUTED, "random vectors", -16),
+        ("self", ORANGE, "its own route", 11),
+        ("plan", BLUE, "route to the other objective", -17),
+        ("random", MUTED, "random vectors", -15),
     )
-    intact = [e["alpha"] for e in data["arms"]["plan"] if e["reached"] >= 0.99]
-    if intact:
-        ax.axvspan(max(intact), 1.0, color="#eeece5", zorder=0)
-        ax.annotate(
-            "write costs episodes",
-            (max(intact) + 0.02, 3.4), fontsize=7.5, color=MUTED, ha="left", va="bottom",
-        )
 
     ax.axhline(10.0, color=INK2, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.annotate("task optimum  10.0", (0.0, 10.0), textcoords="offset points",
+    ax.annotate("task optimum  10.0", (0.02, 10.0), textcoords="offset points",
                 xytext=(0, 5), fontsize=7.5, color=INK2)
     ax.axhline(baseline["indifference"], color=MUTED, lw=0.9, ls=(0, (1, 2)), zorder=1)
-    ax.annotate(f"agent alone  {baseline['indifference']:.1f}", (0.0, baseline["indifference"]),
+    ax.annotate(f"agent alone  {baseline['indifference']:.1f}", (0.02, baseline["indifference"]),
                 textcoords="offset points", xytext=(0, -12), fontsize=7.5, color=MUTED)
 
     for arm, colour, label, dy in series:
-        entries = [e for e in data["arms"][arm] if e["reached"] >= 0.99]
-        xs = [0.0] + [e["alpha"] for e in entries]
-        ys = [baseline["indifference"]] + [e["indifference"] for e in entries]
-        low = [baseline["indifference_ci"][0]] + [e["indifference_ci"][0] for e in entries]
-        high = [baseline["indifference_ci"][1]] + [e["indifference_ci"][1] for e in entries]
-        ax.fill_between(xs, low, high, color=colour, alpha=0.13, lw=0, zorder=2)
-        ax.plot(xs, ys, "-o", color=colour, lw=2, ms=5, zorder=3, clip_on=False)
-        ax.annotate(label, (xs[-1], ys[-1]), textcoords="offset points", xytext=(-4, dy),
-                    ha="right", fontsize=8, color=colour)
+        entries = sorted(data["arms"][arm], key=lambda e: e["alpha"])
+        xs = np.array([0.0] + [e["alpha"] for e in entries])
+        ys = np.array([baseline["indifference"]] + [e["indifference"] for e in entries])
+        reached = np.array([1.0] + [e["reached"] for e in entries])
+        low = np.array([baseline["indifference_ci"][0]] + [e["indifference_ci"][0] for e in entries])
+        high = np.array([baseline["indifference_ci"][1]] + [e["indifference_ci"][1] for e in entries])
 
+        # Solid only while the agent still finishes its episodes. Past that the
+        # write is breaking the policy, and a number read off a broken policy is
+        # not a shifted trade-off — so it is drawn, but drawn differently.
+        # The last point still worth reading, not the first one that is not.
+        keep = int(np.argmax(reached < INTACT)) - 1 if (reached < INTACT).any() else len(xs) - 1
+        ax.fill_between(xs[: keep + 1], low[: keep + 1], high[: keep + 1],
+                        color=colour, alpha=0.13, lw=0, zorder=2)
+        ax.plot(xs[: keep + 1], ys[: keep + 1], "-o", color=colour, lw=2, ms=5, zorder=3, clip_on=False)
+        ax.plot(xs[keep:], ys[keep:], ":o", color=colour, lw=1.4, ms=4, mfc=SURFACE, zorder=3, clip_on=False)
+        ax.annotate(label, (xs[keep], ys[keep]), textcoords="offset points", xytext=(3, dy),
+                    ha="left", fontsize=8, color=colour)
+
+    ax.annotate("dotted: the write is costing episodes", (0.02, 3.2), ha="left",
+                fontsize=7.5, color=MUTED)
     ax.set_xlabel("write strength (cell-state norms)")
     ax.set_ylabel("extra steps walked for the richer objective")
-    ax.set_xlim(0, 1.0)
+    ax.set_xlim(0, 1.05)
     ax.set_ylim(3, 11.6)
     ax.grid(axis="y", zorder=0)
 
@@ -579,7 +584,7 @@ def fig_intervention():
                         xytext=(0, 3), ha="center", fontsize=7.5, color=INK2)
 
     ax.set_xticks(x)
-    ax.set_xticklabels([f"{b}\nn={bands[b]['n']}" for b in labels], fontsize=8)
+    ax.set_xticklabels([f"{b.replace('-10.00', '+')}\nn={bands[b]['n']}" for b in labels], fontsize=8)
     ax.set_xlabel("utility margin  (reward the switch costs)")
     ax.set_ylabel("% took the other objective")
     ax.set_ylim(0, 62)

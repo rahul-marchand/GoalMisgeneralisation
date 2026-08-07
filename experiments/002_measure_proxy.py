@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         help="Must match the run being measured: the value scheme is part of a dataset's fingerprint.",
     )
     parser.add_argument(
+        "--hide-values",
+        action="store_true",
+        help="Match a run trained without a value channel; its observations have one channel fewer.",
+    )
+    parser.add_argument(
         "--json",
         type=Path,
         default=None,

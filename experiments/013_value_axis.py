@@ -88,6 +88,15 @@ def parse_args() -> argparse.Namespace:
         help="Held constant. Annealing would make the diffs at different values incomparable, "
         "since each arm would sit at a different point on its own schedule.",
     )
+    parser.add_argument(
+        "--anneal-to",
+        type=float,
+        default=None,
+        help="Anneal the rate down to this instead of holding it constant. Off for arms, "
+        "where a constant rate is what makes their diffs comparable; on when this is used "
+        "to carry a base agent further rather than to move its values, since a long run "
+        "wants the schedule it would have had.",
+    )
     parser.add_argument("--checkpoints", type=int, default=4, help="Evenly spaced, the last at the final update.")
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=1234)
@@ -113,8 +122,8 @@ def finetune_config(args: argparse.Namespace) -> Args:
     # near zero, and each arm would anneal over its own run rather than sharing
     # one schedule. A constant rate is what makes the arms comparable.
     config.learning_rate = args.lr
-    config.final_learning_rate = args.lr
-    config.anneal_lr = False
+    config.final_learning_rate = args.anneal_to if args.anneal_to is not None else args.lr
+    config.anneal_lr = args.anneal_to is not None
 
     # Evaluation exists to track misgeneralisation across correlations during a
     # long run. Here the measurement is the weight diff, and the behavioural

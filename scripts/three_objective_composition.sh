@@ -28,7 +28,7 @@ cd "$(dirname "$0")/.."
 BASE="${BASE:-/workspace/data/threeobj}"
 ARM_STEPS="${ARM_STEPS:-1000000}"
 LR="${LR:-1e-4}"
-ARM_LEVELS="${ARM_LEVELS:-500000}"
+ARM_LEVELS="${ARM_LEVELS:-150000}"
 DEADLINE=$(( SECONDS + ${WAIT_SECONDS:-43200} ))
 
 # Values are carried in the tag so the analysis reads them from the directory
@@ -63,7 +63,7 @@ for entry in "${GRID[@]}"; do
     echo "  ${tag}  ($*)"
     uv run python scripts/generate_levels.py \
         --n-levels "${ARM_LEVELS}" --min-size 11 --max-size 11 \
-        --valid-levels 50000 --test-levels 50000 \
+        --valid-levels 5000 --test-levels 5000 \
         --n-objectives 3 --objective-values "$@" \
         --out "${BASE}/levels/${tag}" >> "${BASE}/logs/generate.log" 2>&1
 done

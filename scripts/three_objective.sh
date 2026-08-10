@@ -24,7 +24,14 @@ STEPS="${STEPS:-80000000}"
 ARM_STEPS="${ARM_STEPS:-1000000}"
 LR="${LR:-1e-4}"
 N_LEVELS="${N_LEVELS:-1000000}"
-ARM_LEVELS="${ARM_LEVELS:-500000}"
+
+# Arms are far smaller than the base dataset because they are far shorter runs:
+# 1M steps is about 100k episodes, so 140k training levels are already more than
+# one apiece and memorisation is not on the table. Three objectives cost 1.75 ms
+# a level against 0.42 for two — three breadth-first searches and a mutual
+# reachability check rather than two — so a 500k dataset per arm would have put
+# nearly three hours of generation in front of the training run.
+ARM_LEVELS="${ARM_LEVELS:-150000}"
 
 # Evenly spaced, 0.35 apart, so each neighbouring pair is worth 7 extra steps at
 # the task's 0.05 a step — the same order as the two-objective task, which kept
@@ -70,7 +77,7 @@ for entry in "${GRID[@]}"; do
     echo "  ${tag}  ($*)"
     uv run python scripts/generate_levels.py \
         --n-levels "${ARM_LEVELS}" --min-size 11 --max-size 11 \
-        --valid-levels 50000 --test-levels 50000 \
+        --valid-levels 5000 --test-levels 5000 \
         --n-objectives 3 --objective-values "$@" \
         --out "${BASE}/levels/${tag}" >> "${BASE}/logs/generate.log" 2>&1
 done

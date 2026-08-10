@@ -73,6 +73,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--at", type=int, default=-1, help="Which checkpoint of each arm, in step order.")
     parser.add_argument("--skip-behaviour", action="store_true")
+    parser.add_argument(
+        "--cross",
+        action="store_true",
+        help="Test the one-knob hypothesis causally: write colour 0's arms using colour 1's "
+        "axis with the sign flipped. If the two sweeps move one shared knob, that is the "
+        "same edit and must reproduce them; a correlation between noisy axes cannot settle "
+        "this, since noise attenuates it toward zero whichever hypothesis is true.",
+    )
     return parser.parse_args()
 
 
@@ -196,7 +204,74 @@ def main() -> None:
         "  diffs should agree once each sweep's common component is removed."
     )
 
+    # A cosine between two noisy estimates is attenuated toward zero whichever
+    # hypothesis holds, so it cannot be read without knowing how much of each
+    # axis is signal. Splitting a sweep in half and fitting both halves gives
+    # that directly: two independent estimates of the *same* axis, whose cosine
+    # is its reliability.
+    print("\n=== how much of each axis is signal? ===\n")
+
+    def split_half(diffs, values, base_value):
+        halves = (values[0::2], values[1::2])
+        fits = [
+            fit_axis_and_drift(np.array(half) - base_value, np.stack([diffs[v] for v in half]))[0]
+            for half in halves
+        ]
+        return cosine(*fits)
+
+    reliability_one = split_half(one, values_one, COLOUR_ONE_BASE)
+    reliability_zero = split_half(zero, values_zero, COLOUR_ZERO_BASE)
+    observed = cosine(axis_zero, axis_one)
+    print(f"  split-half reliability of axis_1  {reliability_one:+.3f}")
+    print(f"  split-half reliability of axis_0  {reliability_zero:+.3f}")
+    if reliability_one > 0 and reliability_zero > 0:
+        corrected = observed / np.sqrt(reliability_one * reliability_zero)
+        print(f"\n  cos corrected for attenuation    {corrected:+.3f}")
+        print(
+            "\n  Still near -1 after correction means one knob measured through noise.\n"
+            "  Near 0 means two. The correction can overshoot past -1 when the halves are\n"
+            "  this small, so it bounds rather than settles the question."
+        )
+
     if args.skip_behaviour:
+        return
+
+    envs = config.make()
+    get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+
+    if args.cross:
+        # Under one knob the sweeps share a direction: raising colour 0 by d and
+        # lowering colour 1 by d are the same edit, so -axis_1 must write colour
+        # 0's arms as well as axis_0 does. This is causal, so the noise that
+        # attenuates a cosine does not weaken it -- axis_1 has already been shown
+        # to work on its own sweep.
+        print("\n\n=== can colour 1's axis write colour 0's arms? ===\n")
+        print(f"  {'':>32}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
+        measure(base_state.params, policy, get_action, envs, args, "base, untouched")
+        checkpoints = arm_checkpoints(args.arms, "c", args.at)
+        crossed: list[tuple[float, float, float, float]] = []
+        for value in values_zero:
+            offset = value - COLOUR_ZERO_BASE
+            own = measure(
+                unravel(base_flat + offset * axis_zero), policy, get_action, envs, args,
+                f"colour 0 = {value:.2f} via axis_0",
+            )
+            other = measure(
+                unravel(base_flat - offset * axis_one), policy, get_action, envs, args,
+                f"colour 0 = {value:.2f} via -axis_1",
+            )
+            _, _, _, arm_state, _ = load_train_state(checkpoints[value], env_cfg=config)
+            trained = measure(arm_state.params, policy, get_action, envs, args, f"colour 0 = {value:.2f} fine-tuned")
+            crossed.append((value, trained, own, other))
+
+        print(f"\n  {'colour 0':>10}{'fine-tuned':>13}{'via axis_0':>13}{'via -axis_1':>14}")
+        for value, trained, own, other in crossed:
+            print(f"  {value:>10.2f}{trained:>13.1f}{own:>13.1f}{other:>14.1f}")
+        print(
+            "\n  One knob predicts the last two columns agree, since they would be the same\n"
+            "  edit written two ways. Two slots predicts colour 1's axis does not set\n"
+            "  colour 0's value, and the last column departs from the other two."
+        )
         return
 
     print("\n\n=== does axis_0 work at all? held-out writes ===\n")

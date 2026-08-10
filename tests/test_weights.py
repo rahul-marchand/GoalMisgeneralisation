@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.weights import cosine, explained, fit_axis, projected_offset
+from goalmisgen.analysis.weights import cosine, explained, fit_axis, fit_axis_and_drift, projected_offset
 
 
 def linear_family(rng: np.random.Generator, offsets: np.ndarray, noise: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
@@ -115,3 +115,31 @@ def test_offsets_that_are_all_zero_are_refused() -> None:
 def test_mismatched_shapes_are_refused() -> None:
     with pytest.raises(ValueError, match="one offset per diff"):
         fit_axis(np.array([0.1, 0.2]), np.ones((3, 4)))
+
+
+def test_drift_shared_by_every_arm_is_not_mistaken_for_an_axis() -> None:
+    """The failure the origin-forced fit actually produced.
+
+    Give every arm a large common component and a small value-specific one, on
+    offsets that are not balanced around zero. Forcing through the origin drags
+    the drift into the axis, so it reads back nearly the same offset for every
+    arm. Fitting an intercept recovers the real axis instead.
+    """
+    rng = np.random.default_rng(6)
+    offsets = np.array([-0.2, -0.1, 0.1, 0.2, 0.3, 0.4])
+    axis = rng.normal(size=256)
+    drift = 20 * rng.normal(size=256)
+    diffs = drift + np.outer(offsets, axis)
+
+    naive = fit_axis(offsets, diffs)
+    implied = np.array([projected_offset(d, naive) for d in diffs])
+    assert implied.std() < 0.1 * offsets.std()  # every arm looks the same
+
+    fitted, recovered_drift = fit_axis_and_drift(offsets, diffs)
+    assert cosine(fitted, axis) == pytest.approx(1.0, abs=1e-8)
+    assert cosine(recovered_drift, drift) == pytest.approx(1.0, abs=1e-8)
+
+
+def test_intercept_fit_needs_three_arms() -> None:
+    with pytest.raises(ValueError, match="at least three arms"):
+        fit_axis_and_drift(np.array([-0.1, 0.1]), np.ones((2, 4)))

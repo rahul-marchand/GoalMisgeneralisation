@@ -59,7 +59,7 @@ from jax.flatten_util import ravel_pytree
 
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
-from goalmisgen.analysis.weights import cosine, explained, fit_axis, projected_offset
+from goalmisgen.analysis.weights import cosine, explained, fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
 
 BASE_VALUE = 0.5
@@ -167,7 +167,7 @@ def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, 
         resamples=200,
         seed=args.seed,
     )
-    reached = summarise(outcomes).reached
+    reached = summarise(outcomes).reached_objective
     print(f"  {label:>30}{point:>8.1f}  [{low:5.1f}, {high:5.1f}]{reached:>11.1%}")
     return point, low, high, reached
 
@@ -205,56 +205,80 @@ def main() -> None:
     values = sorted(fitted)
     offsets = np.array([v - BASE_VALUE for v in values])
     stacked = np.stack([fitted[v] for v in values])
-    axis = fit_axis(offsets, stacked)
+    axis, drift = fit_axis_and_drift(offsets, stacked)
 
-    print("\n\n=== collinear? cosine between arms ===\n")
+    # Every arm moved by roughly the same amount whatever it was trained on, and
+    # the null arm moved by that amount with nothing to learn, so most of a diff
+    # is the cost of 585 updates rather than the value. What is left after the
+    # common component is removed is the part that could carry a value at all.
+    residual = {v: fitted[v] - drift for v in values}
+    print(f"\ncommon component |drift| {np.linalg.norm(drift):.4g}   axis per unit value |axis| {np.linalg.norm(axis):.4g}")
+    if null is not None:
+        print(f"null arm |delta| {np.linalg.norm(null):.4g}, and {cosine(null, drift):.3f} of it is that same common direction")
+
+    print("\n\n=== collinear? cosine between arms, raw ===\n")
     print("        " + "".join(f"{v:>8.2f}" for v in values))
     for a in values:
         print(f"  {a:.2f}  " + "".join(f"{cosine(fitted[a], fitted[b]):>8.3f}" for b in values))
+
+    print("\n=== and with the common component removed ===\n")
+    print("        " + "".join(f"{v:>8.2f}" for v in values))
+    for a in values:
+        print(f"  {a:.2f}  " + "".join(f"{cosine(residual[a], residual[b]):>8.3f}" for b in values))
     print(
-        "\nA threshold rebuilt per arm puts these near zero. Arms on the same side of the\n"
-        "base should agree, and arms on opposite sides should oppose: a direction that\n"
-        "merely means 'was fine-tuned' would make every entry positive instead."
+        "\nThe raw matrix is positive everywhere, including between arms on opposite\n"
+        "sides of the base, which is the signature of a direction that means no more\n"
+        "than 'was fine-tuned'. Once that is removed, arms on the same side should\n"
+        "agree and arms on opposite sides should oppose. Ordering matters as much as\n"
+        "sign: neighbouring values should look more alike than distant ones."
     )
 
     print("\n=== graded and predictive? ===\n")
-    print(f"  {'value':>7}{'offset':>8}{'|delta|':>10}{'in-sample':>11}{'held-out R^2':>14}{'held-out cos':>14}{'implied offset':>16}")
+    print(f"  {'value':>7}{'offset':>8}{'|delta|':>10}{'|residual|':>12}{'held-out R^2':>14}{'held-out cos':>14}{'implied offset':>16}")
     for value in values:
         others = [v for v in values if v != value]
-        held = fit_axis(np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others]))
-        delta, offset = fitted[value], value - BASE_VALUE
+        held_axis, held_drift = fit_axis_and_drift(
+            np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others])
+        )
+        offset = value - BASE_VALUE
+        left = fitted[value] - held_drift
         print(
-            f"  {value:>7.2f}{offset:>8.2f}{np.linalg.norm(delta):>10.4g}"
-            f"{explained(delta, offset, axis):>11.3f}{explained(delta, offset, held):>14.3f}"
-            f"{cosine(delta, held):>14.3f}{projected_offset(delta, held):>+16.2f}"
+            f"  {value:>7.2f}{offset:>8.2f}{np.linalg.norm(fitted[value]):>10.4g}{np.linalg.norm(residual[value]):>12.4g}"
+            f"{explained(left, offset, held_axis):>14.3f}{cosine(left, held_axis):>14.3f}"
+            f"{projected_offset(left, held_axis):>+16.2f}"
         )
     if null is not None:
-        print(f"  {'null':>7}{0.0:>8.2f}{np.linalg.norm(null):>10.4g}{'—':>11}{'—':>14}{cosine(null, axis):>14.3f}{projected_offset(null, axis):>+16.2f}")
-
+        left = null - drift
+        print(f"  {'null':>7}{0.0:>8.2f}{np.linalg.norm(null):>10.4g}{np.linalg.norm(left):>12.4g}{'—':>14}{cosine(left, axis):>14.3f}{projected_offset(left, axis):>+16.2f}")
     print(
-        "\nIn-sample flatters the widest arm, which partly fits itself; the held-out\n"
-        "columns are the claim. The implied offset is the axis read backwards — how far\n"
-        "this arm moved along a direction it did not help build — and should match the\n"
-        "offset it was trained at, which is the axis carrying a scale and not just a\n"
-        "heading. The null arm's size is the drift floor: an arm is only carrying value\n"
-        "if it moved further than that."
+        "\nThe implied offset is the axis read backwards, fitted without this arm. It\n"
+        "should track the offset the arm was trained at, and the null arm's should sit\n"
+        "near zero. All of them landing on the same number is the fit reporting the\n"
+        "common component rather than the value."
     )
 
     if args.skip_behaviour:
         return
 
-    print("\n\n=== writable? pushing the base weights along the axis ===\n")
+    print("\n\n=== what the arms themselves do ===\n")
     print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
     envs = config.make()
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     measure(base_state.params, policy, get_action, envs, args, "base, untouched")
+    arm_points: list[tuple[float, float]] = []
+    for value, checkpoint in sorted(selected.items()):
+        _, _, _, state, _ = load_train_state(checkpoint, env_cfg=config)
+        point, _, _, _ = measure(state.params, policy, get_action, envs, args, f"v={value:.2f} fine-tuned")
+        arm_points.append((value, point))
 
-    rows: list[tuple[float, float]] = []
+    print("\n\n=== writable? pushing the base weights along the axis ===\n")
+    print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
+    written: list[tuple[float, float]] = []
     for value in sorted(set(values) | set(args.extrapolate)):
         seen = "grid" if value in values else "unseen"
         params = unravel(base_flat + (value - BASE_VALUE) * axis)
         point, _, _, _ = measure(params, policy, get_action, envs, args, f"v={value:.2f} written ({seen})")
-        rows.append((value, point))
+        written.append((value, point))
 
     rng = np.random.default_rng(args.seed)
     for magnitude in (0.3, 0.5):
@@ -262,18 +286,19 @@ def main() -> None:
         direction *= np.linalg.norm(magnitude * axis) / np.linalg.norm(direction)
         measure(unravel(base_flat + direction), policy, get_action, envs, args, f"random, matched to {magnitude:.1f}")
 
-    print("\n\n=== calibrated? written value against the task's own exchange rate ===\n")
-    print(f"  {'written value':>15}{'measured steps':>17}{'task says':>12}{'error':>9}")
-    for value, point in rows:
+    print("\n\n=== calibrated? against the task's own exchange rate ===\n")
+    print(f"  {'value':>8}{'task says':>12}{'fine-tuned':>13}{'written':>10}")
+    trained = dict(arm_points)
+    for value, point in written:
         expected = (1.0 - value) / args.step_penalty
-        print(f"  {value:>15.2f}{point:>17.1f}{expected:>12.1f}{point - expected:>+9.1f}")
+        actual = trained.get(value)
+        print(f"  {value:>8.2f}{expected:>12.1f}{(f'{actual:.1f}' if actual is not None else '—'):>13}{point:>10.1f}")
     print(
-        "\nThe task charges 0.05 a step, so an objective worth v less is worth walking\n"
-        "(1 - v) / 0.05 further for. The agent was never told this and the base run\n"
-        "already misses it by about two steps, so the axis is not expected to hit it\n"
-        "exactly. What matters is the slope — one unit of written value buying the\n"
-        "number of steps the arithmetic says it should — and that it holds outside the\n"
-        "grid the axis was fitted on."
+        "\nThe fine-tuned column is what an arm actually learned; the written column is\n"
+        "what the axis reproduces without training. They agree only if the axis is\n"
+        "carrying the value, and the slope is what to read rather than the absolute\n"
+        "number: the base agent already undervalues distance by about a fifth, and\n"
+        "every arm inherits that."
     )
 
 

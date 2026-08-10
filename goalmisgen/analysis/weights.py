@@ -41,6 +41,35 @@ def fit_axis(offsets: np.ndarray, diffs: np.ndarray) -> np.ndarray:
     return (offsets @ diffs) / denominator
 
 
+def fit_axis_and_drift(offsets: np.ndarray, diffs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Least squares ``diff = drift + offset * axis``.
+
+    Every arm carries a component that has nothing to do with the parameter it
+    was trained on: the same number of updates on the same task moves the weights
+    whether or not there is anything to learn, which is what the null arm
+    measures directly. That component sits at every offset, including zero.
+
+    Forcing the fit through the origin therefore does not remove it — it leaks it
+    into the axis, in proportion to how far the offsets are from being balanced
+    around zero. The symptom is an axis that reads back roughly the same offset
+    for every arm, the null one included. The intercept absorbs it instead, so
+    the axis is estimated from how the arms differ from *each other* rather than
+    from how far they all moved from the base.
+    """
+    offsets = np.asarray(offsets, dtype=np.float64)
+    diffs = np.asarray(diffs, dtype=np.float64)
+    if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
+        raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
+    if len(offsets) < 3:
+        raise ValueError("an intercept and a slope need at least three arms to be identified")
+    centred = offsets - offsets.mean()
+    denominator = float(centred @ centred)
+    if denominator < 1e-12:
+        raise ValueError("every arm sits at the same offset, so there is no slope to fit")
+    axis = (centred @ (diffs - diffs.mean(axis=0))) / denominator
+    return axis, diffs.mean(axis=0) - offsets.mean() * axis
+
+
 def explained(diff: np.ndarray, offset: float, axis: np.ndarray) -> float:
     """Fraction of one diff's squared length that ``offset * axis`` accounts for.
 

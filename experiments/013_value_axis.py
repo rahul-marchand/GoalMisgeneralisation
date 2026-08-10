@@ -70,6 +70,14 @@ def parse_args() -> argparse.Namespace:
         "really the gap moves the same way whichever colour is changed, while a pair "
         "of value slots does not.",
     )
+    parser.add_argument(
+        "--objective-values",
+        type=float,
+        nargs="+",
+        default=None,
+        help="All objectives' values at once, overriding --value and --value-zero. Needed "
+        "beyond two objectives, where the choice no longer reduces to a single difference.",
+    )
     parser.add_argument("--levels", type=str, required=True, help="Dataset generated at this objective value.")
     parser.add_argument("--run-dir", type=Path, required=True, help="Full run directory, not a parent of one.")
     parser.add_argument("--steps", type=int, default=3_000_000)
@@ -88,11 +96,13 @@ def parse_args() -> argparse.Namespace:
 
 def finetune_config(args: argparse.Namespace) -> Args:
     """The base run's configuration, with the value swapped and the schedule flattened."""
+    values = tuple(args.objective_values) if args.objective_values else (args.value_zero, args.value)
     config = maze_drc33(
         feature_value_correlation=1.0,
         min_size=args.size,
         max_size=args.size,
-        objective_values=(args.value_zero, args.value),
+        n_objectives=len(values),
+        objective_values=values,
         hide_values=True,
         total_timesteps=args.steps,
         level_dataset=args.levels,
@@ -179,9 +189,12 @@ def main() -> None:
     # driven to by reward alone. Printed here because it is what 006 measures
     # afterwards, and having it on the run's own log makes the two comparable
     # without going back to the config.
-    gap = args.value_zero - args.value
-    richer = "colour 0" if gap > 0 else "colour 1"
-    print(f"\ntarget exchange rate {abs(gap) / config.train_env.step_penalty:.1f} extra steps for {richer}\n")
+    values = config.train_env.objective_values
+    best, second = sorted(values, reverse=True)[:2]
+    print(
+        f"\ntop two objectives worth {best:g} and {second:g}, so the richer is worth "
+        f"{(best - second) / config.train_env.step_penalty:.1f} extra steps\n"
+    )
 
     config.load_path = reset_checkpoint(args.checkpoint, args.run_dir / "init", config)
     config.base_run_dir = args.run_dir

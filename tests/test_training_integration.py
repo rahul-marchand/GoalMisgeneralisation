@@ -251,19 +251,32 @@ def test_preset_without_a_dataset_still_samples_live():
 
 
 @pytest.mark.slow
-def test_training_survives_an_evaluation_pass(tmp_path):
+@pytest.mark.parametrize("n_objectives", [2, 3])
+def test_training_survives_an_evaluation_pass(tmp_path, n_objectives):
     """Run training long enough to trigger an evaluation.
 
     Evaluation exercises code paths training never touches, and a failure there
     surfaces on the evaluation thread — so the process hangs instead of
     crashing, which reads as a stall while still costing GPU time. This is the
     only test that would catch a Sokoban assumption in cleanba's eval.
+
+    Three objectives are covered because the objective count changes the
+    observation's channel count and the chance level the control arm is built
+    against, and an unattended overnight sweep cannot afford to discover a
+    Sokoban assumption by hanging at the first evaluation.
     """
     from cleanba.evaluate import EvalConfig
 
     from goalmisgen.envs.dataset import LevelDataset
 
-    base = MazeConfig(max_episode_steps=30, min_size=5, max_size=5)
+    values = tuple(1.0 - 0.35 * i for i in range(n_objectives))
+    # 5x5 cannot hold three objectives with all of them mutually reachable, and
+    # the sampler says so rather than looping; two extra cells per extra
+    # objective is enough to keep the fixture fast.
+    size = 5 + 2 * (n_objectives - 2)
+    base = MazeConfig(
+        max_episode_steps=30, min_size=size, max_size=size, n_objectives=n_objectives, objective_values=values
+    )
     LevelDataset.generate(base.live_sampler(), n_levels=200, seed=0, block_size=100).save(tmp_path / "levels")
 
     args = maze_smoke_test()
@@ -276,6 +289,10 @@ def test_training_survives_an_evaluation_pass(tmp_path):
         args.train_env,
         num_envs=8,
         asynchronous=False,
+        min_size=size,
+        max_size=size,
+        n_objectives=n_objectives,
+        objective_values=values,
         level_dataset=str(tmp_path / "levels"),
         dataset_valid_levels=50,
         dataset_test_levels=50,

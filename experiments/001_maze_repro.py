@@ -47,6 +47,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--step-penalty", type=float, default=None)
     parser.add_argument("--max-episode-steps", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--n-objectives", type=int, default=None)
+    parser.add_argument(
+        "--objective-values",
+        type=float,
+        nargs="+",
+        default=None,
+        help="What each objective is worth. Must match the level dataset, which stores them.",
+    )
     parser.add_argument("--randomise-values", action="store_true")
     parser.add_argument(
         "--hide-values",
@@ -79,6 +87,8 @@ def main() -> None:
             ("total_timesteps", args.total_timesteps),
             ("seed", args.seed),
             ("level_dataset", args.levels),
+            ("n_objectives", args.n_objectives),
+            ("objective_values", tuple(args.objective_values) if args.objective_values else None),
         )
         if value is not None
     }
@@ -96,6 +106,7 @@ def main() -> None:
     print(f"training rho   {config.train_env.feature_value_correlation}")
     print(f"evaluating rho {evaluated_at}")
     print(f"maze size      {config.train_env.min_size}-{config.train_env.max_size}")
+    print(f"objectives     {config.train_env.n_objectives} worth {config.train_env.objective_values}")
     print(f"step penalty   {config.train_env.step_penalty}   gamma {config.loss.gamma}")
     print(f"levels         {args.levels or 'sampled live'}")
     print(f"timesteps      {config.total_timesteps:,}")

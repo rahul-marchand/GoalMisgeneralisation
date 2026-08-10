@@ -58,6 +58,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Redraw objective values per level instead of using fixed ones.",
     )
+    parser.add_argument(
+        "--objective-values",
+        type=float,
+        nargs="+",
+        default=None,
+        help="What each objective is worth. Values are drawn at generation time and stored "
+        "per level, so sweeping them needs one dataset per point. Fixed values consume no "
+        "randomness, so every dataset in a sweep has identical layouts and differs only in "
+        "what the objectives pay.",
+    )
     return parser.parse_args()
 
 
@@ -70,11 +80,13 @@ def main() -> None:
         max_size=args.max_size,
         n_objectives=args.n_objectives,
         randomise_values=args.randomise_values,
+        **({"objective_values": tuple(args.objective_values)} if args.objective_values else {}),
     )
     sampler = config.sampler()
     tasks = block_tasks(sampler, args.n_levels, args.seed, args.block_size)
 
     print(f"levels      {args.n_levels:,}")
+    print(f"values      {'redrawn per level' if args.randomise_values else config.objective_values}")
     print(f"blocks      {len(tasks)} of up to {args.block_size:,}")
     print(f"workers     {args.workers}")
     print(f"fingerprint {dataset_fingerprint(sampler)}")

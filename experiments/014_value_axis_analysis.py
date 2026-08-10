@@ -96,6 +96,13 @@ def parse_args() -> argparse.Namespace:
         "whether the axis is the same direction with less of it.",
     )
     parser.add_argument("--skip-behaviour", action="store_true", help="Weight-space sections only.")
+    parser.add_argument(
+        "--leave-one-out",
+        action="store_true",
+        help="Write each grid value from an axis fitted without that arm, and compare against "
+        "what the arm itself learned. Writing a value the axis was fitted on is in-sample and "
+        "cannot separate a real axis from one that memorised the arms it was built from.",
+    )
     return parser.parse_args()
 
 
@@ -260,10 +267,36 @@ def main() -> None:
     if args.skip_behaviour:
         return
 
-    print("\n\n=== what the arms themselves do ===\n")
-    print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
     envs = config.make()
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+
+    if args.leave_one_out:
+        print("\n\n=== writable out of sample? each value from an axis that never saw it ===\n")
+        print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
+        out_of_sample: list[tuple[float, float, float]] = []
+        for value in values:
+            others = [v for v in values if v != value]
+            held_axis, _ = fit_axis_and_drift(np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others]))
+            written_point, _, _, _ = measure(
+                unravel(base_flat + (value - BASE_VALUE) * held_axis), policy, get_action, envs, args, f"v={value:.2f} written, held out"
+            )
+            _, _, _, arm_state, _ = load_train_state(selected[value], env_cfg=config)
+            arm_point, _, _, _ = measure(arm_state.params, policy, get_action, envs, args, f"v={value:.2f} fine-tuned")
+            out_of_sample.append((value, arm_point, written_point))
+
+        print(f"\n  {'value':>8}{'fine-tuned':>13}{'written':>10}{'error':>9}")
+        for value, arm_point, written_point in out_of_sample:
+            print(f"  {value:>8.2f}{arm_point:>13.1f}{written_point:>10.1f}{written_point - arm_point:>+9.1f}")
+        print(
+            "\nEach written value here comes from an axis fitted on the other five arms only,\n"
+            "so nothing about this arm went into the direction that reproduces it. This is\n"
+            "the comparison that separates an axis from a lookup of the arms it was built\n"
+            "from; the in-sample version cannot."
+        )
+        return
+
+    print("\n\n=== what the arms themselves do ===\n")
+    print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
     measure(base_state.params, policy, get_action, envs, args, "base, untouched")
     arm_points: list[tuple[float, float]] = []
     for value, checkpoint in sorted(selected.items()):

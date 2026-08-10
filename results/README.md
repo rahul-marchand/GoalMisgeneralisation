@@ -13,6 +13,8 @@ hand; the figures read the JSON in `figures/data/`, not these files.
 | `value-axis-full.txt` | `experiments/014_value_axis_analysis.py` on the value grid, last checkpoint of each arm |
 | `value-axis-quarter.txt` | the same at the first checkpoint, a quarter of the fine-tune |
 | `value-axis-heldout.txt` | `--leave-one-out`: each value written from an axis fitted without its arm |
+| `value-or-gap.txt` | `experiments/015_value_or_gap.py` on both sweeps |
+| `value-or-gap-cross.txt` | the same with `--cross`, which turned out not to separate the hypotheses |
 
 All four agents have current behavioural and probe numbers. The 5×5 probe is
 the least informative of them: with seven free cells and two-step routes, a
@@ -40,3 +42,25 @@ the fit needs an intercept.
 
 The three files above have gymnasium's deprecation warnings filtered out and
 nothing else altered.
+
+## Value or gap
+
+`COLOUR=0 scripts/value_axis_grid.sh` sweeps colour 0 over the same gaps the
+colour 1 sweep covered, so the two are directly comparable.
+
+The knob is real either way: both axes reproduce held-out arms of their own
+sweep, and each writes the other's arms to within about a tenth of a step.
+
+Whether it is a *value* or the *gap* is not settled here. The discriminating
+number is `cos(axis_0, axis_1)`, which is -0.255 raw. Both axes are fitted from
+diffs that are mostly behaviourally inert, and their split-half reliabilities are
+0.144 and 0.151, so the cosine is attenuated toward zero whichever hypothesis
+holds. Corrected it reads -1.73, consistent with the -1 that one shared knob
+predicts and not with the 0 that two value slots predict, but the correction
+multiplies by nearly seven and cannot carry a conclusion.
+
+`--cross` was added to settle it causally and does not: raising colour 0 and
+lowering colour 1 by the same amount leave the same gap, so both hypotheses
+predict the agreement it found. The file is kept as the record of a test that
+does not do what it was built to do. Separating a value from the gap needs a
+task whose choice does not reduce to one difference.

@@ -36,6 +36,23 @@ The order matters: a null cosine is only meaningful once ``axis_0`` is shown to
 work. A direction fitted from noise would also be uncorrelated with anything, so
 this checks that writing along ``axis_0`` reproduces its own arms before any
 weight is put on the comparison.
+
+Two traps, one of which this script fell into.
+
+**Attenuation.** Both axes are fitted from diffs that are mostly movement with no
+behavioural effect, so each is a noisy estimate of its own direction and the
+cosine between them is pulled toward zero whichever hypothesis holds. Split-half
+reliability measures that and is reported beside the cosine. At the reliabilities
+this grid achieves — around 0.15 — the correction multiplies by nearly seven, so
+it bounds the answer rather than giving it.
+
+**``--cross`` does not discriminate.** It was added to settle the question
+causally and cannot. Raising colour 0 by ``d`` and lowering colour 1 by ``d``
+leave the same gap, so under *both* hypotheses they produce the same policy. No
+behavioural test on a two-objective task can separate a value from the gap,
+which is what the top of this docstring already said. Separating them needs a
+task where the choice does not reduce to one difference — three objectives, where
+a single scalar cannot express the problem.
 """
 
 from __future__ import annotations
@@ -76,10 +93,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cross",
         action="store_true",
-        help="Test the one-knob hypothesis causally: write colour 0's arms using colour 1's "
-        "axis with the sign flipped. If the two sweeps move one shared knob, that is the "
-        "same edit and must reproduce them; a correlation between noisy axes cannot settle "
-        "this, since noise attenuates it toward zero whichever hypothesis is true.",
+        help="Write colour 0's arms using colour 1's axis with the sign flipped. This does "
+        "NOT separate the two hypotheses -- see the note in the module docstring -- and is "
+        "kept only as a check that the two axes are interchangeable edits of the gap.",
     )
     return parser.parse_args()
 
@@ -240,11 +256,11 @@ def main() -> None:
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
 
     if args.cross:
-        # Under one knob the sweeps share a direction: raising colour 0 by d and
-        # lowering colour 1 by d are the same edit, so -axis_1 must write colour
-        # 0's arms as well as axis_0 does. This is causal, so the noise that
-        # attenuates a cosine does not weaken it -- axis_1 has already been shown
-        # to work on its own sweep.
+        # This was built to separate the hypotheses causally and does not. Under
+        # *either* one, lowering colour 1 by d and raising colour 0 by d leave the
+        # same gap, and the choice depends on nothing else, so both predict these
+        # columns agree. Kept because it does establish something narrower: the
+        # two axes are interchangeable as edits of the gap, to within 0.1 steps.
         print("\n\n=== can colour 1's axis write colour 0's arms? ===\n")
         print(f"  {'':>32}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
         measure(base_state.params, policy, get_action, envs, args, "base, untouched")
@@ -268,9 +284,9 @@ def main() -> None:
         for value, trained, own, other in crossed:
             print(f"  {value:>10.2f}{trained:>13.1f}{own:>13.1f}{other:>14.1f}")
         print(
-            "\n  One knob predicts the last two columns agree, since they would be the same\n"
-            "  edit written two ways. Two slots predicts colour 1's axis does not set\n"
-            "  colour 0's value, and the last column departs from the other two."
+            "\n  These agree under both hypotheses, so this settles nothing about which is\n"
+            "  true: the choice depends only on the gap, and both edits move the gap by the\n"
+            "  same amount. It does show the two axes are interchangeable edits of it."
         )
         return
 

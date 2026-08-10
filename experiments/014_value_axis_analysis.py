@@ -122,9 +122,14 @@ def arm_checkpoints(root: Path) -> dict[float, Path]:
     return found
 
 
-def measure(params, policy, envs, args, label: str) -> tuple[float, float, float, float]:
-    """Exchange rate in extra steps, its interval, and whether the agent still finishes."""
-    get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, float, float, float]:
+    """Exchange rate in extra steps, its interval, and whether the agent still finishes.
+
+    ``get_action`` is compiled once by the caller and reused. Params are an
+    argument rather than a constant, so every arm and every written value shares
+    one compilation; jitting inside here instead would recompile for each of the
+    dozen measurements and cost more than the rollouts do.
+    """
     carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
     state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
@@ -218,19 +223,21 @@ def main() -> None:
     print("\n\n=== writable? pushing the base weights along the axis ===\n")
     print(f"  {'':>30}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
     envs = config.make()
-    measure(base_state.params, policy, envs, args, "base, untouched")
+    get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+    measure(base_state.params, policy, get_action, envs, args, "base, untouched")
 
     rows: list[tuple[float, float]] = []
     for value in sorted(set(values) | set(args.extrapolate)):
         seen = "grid" if value in values else "unseen"
-        point, _, _, _ = measure(unravel(base_flat + (value - BASE_VALUE) * axis), policy, envs, args, f"v={value:.2f} written ({seen})")
+        params = unravel(base_flat + (value - BASE_VALUE) * axis)
+        point, _, _, _ = measure(params, policy, get_action, envs, args, f"v={value:.2f} written ({seen})")
         rows.append((value, point))
 
     rng = np.random.default_rng(args.seed)
     for magnitude in (0.3, 0.5):
         direction = rng.normal(size=axis.size)
         direction *= np.linalg.norm(magnitude * axis) / np.linalg.norm(direction)
-        measure(unravel(base_flat + direction), policy, envs, args, f"random, matched to {magnitude:.1f}")
+        measure(unravel(base_flat + direction), policy, get_action, envs, args, f"random, matched to {magnitude:.1f}")
 
     print("\n\n=== calibrated? written value against the task's own exchange rate ===\n")
     print(f"  {'written value':>15}{'measured steps':>17}{'task says':>12}{'error':>9}")

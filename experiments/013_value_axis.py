@@ -60,7 +60,16 @@ from goalmisgen.configs.writers import CsvWriter
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("checkpoint", type=Path, help="The trained agent to fine-tune from.")
-    parser.add_argument("--value", type=float, required=True, help="What colour 1 is worth. Colour 0 stays at 1.0.")
+    parser.add_argument("--value", type=float, required=True, help="What colour 1 is worth.")
+    parser.add_argument(
+        "--value-zero",
+        type=float,
+        default=1.0,
+        help="What colour 0 is worth. Sweeping this instead separates a value from a "
+        "threshold: only the gap between the two drives behaviour, so a knob that is "
+        "really the gap moves the same way whichever colour is changed, while a pair "
+        "of value slots does not.",
+    )
     parser.add_argument("--levels", type=str, required=True, help="Dataset generated at this objective value.")
     parser.add_argument("--run-dir", type=Path, required=True, help="Full run directory, not a parent of one.")
     parser.add_argument("--steps", type=int, default=3_000_000)
@@ -83,7 +92,7 @@ def finetune_config(args: argparse.Namespace) -> Args:
         feature_value_correlation=1.0,
         min_size=args.size,
         max_size=args.size,
-        objective_values=(1.0, args.value),
+        objective_values=(args.value_zero, args.value),
         hide_values=True,
         total_timesteps=args.steps,
         level_dataset=args.levels,
@@ -170,8 +179,9 @@ def main() -> None:
     # driven to by reward alone. Printed here because it is what 006 measures
     # afterwards, and having it on the run's own log makes the two comparable
     # without going back to the config.
-    gap = 1.0 - args.value
-    print(f"\ntarget exchange rate {gap / config.train_env.step_penalty:.1f} extra steps for colour 0\n")
+    gap = args.value_zero - args.value
+    richer = "colour 0" if gap > 0 else "colour 1"
+    print(f"\ntarget exchange rate {abs(gap) / config.train_env.step_penalty:.1f} extra steps for {richer}\n")
 
     config.load_path = reset_checkpoint(args.checkpoint, args.run_dir / "init", config)
     config.base_run_dir = args.run_dir

@@ -23,9 +23,21 @@ STEPS="${STEPS:-3000000}"
 LR="${LR:-1e-4}"
 N_LEVELS="${N_LEVELS:-500000}"
 
+# Which objective's value the sweep moves. Behaviour depends only on the gap
+# between the two, so a sweep of colour 0 covers the same gaps as a sweep of
+# colour 1 and must produce the same weight direction if what was found is the
+# gap rather than a value.
+COLOUR="${COLOUR:-1}"
+
 # Value and directory tag together, rather than computing one from the other,
 # so a misplaced rounding cannot silently point an arm at the wrong dataset.
-GRID=("0.9 v090" "0.8 v080" "0.7 v070" "0.6 v060" "0.5 v050" "0.4 v040" "0.3 v030")
+if [ "${COLOUR}" = "1" ]; then
+    OTHER=1.0
+    GRID=("0.9 v090" "0.8 v080" "0.7 v070" "0.6 v060" "0.5 v050" "0.4 v040" "0.3 v030")
+else
+    OTHER=0.5
+    GRID=("0.6 c060" "0.7 c070" "0.8 c080" "0.9 c090" "1.0 c100" "1.1 c110" "1.2 c120")
+fi
 
 mkdir -p "${BASE}/levels" "${BASE}/runs" "${BASE}/logs"
 
@@ -37,11 +49,12 @@ for pair in "${GRID[@]}"; do
         echo "  ${tag} present"
         continue
     fi
-    echo "  ${tag}  (colour 1 worth ${value})"
+    if [ "${COLOUR}" = "1" ]; then VALUES="${OTHER} ${value}"; else VALUES="${value} ${OTHER}"; fi
+    echo "  ${tag}  (colour ${COLOUR} worth ${value})"
     uv run python scripts/generate_levels.py \
         --n-levels "${N_LEVELS}" --min-size 11 --max-size 11 \
         --valid-levels 50000 --test-levels 50000 \
-        --objective-values 1.0 "${value}" \
+        --objective-values ${VALUES} \
         --out "${BASE}/levels/${tag}" >> "${BASE}/logs/generate.log" 2>&1
 done
 
@@ -54,10 +67,11 @@ for pair in "${GRID[@]}"; do
         echo "  ${tag} already has a checkpoint"
         continue
     fi
-    echo "  ${tag}  (colour 1 worth ${value})  -> ${BASE}/logs/${tag}.log"
+    echo "  ${tag}  (colour ${COLOUR} worth ${value})  -> ${BASE}/logs/${tag}.log"
     rm -rf "${BASE}/runs/${tag}"
+    if [ "${COLOUR}" = "1" ]; then ARM=(--value "${value}"); else ARM=(--value "${OTHER}" --value-zero "${value}"); fi
     uv run python experiments/013_value_axis.py "${CHECKPOINT}" \
-        --value "${value}" \
+        "${ARM[@]}" \
         --levels "${BASE}/levels/${tag}" \
         --run-dir "${BASE}/runs/${tag}" \
         --steps "${STEPS}" --lr "${LR}" \

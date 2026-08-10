@@ -85,6 +85,16 @@ def parse_args() -> argparse.Namespace:
         "sit outside the grid in both directions, where a threshold compiled from the "
         "training values has no reason to keep working.",
     )
+    parser.add_argument(
+        "--at",
+        type=int,
+        default=-1,
+        help="Which saved checkpoint of each arm to use, as an index into the arm's "
+        "checkpoints in step order; -1 is the last. Behaviour converges well before the "
+        "end of a fine-tune, so every update after that adds drift to the diff without "
+        "adding value. Reading the grid at an earlier, matched budget is how to see "
+        "whether the axis is the same direction with less of it.",
+    )
     parser.add_argument("--skip-behaviour", action="store_true", help="Weight-space sections only.")
     return parser.parse_args()
 
@@ -107,8 +117,14 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
     )
 
 
-def arm_checkpoints(root: Path) -> dict[float, Path]:
-    """The last checkpoint of every ``vXXX`` run directory under ``root``."""
+def arm_checkpoints(root: Path, at: int = -1) -> dict[float, Path]:
+    """One checkpoint from every ``vXXX`` run directory under ``root``.
+
+    Arms are only comparable when read at the same number of updates, so the
+    caller picks by index and the step each arm resolved to is printed. An arm
+    that saved a different number of checkpoints would otherwise be silently
+    compared at a different budget from the rest.
+    """
     found: dict[float, Path] = {}
     for run in sorted(root.iterdir()):
         match = re.fullmatch(r"v(\d{3})", run.name)
@@ -118,7 +134,10 @@ def arm_checkpoints(root: Path) -> dict[float, Path]:
         if not checkpoints:
             print(f"  {run.name}: no checkpoint saved, skipping")
             continue
-        found[int(match.group(1)) / 100] = checkpoints[-1]
+        try:
+            found[int(match.group(1)) / 100] = checkpoints[at]
+        except IndexError:
+            print(f"  {run.name}: only {len(checkpoints)} checkpoints, no index {at}, skipping")
     return found
 
 
@@ -164,8 +183,12 @@ def main() -> None:
     print(f"base {args.base.name}  (update {update}, {base_flat.size:,} parameters)\n")
 
     print("arms")
+    selected = arm_checkpoints(args.arms, args.at)
+    steps = {int(path.name.removeprefix("cp_")) for path in selected.values()}
+    if len(steps) > 1:
+        print(f"  WARNING: arms are at different budgets {sorted(steps)}, so their diffs are not comparable")
     diffs: dict[float, np.ndarray] = {}
-    for value, checkpoint in sorted(arm_checkpoints(args.arms).items()):
+    for value, checkpoint in sorted(selected.items()):
         _, _, _, state, arm_update = load_train_state(checkpoint, env_cfg=config)
         flat, _ = ravel_pytree(state.params)
         diffs[value] = np.asarray(flat - base_flat, dtype=np.float64)

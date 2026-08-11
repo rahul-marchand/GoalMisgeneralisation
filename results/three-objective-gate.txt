@@ -1,0 +1,23 @@
+Gate at 80M steps, 2026-08-11 03:45 UTC: proceed to the arms, do not extend to 150M.
+
+  reached 100.0%   chose optimal 87.4%
+
+Returns by sixths of training:
+
+  training (rho=1.0)  -3.99  0.4202  0.4770  0.4789  0.4844  0.4840
+  rho=0.33            -3.98  0.2985  0.3246  0.3359  0.3426  0.3191
+  rho=0.00            -3.99  0.1994  0.2102  0.2160  0.2219  0.1980
+  rho100 - rho000     -0.01  0.2208  0.2668  0.2629  0.2625  0.2859
+
+Performance on the distribution it trains on has plateaued: the last three
+slices are 0.4789, 0.4844, 0.4840. The only thing still moving is the gap
+between the training correlation and the broken one, and it is moving the wrong
+way -- the agent is leaning further on colour as a proxy rather than getting
+better at comparing values. More steps would make it a worse subject for this
+experiment, not a better one.
+
+scripts/training_curve.py said "still climbing", reading the aggregate training
+return: the last two slices beat the two before by +0.0023 against a spread of
+0.0015. Per slice the gains were +0.0007 and +0.0004, which is a curve flattening
+out, not one climbing. The threshold is too tight; the disaggregated arms are
+what settled it.

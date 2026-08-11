@@ -1,0 +1,76 @@
+commit f1aa494
+argv   --base /workspace/data/threeobj/runs/base/local-files/cp_70103040 --arms /workspace/data/threeobj/runs --levels /workspace/data/threeobj/levels/base
+
+base cp_70103040  (1,449,893 parameters)  values (1.0, 0.65, 0.3)
+
+arms
+     m_090_065_040  values (0.9, 0.65, 0.4)  offset (-0.1, 0.0, 0.1)  |delta| 8.482
+     m_100_075_020  values (1.0, 0.75, 0.2)  offset (0.0, 0.1, -0.1)  |delta| 8.336
+     m_110_055_030  values (1.1, 0.55, 0.3)  offset (0.1, -0.1, 0.0)  |delta| 8.693
+     m_120_045_030  values (1.2, 0.45, 0.3)  offset (0.2, -0.2, 0.0)  |delta| 9.12
+            o0_080  values (0.8, 0.65, 0.3)  offset (-0.2, 0.0, 0.0)  |delta| 8.406
+            o0_090  values (0.9, 0.65, 0.3)  offset (-0.1, 0.0, 0.0)  |delta| 8.169
+            o0_110  values (1.1, 0.65, 0.3)  offset (0.1, 0.0, 0.0)  |delta| 8.535
+            o0_120  values (1.2, 0.65, 0.3)  offset (0.2, 0.0, 0.0)  |delta| 8.581
+            o1_045  values (1.0, 0.45, 0.3)  offset (0.0, -0.2, 0.0)  |delta| 8.351
+            o1_055  values (1.0, 0.55, 0.3)  offset (0.0, -0.1, 0.0)  |delta| 8.655
+            o1_075  values (1.0, 0.75, 0.3)  offset (0.0, 0.1, 0.0)  |delta| 8.363
+            o1_085  values (1.0, 0.85, 0.3)  offset (0.0, 0.2, 0.0)  |delta| 8.333
+            o2_010  values (1.0, 0.65, 0.1)  offset (0.0, 0.0, -0.2)  |delta| 8.645
+            o2_020  values (1.0, 0.65, 0.2)  offset (0.0, 0.0, -0.1)  |delta| 8.406
+            o2_040  values (1.0, 0.65, 0.4)  offset (0.0, 0.0, 0.1)  |delta| 8.169
+            o2_050  values (1.0, 0.65, 0.5)  offset (0.0, 0.0, 0.2)  |delta| 8.171
+
+
+=== how much of each axis is signal? ===
+
+  objective 0: |axis|     26.33   split-half reliability +0.085
+  objective 1: |axis|     24.94   split-half reliability +0.044
+  objective 2: |axis|     25.31   split-half reliability +0.061
+
+  Two disjoint symmetric pairs of arms give two estimates of the same axis.
+  Everything below is attenuated by whatever this falls short of 1.
+
+=== are the three axes distinct directions? ===
+
+        pair    cosine   corrected
+      0 vs 1    -0.139      -2.269
+      0 vs 2    -0.125      -1.724
+      1 vs 2     0.072       1.384
+
+  |axis_0 + axis_1 + axis_2| / mean|axis| = 1.614
+  Adding a constant to every value changes no choice, so a representation that
+  holds only differences should put this near zero, and absolute per-objective
+  registers need not. Three unrelated directions would give about 1.7.
+
+
+=== composition: two values moved at once ===
+
+               arm               offsets   cos(sum, actual)  |sum|/|actual|
+     m_090_065_040      (-0.1, 0.0, 0.1)              0.125           0.457
+     m_100_075_020      (0.0, 0.1, -0.1)              0.024           0.411
+     m_110_055_030      (0.1, -0.1, 0.0)              0.146           0.445
+     m_120_045_030      (0.2, -0.2, 0.0)              0.168           0.849
+
+  These arms were held out of every fit. A value held per objective makes the
+  sum of two single-value axes the right prediction for moving both; a policy
+  rebuilt per configuration makes it the wrong one. Read the cosine against the
+  reliability ceiling above, not against 1.
+
+
+=== and does the composed edit behave like the arm? ===
+
+                                       steps          optimal          reached
+                     base, untouched     5.8   optimal  87.4%   reached 100.0%
+              m_090_065_040 composed     3.0   optimal  83.0%   reached 100.0%
+            m_090_065_040 fine-tuned     2.8   optimal  83.1%   reached  99.9%
+              m_100_075_020 composed     6.0   optimal  87.4%   reached 100.0%
+            m_100_075_020 fine-tuned     6.4   optimal  87.8%   reached 100.0%
+              m_110_055_030 composed     9.4   optimal  87.8%   reached 100.0%
+            m_110_055_030 fine-tuned     8.7   optimal  88.4%   reached 100.0%
+              m_120_045_030 composed    13.2   optimal  85.4%   reached 100.0%
+            m_120_045_030 fine-tuned    10.1   optimal  87.8%   reached 100.0%
+
+  The exchange rate is a two-objective summary and three objectives do not
+  reduce to one, so read `optimal` alongside it: an edit that sets the values
+  right should pick the best objective as often as the arm trained to.

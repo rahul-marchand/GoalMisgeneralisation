@@ -15,6 +15,8 @@ hand; the figures read the JSON in `figures/data/`, not these files.
 | `value-axis-heldout.txt` | `--leave-one-out`: each value written from an axis fitted without its arm |
 | `value-or-gap.txt` | `experiments/015_value_or_gap.py` on both sweeps |
 | `value-or-gap-cross.txt` | the same with `--cross`, which turned out not to separate the hypotheses |
+| `three-objective.txt` | `experiments/016_three_objective_values.py` on the three-objective grid |
+| `three-objective-gate.txt` | why the base agent was swept around at 80M rather than trained further |
 
 All four agents have current behavioural and probe numbers. The 5×5 probe is
 the least informative of them: with seven free cells and two-step routes, a
@@ -64,3 +66,28 @@ lowering colour 1 by the same amount leave the same gap, so both hypotheses
 predict the agreement it found. The file is kept as the record of a test that
 does not do what it was built to do. Separating a value from the gap needs a
 task whose choice does not reduce to one difference.
+
+## Three objectives
+
+`scripts/three_objective.sh` and its composition stage train a base agent at
+values (1.0, 0.65, 0.3) with no value channel, then move one objective's value
+at a time over offsets of plus and minus 0.1 and 0.2, and finally move two at
+once as arms held out of every fit.
+
+The behavioural composition test carries the result. Adding two single-value
+axes, neither fitted on the arm being predicted, reproduces what that arm
+learned in both exchange rate and choice quality — including the drop to 83%
+optimal on the arm where the values were brought closest together, which the
+composed edit reproduces to a tenth of a point.
+
+Every weight-space statistic in that file is uninformative and should not be
+quoted. Split-half reliability came out at 0.085, 0.044 and 0.061, so the axes
+are a few per cent signal, and the attenuation-corrected cosines fall outside
+the range a cosine can take — which is the correction announcing that it has
+broken down rather than a number to interpret. Arms here are 1M steps against
+the two-objective grid's 3M, and offsets reach 0.2 rather than 0.4; signal
+scales with the offset while noise does not, so a fourfold loss of
+signal-to-noise was to be expected before the shorter arms are even counted.
+
+The base agent is `cp_70103040` rather than the 80M steps it trained for; see
+the note in `goalmisgen/configs/presets.py` on `with_final_checkpoint`.

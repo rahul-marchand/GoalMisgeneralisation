@@ -206,13 +206,26 @@ def main() -> None:
         "  Everything below is attenuated by whatever this falls short of 1."
     )
 
+    # Split-half reliability describes a *half-length* estimate, and the axes
+    # being correlated are fitted on all the arms. Dividing a full-axis cosine by
+    # the half-length figure over-corrects, which is what put every corrected
+    # value outside the range a cosine can occupy. Spearman-Brown converts one to
+    # the other.
+    full = {index: 2 * r / (1 + r) if r > -1 else float("nan") for index, r in reliability.items()}
     print("\n=== are the three axes distinct directions? ===\n")
-    print(f"  {'pair':>10}{'cosine':>10}{'corrected':>12}")
+    print(f"  {'pair':>10}{'cosine':>10}{'corrected':>12}   ceiling from")
     for i, j in itertools.combinations(range(3), 2):
         raw = cosine(axes[i], axes[j])
-        floor = reliability.get(i, float("nan")) * reliability.get(j, float("nan"))
+        floor = full.get(i, float("nan")) * full.get(j, float("nan"))
         corrected = raw / np.sqrt(floor) if floor > 0 else float("nan")
-        print(f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}")
+        flag = "  <- too noisy to read" if min(full.get(i, 0), full.get(j, 0)) < 0.1 else ""
+        print(f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}   {full.get(i, float('nan')):.3f}, {full.get(j, float('nan')):.3f}{flag}")
+    print(
+        "\n  One shared knob puts every pair at -1; a representation holding only the\n"
+        "  differences puts them at -0.5, since three symmetric vectors summing to zero\n"
+        "  must; three absolute registers put them near 0. A corrected figure still\n"
+        "  outside the range a cosine can take means the ceiling is too small to divide by."
+    )
 
     total = axes[0] + axes[1] + axes[2]
     scale = float(np.mean([np.linalg.norm(axes[i]) for i in range(3)]))

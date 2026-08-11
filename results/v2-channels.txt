@@ -1,0 +1,101 @@
+commit 58e984d
+argv   --base /workspace/data/threeobj_v2/runs/base/local-files/cp_80000000 --arms /workspace/data/threeobj_v2/runs --sweep o0_ 1.0 --sweep o1_ 0.55 --sweep o2_ 0.4 --levels /workspace/data/threeobj_v2/levels/base --objective-values 1.0 0.55 0.4
+
+cell_list_0: hh (3, 3, 32, 128), ih (3, 3, 96, 128)
+  sweep 'o0_': 4 arms at offsets [-0.4, -0.2, 0.2, 0.4]
+  sweep 'o1_': 4 arms at offsets [-0.4, -0.2, 0.2, 0.4]
+  sweep 'o2_': 4 arms at offsets [-0.3, -0.15, 0.15, 0.3]
+
+
+=== cell_list_0/ih: which gates? ===
+
+     sweep        input    candidate       forget       output
+       o0_         1.01         1.03         0.88         1.01
+       o1_         0.98         1.09         0.94         0.99
+       o2_         0.94         1.09         0.99         1.01
+
+  Enrichment over the shared fine-tuning component: 1.0 means this gate moves
+  for the value exactly as much as it moves for nothing in particular.
+
+=== cell_list_0/ih: which of the 32 hidden channels? ===
+
+       o0_ top 8: ch12(1.37)  ch26(1.36)  ch06(1.33)  ch19(1.30)  ch10(1.25)  ch21(1.25)  ch20(1.21)  ch15(1.20)
+           spread:  min 0.64  median 0.94  max 1.37
+       o1_ top 8: ch12(1.43)  ch06(1.38)  ch05(1.36)  ch10(1.30)  ch29(1.24)  ch30(1.21)  ch19(1.17)  ch01(1.09)
+           spread:  min 0.68  median 0.98  max 1.43
+       o2_ top 8: ch12(1.63)  ch20(1.58)  ch18(1.25)  ch09(1.23)  ch19(1.18)  ch16(1.18)  ch28(1.15)  ch05(1.12)
+           spread:  min 0.72  median 0.95  max 1.63
+
+  profile correlations, every fit from three arms:
+
+
+  Across-sweep agreement matching within-sweep agreement means the two sweeps
+  pick the same channels as well as the method can resolve. Falling short of it
+  means they do not.
+
+
+=== cell_list_0/hh: which gates? ===
+
+     sweep        input    candidate       forget       output
+       o0_         1.01         1.00         0.99         0.99
+       o1_         0.99         1.01         0.99         1.00
+       o2_         1.00         0.99         0.98         1.02
+
+  Enrichment over the shared fine-tuning component: 1.0 means this gate moves
+  for the value exactly as much as it moves for nothing in particular.
+
+=== cell_list_0/hh: which of the 32 hidden channels? ===
+
+       o0_ top 8: ch28(1.42)  ch15(1.41)  ch06(1.36)  ch02(1.32)  ch12(1.30)  ch09(1.20)  ch26(1.19)  ch31(1.18)
+           spread:  min 0.68  median 0.94  max 1.42
+       o1_ top 8: ch06(1.52)  ch05(1.32)  ch01(1.31)  ch02(1.26)  ch15(1.22)  ch16(1.18)  ch28(1.13)  ch25(1.11)
+           spread:  min 0.67  median 0.97  max 1.52
+       o2_ top 8: ch28(1.45)  ch15(1.45)  ch01(1.42)  ch12(1.25)  ch02(1.20)  ch21(1.16)  ch20(1.13)  ch31(1.06)
+           spread:  min 0.66  median 0.99  max 1.45
+
+  profile correlations, every fit from three arms:
+
+
+  Across-sweep agreement matching within-sweep agreement means the two sweeps
+  pick the same channels as well as the method can resolve. Falling short of it
+  means they do not.
+
+
+=== do the sweeps move the shared channels the same way? ===
+
+  cell_list_0/ih
+            pair  channels   across  ceiling  corrected
+       o0_ v o1_     top 2   -0.384    0.358     -1.072
+       o0_ v o2_     top 2   -0.350    0.408     -0.856
+       o1_ v o2_     top 2    0.281    0.284      0.992
+       o0_ v o1_     top 8   -0.373    0.378     -0.988
+       o0_ v o2_     top 8   -0.333    0.368     -0.904
+       o1_ v o2_     top 8    0.224    0.248      0.902
+       o0_ v o1_    all 32   -0.275    0.288     -0.954
+       o0_ v o2_    all 32   -0.236    0.285     -0.827
+       o1_ v o2_    all 32    0.145    0.190      0.763
+  cell_list_0/hh
+            pair  channels   across  ceiling  corrected
+       o0_ v o1_     top 2   -0.250    0.286     -0.875
+       o0_ v o2_     top 2   -0.241    0.312     -0.773
+       o1_ v o2_     top 2    0.148    0.214      0.690
+       o0_ v o1_     top 8   -0.216    0.263     -0.821
+       o0_ v o2_     top 8   -0.237    0.288     -0.822
+       o1_ v o2_     top 8    0.115    0.195      0.589
+       o0_ v o1_    all 32   -0.170    0.200     -0.852
+       o0_ v o2_    all 32   -0.173    0.222     -0.779
+       o1_ v o2_    all 32    0.080    0.144      0.557
+
+  Every estimate here comes from one symmetric pair of arms, so across and
+  within rest on the same number of arms and the ratio is a disattenuated
+  cosine rather than a mixture of two sample sizes.
+
+  With two objectives, one shared knob puts this at -1. With three it cannot:
+  three vectors cannot be pairwise anti-parallel. There -0.5 is what a
+  representation holding only differences gives, since three symmetric axes
+  summing to zero must, and 0 is what three absolute registers give.
+
+
+A handful of channels carrying the axis in both sweeps would be the first thing
+here deserving the word circuit. Concentration in one sweep alone would not be:
+a fitted axis is mostly sampling error, and noise concentrates by chance.

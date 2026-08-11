@@ -1,0 +1,30 @@
+commit 58e984d
+argv   --arms /workspace/data/threeobj_v2/runs --levels /workspace/data/threeobj_v2/levels --base /workspace/data/threeobj_v2/runs/base/local-files/cp_80000000 --base-levels /workspace/data/threeobj_v2/levels/base --base-values 1.0 0.55 0.4
+
+               arm                  values  asymmetry   optimal   reached
+              base        (1.0, 0.55, 0.4)       0.30     92.2%    100.0%
+     m_080_075_040        (0.8, 0.75, 0.4)       0.30     82.7%    100.0%
+     m_100_075_025       (1.0, 0.75, 0.25)       0.25     82.4%    100.0%
+     m_120_035_040        (1.2, 0.35, 0.4)       0.75     89.1%    100.0%
+     m_120_035_055       (1.2, 0.35, 0.55)       0.45     90.5%    100.0%
+     m_120_055_025       (1.2, 0.55, 0.25)       0.35     91.2%    100.0%
+            o0_060        (0.6, 0.55, 0.4)       0.10     91.6%    100.0%
+            o0_080        (0.8, 0.55, 0.4)       0.10     92.0%    100.0%
+            o0_120        (1.2, 0.55, 0.4)       0.50     90.8%    100.0%
+            o0_140        (1.4, 0.55, 0.4)       0.70     90.8%    100.0%
+            o1_015        (1.0, 0.15, 0.4)       0.35     89.1%    100.0%
+            o1_035        (1.0, 0.35, 0.4)       0.55     90.8%    100.0%
+            o1_075        (1.0, 0.75, 0.4)       0.10     85.9%    100.0%
+            o1_095        (1.0, 0.95, 0.4)       0.50     76.7%    100.0%
+            o2_010        (1.0, 0.55, 0.1)       0.00     89.3%    100.0%
+            o2_025       (1.0, 0.55, 0.25)       0.15     89.7%    100.0%
+            o2_055       (1.0, 0.55, 0.55)       0.45     93.6%    100.0%
+            o2_070        (1.0, 0.55, 0.7)       0.15     91.9%    100.0%
+
+  optimal against asymmetry: slope -0.006 per unit, r -0.032
+  fitted at asymmetry 0: 88.9%   at 0.4: 88.7%
+
+  A clearly negative slope is the projection account confirmed without touching
+  weight space: the further an arm's task is from something one stored constant
+  can express, the worse it does on it. A flat line says the arms hold the
+  second degree of freedom and the collinear axes are a measurement artefact.

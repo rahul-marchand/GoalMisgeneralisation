@@ -1,0 +1,65 @@
+commit 58e984d
+argv   --base /workspace/data/threeobj_v2/runs/base/local-files/cp_80000000 --arms /workspace/data/threeobj_v2/runs --levels /workspace/data/threeobj_v2/levels/base --base-values 1.0 0.55 0.4 --at 0 --skip-behaviour
+
+base cp_80000000  (1,449,893 parameters)  values (1.0, 0.55, 0.4)
+
+arms
+     m_080_075_040  values (0.8, 0.75, 0.4)  offset (-0.2, 0.2, 0.0)  |delta| 4.493
+     m_100_075_025  values (1.0, 0.75, 0.25)  offset (0.0, 0.2, -0.15)  |delta| 3.964
+     m_120_035_040  values (1.2, 0.35, 0.4)  offset (0.2, -0.2, 0.0)  |delta| 4.471
+     m_120_035_055  values (1.2, 0.35, 0.55)  offset (0.2, -0.2, 0.15)  |delta| 4.358
+     m_120_055_025  values (1.2, 0.55, 0.25)  offset (0.2, 0.0, -0.15)  |delta| 4.454
+            o0_060  values (0.6, 0.55, 0.4)  offset (-0.4, 0.0, 0.0)  |delta| 5.476
+            o0_080  values (0.8, 0.55, 0.4)  offset (-0.2, 0.0, 0.0)  |delta| 3.87
+            o0_120  values (1.2, 0.55, 0.4)  offset (0.2, 0.0, 0.0)  |delta| 4.355
+            o0_140  values (1.4, 0.55, 0.4)  offset (0.4, 0.0, 0.0)  |delta| 4.603
+            o1_015  values (1.0, 0.15, 0.4)  offset (0.0, -0.4, 0.0)  |delta| 4.28
+            o1_035  values (1.0, 0.35, 0.4)  offset (0.0, -0.2, 0.0)  |delta| 4.089
+            o1_075  values (1.0, 0.75, 0.4)  offset (0.0, 0.2, 0.0)  |delta| 3.853
+            o1_095  values (1.0, 0.95, 0.4)  offset (0.0, 0.4, 0.0)  |delta| 3.995
+            o2_010  values (1.0, 0.55, 0.1)  offset (0.0, 0.0, -0.3)  |delta| 4.268
+            o2_025  values (1.0, 0.55, 0.25)  offset (0.0, 0.0, -0.15)  |delta| 4.037
+            o2_055  values (1.0, 0.55, 0.55)  offset (0.0, 0.0, 0.15)  |delta| 3.847
+            o2_070  values (1.0, 0.55, 0.7)  offset (0.0, 0.0, 0.3)  |delta| 4
+
+
+=== how much of each axis is signal? ===
+
+  objective 0: |axis|     9.262   split-half reliability +0.367
+  objective 1: |axis|     7.195   split-half reliability +0.247
+  objective 2: |axis|     9.114   split-half reliability +0.180
+
+  Two disjoint symmetric pairs of arms give two estimates of the same axis.
+  Everything below is attenuated by whatever this falls short of 1.
+
+=== are the three axes distinct directions? ===
+
+        pair    cosine   corrected   ceiling from
+      0 vs 1    -0.400      -0.868   0.537, 0.396
+      0 vs 2    -0.324      -0.799   0.537, 0.305
+      1 vs 2     0.220       0.632   0.396, 0.305
+
+  One shared knob puts every pair at -1; a representation holding only the
+  differences puts them at -0.5, since three symmetric vectors summing to zero
+  must; three absolute registers put them near 0. A corrected figure still
+  outside the range a cosine can take means the ceiling is too small to divide by.
+
+  |axis_0 + axis_1 + axis_2| / mean|axis| = 1.396
+  Adding a constant to every value changes no choice, so a representation that
+  holds only differences should put this near zero, and absolute per-objective
+  registers need not. Three unrelated directions would give about 1.7.
+
+
+=== composition: two values moved at once ===
+
+               arm               offsets   cos(sum, actual)  |sum|/|actual|
+     m_080_075_040      (-0.2, 0.2, 0.0)              0.501           0.615
+     m_100_075_025     (0.0, 0.2, -0.15)              0.102           0.442
+     m_120_035_040      (0.2, -0.2, 0.0)              0.361           0.618
+     m_120_035_055     (0.2, -0.2, 0.15)              0.268           0.607
+     m_120_055_025     (0.2, 0.0, -0.15)              0.316           0.591
+
+  These arms were held out of every fit. A value held per objective makes the
+  sum of two single-value axes the right prediction for moving both; a policy
+  rebuilt per configuration makes it the wrong one. Read the cosine against the
+  reliability ceiling above, not against 1.

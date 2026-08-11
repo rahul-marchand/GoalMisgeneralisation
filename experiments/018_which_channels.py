@@ -221,27 +221,43 @@ def main() -> None:
         (first, (offsets_a, arms_a)), (second, (offsets_b, arms_b)) = sweeps.items()
         for which in ("ih", "hh"):
             axis_a, drift_a = fit(offsets_a, arms_a, base, which)
-            axis_b, drift_b = fit(offsets_b, arms_b, base, which)
+            axis_b, _ = fit(offsets_b, arms_b, base, which)
             ranking = np.argsort(enrichment(axis_a, drift_a, by_channel))[::-1]
 
-            order = np.argsort(offsets_a)
-            halves = [order[0::2], order[1::2]]
-            ceiling_axes = [fit(offsets_a[h], [arms_a[i] for i in h], base, which)[0] for h in halves if len(h) >= 3]
+            # Both sides of the comparison must come from the same number of
+            # arms. A six-arm fit compared against a three-arm ceiling makes the
+            # ceiling look low and the corrected figure look larger than it is.
+            halves = {}
+            for tag, (offsets, arms) in ((first, (offsets_a, arms_a)), (second, (offsets_b, arms_b))):
+                order = np.argsort(offsets)
+                for label, index in (("a", order[0::2]), ("b", order[1::2])):
+                    if len(index) >= 3:
+                        halves[f"{tag}{label}"] = fit(offsets[index], [arms[i] for i in index], base, which)[0]
 
             print(f"  cell_list_{args.cell}/{which}")
-            print(f"    {'channels kept':>18}{'params':>10}{'cos across':>13}{'ceiling':>10}{'corrected':>12}")
+            print(f"    {'channels':>12}{'params':>9}{'across 6v6':>12}{'across 3v3':>12}{'within 3v3':>12}{'corrected':>11}")
             for keep in (2, 4, 8, 16, len(ranking)):
                 picked = ranking[:keep]
-                take = lambda k: np.concatenate([k.reshape(*k.shape[:-1], 4, -1)[..., :, c].ravel() for c in picked])
-                across = float(np.dot(take(axis_a), take(axis_b)) / (np.linalg.norm(take(axis_a)) * np.linalg.norm(take(axis_b))))
+
+                def take(k, picked=picked):
+                    return np.concatenate([k.reshape(*k.shape[:-1], 4, -1)[..., :, c].ravel() for c in picked])
+
+                def cos(x, y):
+                    return float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y)))
+
+                full = cos(take(axis_a), take(axis_b))
+                across = [cos(take(halves[f"{first}{i}"]), take(halves[f"{second}{j}"])) for i in "ab" for j in "ab" if f"{first}{i}" in halves and f"{second}{j}" in halves]
+                within = [
+                    cos(take(halves[f"{tag}a"]), take(halves[f"{tag}b"]))
+                    for tag in (first, second)
+                    if f"{tag}a" in halves and f"{tag}b" in halves
+                ]
                 label = f"top {keep}" if keep < len(ranking) else "all 32"
-                if len(ceiling_axes) == 2:
-                    x, y = take(ceiling_axes[0]), take(ceiling_axes[1])
-                    ceiling = float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y)))
-                    corrected = across / ceiling if ceiling > 0 else float("nan")
-                    print(f"    {label:>18}{take(axis_a).size:>10,}{across:>13.3f}{ceiling:>10.3f}{corrected:>12.3f}")
+                if across and within:
+                    corrected = float(np.mean(across)) / float(np.mean(within))
+                    print(f"    {label:>12}{take(axis_a).size:>9,}{full:>12.3f}{np.mean(across):>12.3f}{np.mean(within):>12.3f}{corrected:>11.3f}")
                 else:
-                    print(f"    {label:>18}{take(axis_a).size:>10,}{across:>13.3f}{'—':>10}{'—':>12}")
+                    print(f"    {label:>12}{take(axis_a).size:>9,}{full:>12.3f}{'—':>12}{'—':>12}{'—':>11}")
         print(
             f"\n  {first!r} moves one objective's value and {second!r} moves another's. If the\n"
             "  agent holds a single knob -- the gap, or a threshold on it -- raising one value\n"

@@ -1,0 +1,31 @@
+commit b74e193
+argv   --base /workspace/data/runs/novalue11/local-files/cp_140206080 --channels 3 19 23 --layer 0 --alphas -1.0 1.0 --skip probe --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+
+layer 0 of the recurrent stack, channels [3, 19, 23]
+
+=== ablation: zero those channels in the untouched agent ===
+
+                                             steps
+                                 untouched     7.8   optimal  95.8%   reached 100.0%
+               channels [3, 19, 23] zeroed     7.9   optimal  95.9%   reached 100.0%
+           random pair [18, 15, 25] zeroed     7.7   optimal  95.3%   reached 100.0%
+              random pair [0, 2, 1] zeroed     7.7   optimal  95.5%   reached 100.0%
+           random pair [18, 15, 28] zeroed     7.6   optimal  95.1%   reached 100.0%
+           random pair [21, 16, 18] zeroed     7.6   optimal  95.2%   reached 100.0%
+
+  A value comparison removed should push the exchange rate toward zero -- the
+  agent taking whichever objective is nearest -- while it still reaches one.
+  Random pairs say how much of any effect is just losing two channels.
+
+
+=== steering: add to those channels during the rollout ===
+
+                                             steps
+                                 untouched     7.8   optimal  95.8%   reached 100.0%
+                 channels [3, 19, 23] -1.0     7.1   optimal  93.7%   reached  97.3%
+                 channels [3, 19, 23] +1.0     7.2   optimal  94.1%   reached  99.8%
+              random pair [25, 21, 8] -1.0     6.5   optimal  94.8%   reached  57.7%
+              random pair [25, 21, 8] +1.0     6.8   optimal  91.7%   reached  96.3%
+
+  A channel holding what an objective is worth should move the exchange rate
+  monotonically in the amount added, and the random pair should not.

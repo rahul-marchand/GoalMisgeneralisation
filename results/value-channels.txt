@@ -1,0 +1,47 @@
+commit b74e193
+argv   --base /workspace/data/runs/novalue11/local-files/cp_140206080 --channels 7 1 --layer 0 --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+
+layer 0 of the recurrent stack, channels [7, 1]
+
+=== ablation: zero those channels in the untouched agent ===
+
+                                             steps
+                                 untouched     7.8   optimal  95.8%   reached 100.0%
+                    channels [7, 1] zeroed     7.4   optimal  94.8%   reached 100.0%
+               random pair [26, 21] zeroed     7.6   optimal  95.3%   reached 100.0%
+                random pair [11, 9] zeroed     7.9   optimal  95.8%   reached 100.0%
+                 random pair [0, 3] zeroed     7.8   optimal  95.7%   reached 100.0%
+               random pair [25, 21] zeroed     7.6   optimal  95.3%   reached 100.0%
+
+  A value comparison removed should push the exchange rate toward zero -- the
+  agent taking whichever objective is nearest -- while it still reaches one.
+  Random pairs say how much of any effect is just losing two channels.
+
+
+=== steering: add to those channels during the rollout ===
+
+                                             steps
+                                 untouched     7.8   optimal  95.8%   reached 100.0%
+                      channels [7, 1] -3.0     6.6   optimal  93.5%   reached  72.3%
+                      channels [7, 1] -1.0     8.4   optimal  95.7%   reached  97.9%
+                      channels [7, 1] +1.0     7.2   optimal  93.4%   reached  99.5%
+                      channels [7, 1] +3.0     6.7   optimal  92.9%   reached  64.1%
+                 random pair [16, 20] -3.0     5.8   optimal  93.1%   reached  58.9%
+                 random pair [16, 20] +3.0     6.4   optimal  95.1%   reached  44.5%
+
+  A channel holding what an objective is worth should move the exchange rate
+  monotonically in the amount added, and the random pair should not.
+
+
+=== probe: which channels predict the objective the agent takes? ===
+
+  1,024 episodes, 78.7% took feature 0
+
+  channels ranked by how well their activation predicts the choice:
+    ch03(0.674)  ch19(0.670)  ch23(0.661)  ch14(0.635)  ch17(0.633)  ch00(0.615)  ch25(0.599)  ch20(0.595)
+
+  the weight-space picks [7, 1] sit at ranks 15, 30
+
+  An independent ranking that puts the same channels on top would be two
+  unrelated methods agreeing. One that does not means the axis wrote where it
+  was cheap to write, which is not where the decision is held.

@@ -209,13 +209,23 @@ def main() -> None:
             others = [i for i in range(len(offsets)) if i != held]
             axis_h, drift_h = fit_axis_and_drift(offsets[others], stack[others])
             implied.append(projected_offset(np.where(mask, stack[held] - drift_h, 0.0), np.where(mask, axis_h, 0.0)))
-        print(f"  {label:>28}{int(mask.sum()):>10,}{share:>9.1%}   " + "  ".join(f"{v:+.2f}" for v in implied))
+        implied = np.array(implied)
+        slope = float(np.polyfit(offsets, implied, 1)[0])
+        correlation = float(np.corrcoef(offsets, implied)[0, 1])
+        print(
+            f"  {label:>28}{int(mask.sum()):>10,}{share:>9.1%}   "
+            + "  ".join(f"{v:+.2f}" for v in implied)
+            + f"   r {correlation:+.2f}  slope {slope:+.2f}"
+        )
     print(
         "\n  Every axis here is fitted without the arm it is scoring. Done in-sample this\n"
         "  table reproduces the true offsets exactly and means nothing: the axis is a\n"
         "  weighted sum of these same arms, each arm's weight is proportional to its own\n"
         "  offset, and its own noise dominates its own projection. So it recovers what\n"
-        "  the estimator put there. Held out, that route is closed."
+        "  the estimator put there. Held out, that route is closed.\n\n"
+        "  A slope of 1 would mean the offset can be read straight off a checkpoint the\n"
+        "  axis never saw. A slope near 0 with the same number returned for every arm is\n"
+        "  the failure 014 reported."
     )
 
     if args.skip_behaviour:

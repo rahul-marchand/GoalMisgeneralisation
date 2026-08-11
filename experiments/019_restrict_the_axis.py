@@ -82,7 +82,7 @@ def named_leaves(params) -> list[tuple[str, np.ndarray]]:
     return [("/".join(str(k.key) for k in path), np.asarray(v)) for path, v in flat]
 
 
-def channel_masks(shapes: dict[str, tuple], keep: dict[int, np.ndarray]) -> dict[str, np.ndarray]:
+def channel_masks(shapes: dict[str, tuple], keep: dict[int, np.ndarray], encoder: bool = False) -> dict[str, np.ndarray]:
     """One boolean array per parameter, keeping chosen channels of each cell.
 
     A gate convolution's last axis is ``4 x hidden``, so hidden channel ``c``
@@ -93,6 +93,8 @@ def channel_masks(shapes: dict[str, tuple], keep: dict[int, np.ndarray]) -> dict
     masks = {}
     for name, shape in shapes.items():
         mask = np.zeros(shape, dtype=bool)
+        if encoder and "network_params" in name and "cell_list" not in name:
+            mask[...] = True
         cell = re.search(r"cell_list_(\d+)/(ih|hh)/kernel", name)
         if cell is not None and int(cell.group(1)) in keep:
             hidden = shape[-1] // 4
@@ -188,14 +190,17 @@ def main() -> None:
 
     variants: dict[str, np.ndarray] = {"full axis": np.ones_like(axis, dtype=bool)}
     cells_only = {cell: order for cell, order in ranking.items()}
-    for label, keep in (
-        ("all cells, all channels", {c: o for c, o in cells_only.items()}),
-        ("cell 0 only, all channels", {0: cells_only[0]}),
-        ("all cells, top 8 channels", {c: o[:8] for c, o in cells_only.items()}),
-        ("all cells, top 2 channels", {c: o[:2] for c, o in cells_only.items()}),
-        ("cell 0 only, top 2 channels", {0: cells_only[0][:2]}),
+    for label, keep, encoder in (
+        ("all cells, all channels", {c: o for c, o in cells_only.items()}, False),
+        ("all cells, top 2 channels", {c: o[:2] for c, o in cells_only.items()}, False),
+        ("cell 0 only, top 2 channels", {0: cells_only[0][:2]}, False),
+        ("cell 1 only, top 2 channels", {1: cells_only[1][:2]}, False),
+        ("cell 2 only, top 2 channels", {2: cells_only[2][:2]}, False),
+        ("encoder only", {}, True),
+        ("encoder + cell 0 top 2", {0: cells_only[0][:2]}, True),
+        ("encoder + all cells top 2", {c: o[:2] for c, o in cells_only.items()}, True),
     ):
-        masks = channel_masks(shapes, keep)
+        masks = channel_masks(shapes, keep, encoder)
         variants[label] = np.concatenate([masks[name].ravel() for name in names])
 
     print("\n\n=== can an offset be read back off an arm it never saw? ===\n")

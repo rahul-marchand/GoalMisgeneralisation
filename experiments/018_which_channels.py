@@ -100,6 +100,32 @@ def sweep_axis(root: Path, prefix: str, base_value: float, at: int, config, cell
     return np.array(offsets), arms
 
 
+def paired_axis(offsets, arms, base, which: str):
+    """A finite-difference axis from one symmetric pair of arms.
+
+    Two arms at +m and -m give an estimate of the slope with the shared
+    fine-tuning component differenced away, and it needs no intercept, so it
+    works where a least-squares fit cannot: a sweep of four arms splits into two
+    such pairs, and a sweep of six into three. Every comparison below is built
+    from these, so both sides always rest on the same number of arms.
+    """
+    high, low = int(np.argmax(offsets)), int(np.argmin(offsets))
+    span = offsets[high] - offsets[low]
+    return (arms[high][which] - arms[low][which]) / span
+
+
+def symmetric_halves(offsets, arms, base, which: str):
+    """Independent axis estimates, one per symmetric pair of offsets."""
+    table = {round(float(o), 3): arm for o, arm in zip(offsets, arms)}
+    estimates = []
+    for magnitude in sorted({abs(o) for o in table}, reverse=True):
+        if magnitude in table and -magnitude in table:
+            estimates.append(
+                (table[magnitude][which] - table[-magnitude][which]) / (2 * magnitude)
+            )
+    return estimates
+
+
 def fit(offsets, arms, base, which: str):
     stack = np.stack([(arm[which] - base[which]).ravel() for arm in arms])
     axis, drift = fit_axis_and_drift(offsets, stack)
@@ -216,27 +242,24 @@ def main() -> None:
     # directly, and restricting it to the channels that carry the axis is what
     # makes it answerable -- the global version drowns, because most of the
     # network is carrying arm-specific movement that behaviour never sees.
-    if len(sweeps) == 2:
-        print("\n\n=== do the two sweeps move those channels the same way? ===\n")
-        (first, (offsets_a, arms_a)), (second, (offsets_b, arms_b)) = sweeps.items()
+    if len(sweeps) >= 2:
+        print("\n\n=== do the sweeps move the shared channels the same way? ===\n")
         for which in ("ih", "hh"):
-            axis_a, drift_a = fit(offsets_a, arms_a, base, which)
-            axis_b, _ = fit(offsets_b, arms_b, base, which)
-            ranking = np.argsort(enrichment(axis_a, drift_a, by_channel))[::-1]
+            halves = {
+                name: symmetric_halves(offsets, arms, base, which) for name, (offsets, arms) in sweeps.items()
+            }
+            usable = {name: estimates for name, estimates in halves.items() if len(estimates) >= 2}
+            if len(usable) < 2:
+                print(f"  cell_list_{args.cell}/{which}: fewer than two sweeps have two symmetric pairs, skipping")
+                continue
 
-            # Both sides of the comparison must come from the same number of
-            # arms. A six-arm fit compared against a three-arm ceiling makes the
-            # ceiling look low and the corrected figure look larger than it is.
-            halves = {}
-            for tag, (offsets, arms) in ((first, (offsets_a, arms_a)), (second, (offsets_b, arms_b))):
-                order = np.argsort(offsets)
-                for label, index in (("a", order[0::2]), ("b", order[1::2])):
-                    if len(index) >= 3:
-                        halves[f"{tag}{label}"] = fit(offsets[index], [arms[i] for i in index], base, which)[0]
+            reference = next(iter(sweeps))
+            axis_ref, drift_ref = fit(*sweeps[reference], base, which)
+            ranking = np.argsort(enrichment(axis_ref, drift_ref, by_channel))[::-1]
 
             print(f"  cell_list_{args.cell}/{which}")
-            print(f"    {'channels':>12}{'params':>9}{'across 6v6':>12}{'across 3v3':>12}{'within 3v3':>12}{'corrected':>11}")
-            for keep in (2, 4, 8, 16, len(ranking)):
+            print(f"    {'pair':>12}{'channels':>10}{'across':>9}{'ceiling':>9}{'corrected':>11}")
+            for keep in (2, 8, len(ranking)):
                 picked = ranking[:keep]
 
                 def take(k, picked=picked):
@@ -245,25 +268,26 @@ def main() -> None:
                 def cos(x, y):
                     return float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y)))
 
-                full = cos(take(axis_a), take(axis_b))
-                across = [cos(take(halves[f"{first}{i}"]), take(halves[f"{second}{j}"])) for i in "ab" for j in "ab" if f"{first}{i}" in halves and f"{second}{j}" in halves]
-                within = [
-                    cos(take(halves[f"{tag}a"]), take(halves[f"{tag}b"]))
-                    for tag in (first, second)
-                    if f"{tag}a" in halves and f"{tag}b" in halves
-                ]
+                within = {
+                    name: cos(take(estimates[0]), take(estimates[1])) for name, estimates in usable.items()
+                }
                 label = f"top {keep}" if keep < len(ranking) else "all 32"
-                if across and within:
-                    corrected = float(np.mean(across)) / float(np.mean(within))
-                    print(f"    {label:>12}{take(axis_a).size:>9,}{full:>12.3f}{np.mean(across):>12.3f}{np.mean(within):>12.3f}{corrected:>11.3f}")
-                else:
-                    print(f"    {label:>12}{take(axis_a).size:>9,}{full:>12.3f}{'—':>12}{'—':>12}{'—':>11}")
+                for first, second in itertools.combinations(sorted(usable), 2):
+                    across = float(
+                        np.mean([cos(take(a), take(b)) for a in usable[first] for b in usable[second]])
+                    )
+                    floor = within[first] * within[second]
+                    corrected = across / np.sqrt(floor) if floor > 0 else float("nan")
+                    flag = "  <- ceiling too small" if min(within[first], within[second]) < 0.05 else ""
+                    print(f"    {f'{first} v {second}':>12}{label:>10}{across:>9.3f}{np.sqrt(max(floor, 0)):>9.3f}{corrected:>11.3f}{flag}")
         print(
-            f"\n  {first!r} moves one objective's value and {second!r} moves another's. If the\n"
-            "  agent holds a single knob -- the gap, or a threshold on it -- raising one value\n"
-            "  and raising the other must move the weights oppositely, so the corrected cosine\n"
-            "  belongs near -1. Two separate registers put it near 0. The ceiling is two\n"
-            "  half-fits of the same sweep, where the answer is +1 by construction."
+            "\n  Every estimate here comes from one symmetric pair of arms, so across and\n"
+            "  within rest on the same number of arms and the ratio is a disattenuated\n"
+            "  cosine rather than a mixture of two sample sizes.\n\n"
+            "  With two objectives, one shared knob puts this at -1. With three it cannot:\n"
+            "  three vectors cannot be pairwise anti-parallel. There -0.5 is what a\n"
+            "  representation holding only differences gives, since three symmetric axes\n"
+            "  summing to zero must, and 0 is what three absolute registers give."
         )
 
     print(

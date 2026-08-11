@@ -149,6 +149,16 @@ def main() -> None:
     notes = load_notes(args.notes)
     all_datasets, all_runs = datasets(args.data, notes), runs(args.data, notes)
 
+    # A group note repeated down sixteen rows is noise; numbering them keeps the
+    # table scannable and puts each reason in one place, where it can be edited
+    # once.
+    legend: dict[str, int] = {}
+
+    def cite(note: str) -> str:
+        if not note:
+            return "**none**"
+        return f"[{legend.setdefault(note, len(legend) + 1)}]"
+
     lines = [
         "# What is on the data volume",
         "",
@@ -169,8 +179,7 @@ def main() -> None:
         values = ", ".join(f"{v:g}" for v in entry["values"]) if entry["values"] else "?"
         count = f"{entry['levels']:,}" if entry["levels"] else "?"
         lines.append(
-            f"| `{entry['path']}` | {count} | {values} | `{entry['fingerprint']}` | {entry['size']} "
-            f"| {entry['note'] or '**no note**'} |"
+            f"| `{entry['path']}` | {count} | {values} | `{entry['fingerprint']}` | {entry['size']} | {cite(entry['note'])} |"
         )
 
     lines += [
@@ -188,12 +197,15 @@ def main() -> None:
     for entry in all_runs:
         values = ", ".join(f"{v:g}" for v in entry["values"]) if entry.get("values") else "?"
         steps = f"{entry['steps']:,}" if entry.get("steps") else "?"
-        note = entry["note"] or "**no note**"
         unexplained += 0 if entry["note"] else 1
         lines.append(
             f"| `{entry['path']}` | {entry.get('objectives') or '?'} | {values} | `{entry.get('levels') or '?'}` | "
-            f"{steps} | {entry['checkpoints']} | {entry['size']} | {note} |"
+            f"{steps} | {entry['checkpoints']} | {entry['size']} | {cite(entry['note'])} |"
         )
+
+    lines += ["", "## Why", ""]
+    for note, number in sorted(legend.items(), key=lambda item: item[1]):
+        lines += [f"**[{number}]** {note}", ""]
 
     if unexplained:
         lines += [

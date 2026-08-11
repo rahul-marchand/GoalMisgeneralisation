@@ -1,0 +1,30 @@
+commit 1e68dd3
+argv   --arms /workspace/data/threeobj2/runs --levels /workspace/data/threeobj2/levels --base /workspace/data/threeobj/runs/base/local-files/cp_70103040 --base-levels /workspace/data/threeobj/levels/base --base-values 1.0 0.65 0.3
+
+               arm                  values  asymmetry   optimal   reached
+              base        (1.0, 0.65, 0.3)       0.00     87.4%    100.0%
+     m_080_085_030        (0.8, 0.85, 0.3)       0.45     76.0%    100.0%
+     m_100_085_010        (1.0, 0.85, 0.1)       0.60     78.5%    100.0%
+     m_120_045_030        (1.2, 0.45, 0.3)       0.60     92.4%    100.0%
+     m_120_045_050        (1.2, 0.45, 0.5)       0.65     92.6%    100.0%
+     m_120_065_010        (1.2, 0.65, 0.1)       0.00     89.8%    100.0%
+            o0_060        (0.6, 0.65, 0.3)       0.25     83.3%    100.0%
+            o0_080        (0.8, 0.65, 0.3)       0.20     84.2%    100.0%
+            o0_120        (1.2, 0.65, 0.3)       0.20     90.5%    100.0%
+            o0_140        (1.4, 0.65, 0.3)       0.40     90.7%    100.0%
+            o1_025        (1.0, 0.25, 0.3)       0.65     93.0%    100.0%
+            o1_045        (1.0, 0.45, 0.3)       0.40     90.1%    100.0%
+            o1_085        (1.0, 0.85, 0.3)       0.40     79.8%    100.0%
+            o1_105        (1.0, 1.05, 0.3)       0.65     71.4%    100.0%
+            o2_005       (1.0, 0.65, 0.05)       0.25     85.6%    100.0%
+            o2_020        (1.0, 0.65, 0.2)       0.10     86.0%    100.0%
+            o2_040        (1.0, 0.65, 0.4)       0.10     89.6%    100.0%
+            o2_055       (1.0, 0.65, 0.55)       0.25     92.6%    100.0%
+
+  optimal against asymmetry: slope -0.061 per unit, r -0.201
+  fitted at asymmetry 0: 88.5%   at 0.4: 86.0%
+
+  A clearly negative slope is the projection account confirmed without touching
+  weight space: the further an arm's task is from something one stored constant
+  can express, the worse it does on it. A flat line says the arms hold the
+  second degree of freedom and the collinear axes are a measurement artefact.

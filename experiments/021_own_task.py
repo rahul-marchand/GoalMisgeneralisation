@@ -33,6 +33,29 @@ Two outcomes, both worth having:
 Asymmetry is computed on values sorted high to low, because feature ids are
 assigned by rank: an arm whose nominal values put objective 1 below objective 2
 still has colour 1 marking the middle-valued objective.
+
+**Asymmetry alone is not enough, and the first run showed why.** How often an
+agent picks the best objective depends overwhelmingly on how far ahead the best
+one is: on the (1.0, 0.65, 0.3) grid, the gap between the top two values
+correlates with the score at r = +0.85, while asymmetry on its own reaches only
+r = -0.20. Near-tied leaders are simply a harder task, whatever the agent holds.
+
+Controlling for that separates them, since the two regressors are nearly
+independent (r = +0.13):
+
+    optimal = 80.7 + 22.7 * top_gap - 9.0 * asymmetry     residual sd 2.6 points
+
+giving a partial correlation of -0.59 for asymmetry. That is the projection
+account supported behaviourally. It is also a covariate chosen after seeing the
+table, on eighteen arms, so it generates the hypothesis rather than confirming
+it.
+
+**Pre-registered prediction, recorded before the (1.0, 0.55, 0.4) grid finishes
+training.** Fitting the same two-regressor model there should give a negative
+asymmetry coefficient, of the same order as -9 points per unit, with top_gap
+again the larger term. A coefficient near zero on that grid refutes the
+projection account, and would mean the collinear axes measured on the first two
+grids are a fact about the measurement rather than about the agent.
 """
 
 from __future__ import annotations

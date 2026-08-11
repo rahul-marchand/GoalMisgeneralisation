@@ -63,6 +63,14 @@ def parse_args() -> argparse.Namespace:
         "instead of reading it. No misgeneralisation can be measured on such a run.",
     )
     parser.add_argument(
+        "--note",
+        type=str,
+        default=None,
+        help="Why this run is being launched, written to NOTE.md beside its checkpoints. "
+        "The configuration is saved anyway; the reason is not, and it is the part that "
+        "cannot be reconstructed later from what is on disk.",
+    )
+    parser.add_argument(
         "--run-dir",
         type=Path,
         default=Path("/workspace/data/runs"),
@@ -98,6 +106,9 @@ def main() -> None:
         overrides["hide_values"] = True
     config = with_final_checkpoint(maze_drc33(**overrides))
     config.base_run_dir = args.run_dir
+    args.run_dir.mkdir(parents=True, exist_ok=True)
+    if args.note:
+        (args.run_dir / "NOTE.md").write_text(args.note.strip() + "\n")
 
     evaluated_at = sorted(e.env.feature_value_correlation for e in config.eval_envs.values() if isinstance(e.env, MazeConfig))
     # Report the resolved configuration, not the raw flags: an unset flag leaves

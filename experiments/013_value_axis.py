@@ -98,6 +98,14 @@ def parse_args() -> argparse.Namespace:
         "wants the schedule it would have had.",
     )
     parser.add_argument("--checkpoints", type=int, default=4, help="Evenly spaced, the last at the final update.")
+    parser.add_argument(
+        "--note",
+        type=str,
+        default=None,
+        help="Why this run is being launched, written to NOTE.md beside its checkpoints. "
+        "The configuration is saved anyway; the reason is not, and it is the part that "
+        "cannot be reconstructed later from what is on disk.",
+    )
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
@@ -212,6 +220,8 @@ def main() -> None:
 
     config.load_path = reset_checkpoint(args.checkpoint, args.run_dir / "init", config)
     config.base_run_dir = args.run_dir
+    if args.note:
+        (args.run_dir / "NOTE.md").write_text(args.note.strip() + "\n")
 
     if os.environ.get("WANDB_MODE") in ("disabled", "offline") or not os.environ.get("WANDB_API_KEY"):
         print("W&B unavailable; logging metrics to CSV instead\n")

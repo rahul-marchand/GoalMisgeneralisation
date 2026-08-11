@@ -31,6 +31,7 @@ since the raw profile mostly reflects where fine-tuning moves weights at all.
 from __future__ import annotations
 
 import argparse
+import itertools
 import re
 import subprocess
 import sys

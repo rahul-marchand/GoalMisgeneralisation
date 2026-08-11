@@ -83,7 +83,7 @@ def named_leaves(params) -> list[tuple[str, np.ndarray]]:
 
 
 def channel_masks(shapes: dict[str, tuple], keep: dict[int, np.ndarray], encoder: bool = False) -> dict[str, np.ndarray]:
-    """One boolean array per parameter, keeping chosen channels of each cell.
+    """One boolean array per parameter, keeping chosen channels of each recurrent layer.
 
     A gate convolution's last axis is ``4 x hidden``, so hidden channel ``c``
     owns indices ``c, 32+c, 64+c, 96+c`` — one per gate. Everything outside the
@@ -191,14 +191,14 @@ def main() -> None:
     variants: dict[str, np.ndarray] = {"full axis": np.ones_like(axis, dtype=bool)}
     cells_only = {cell: order for cell, order in ranking.items()}
     for label, keep, encoder in (
-        ("all cells, all channels", {c: o for c, o in cells_only.items()}, False),
-        ("all cells, top 2 channels", {c: o[:2] for c, o in cells_only.items()}, False),
-        ("cell 0 only, top 2 channels", {0: cells_only[0][:2]}, False),
-        ("cell 1 only, top 2 channels", {1: cells_only[1][:2]}, False),
-        ("cell 2 only, top 2 channels", {2: cells_only[2][:2]}, False),
+        ("all layers, all channels", {c: o for c, o in cells_only.items()}, False),
+        ("all layers, top 2 channels", {c: o[:2] for c, o in cells_only.items()}, False),
+        ("layer 0 only, top 2 channels", {0: cells_only[0][:2]}, False),
+        ("layer 1 only, top 2 channels", {1: cells_only[1][:2]}, False),
+        ("layer 2 only, top 2 channels", {2: cells_only[2][:2]}, False),
         ("encoder only", {}, True),
-        ("encoder + cell 0 top 2", {0: cells_only[0][:2]}, True),
-        ("encoder + all cells top 2", {c: o[:2] for c, o in cells_only.items()}, True),
+        ("encoder + layer 0 top 2", {0: cells_only[0][:2]}, True),
+        ("encoder + all layers top 2", {c: o[:2] for c, o in cells_only.items()}, True),
     ):
         masks = channel_masks(shapes, keep, encoder)
         variants[label] = np.concatenate([masks[name].ravel() for name in names])

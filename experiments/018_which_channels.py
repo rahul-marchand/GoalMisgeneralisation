@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--levels", type=str, required=True)
     parser.add_argument("--objective-values", type=float, nargs="+", required=True)
-    parser.add_argument("--cell", type=int, default=0, help="Which recurrent layer to open up.")
+    parser.add_argument("--cell", type=int, default=0, help="Which recurrent layer to open up (cell_list_N is a layer, not a maze cell).")
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--at", type=int, default=-1)
     parser.add_argument("--top", type=int, default=8)

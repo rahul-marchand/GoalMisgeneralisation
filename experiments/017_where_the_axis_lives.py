@@ -73,7 +73,10 @@ def leaf_paths(params) -> list[tuple[str, tuple]]:
 
 
 def module_of(path: str) -> str:
-    """Group parameters into the pieces the architecture is built from."""
+    """Group parameters into the pieces the architecture is built from.
+
+    ``cell_list_N`` is the Nth ConvLSTM *layer*. Its state is a full spatial map,
+    so the index is depth in the recurrent stack and never a maze position."""
     if (cell := re.search(r"cell_list_(\d+)/([a-z]+)", path)) is not None:
         return f"cell_list_{cell.group(1)}/{cell.group(2)}"
     for name in ("actor_params", "critic_params"):

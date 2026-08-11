@@ -1,0 +1,53 @@
+commit 08bff94
+argv   --base /workspace/data/runs/novalue11/local-files/cp_140206080 --arms /workspace/data/valueaxis/runs --prefix v --base-value 0.5 --rank-from c --rank-base-value 1.0 --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+
+6 arms at offsets [-0.2, -0.1, 0.1, 0.2, 0.3, 0.4]
+
+channels ranked using sweep c (6 arms, independent of the sweep under test), best first:
+  cell_list_0: ch07 ch01 ch23 ch22 ch18 ch05 ch24 ch06
+  cell_list_1: ch28 ch04 ch13 ch23 ch14 ch09 ch30 ch27
+  cell_list_2: ch13 ch22 ch24 ch16 ch05 ch21 ch11 ch29
+
+
+=== can an offset be read back off an arm it never saw? ===
+
+                          kept    params  of axis   implied offsets against the true ones
+                                                    -0.20  -0.10  +0.10  +0.20  +0.30  +0.40   <- true
+                     full axis 1,449,605   100.0%   +0.12  +0.10  +0.11  +0.13  +0.13  +0.12   r +0.47  slope +0.03
+       all cells, all channels   442,368    51.3%   +0.09  +0.07  +0.11  +0.14  +0.16  +0.14   r +0.90  slope +0.14
+     cell 0 only, all channels   147,456    20.6%   +0.06  +0.04  +0.10  +0.14  +0.19  +0.17   r +0.94  slope +0.25
+     all cells, top 8 channels   110,592    15.4%   +0.06  +0.03  +0.10  +0.15  +0.19  +0.18   r +0.94  slope +0.25
+     all cells, top 2 channels    27,648     5.0%   +0.03  -0.00  +0.08  +0.14  +0.21  +0.22   r +0.96  slope +0.39
+   cell 0 only, top 2 channels     9,216     2.8%   -0.01  -0.04  +0.06  +0.14  +0.25  +0.27   r +0.96  slope +0.55
+
+  Every axis here is fitted without the arm it is scoring. Done in-sample this
+  table reproduces the true offsets exactly and means nothing: the axis is a
+  weighted sum of these same arms, each arm's weight is proportional to its own
+  offset, and its own noise dominates its own projection. So it recovers what
+  the estimator put there. Held out, that route is closed.
+
+  A slope of 1 would mean the offset can be read straight off a checkpoint the
+  axis never saw. A slope near 0 with the same number returned for every arm is
+  the failure 014 reported.
+
+
+=== does writing only those channels still move behaviour? ===
+
+                                                 steps
+                               base, untouched     7.7   reached 100.0%
+                              full axis, as is     2.4   reached 100.0%
+                all cells, all channels, as is     4.0   reached 100.0%
+        all cells, all channels, rescaled x1.4     3.2   reached 100.0%
+              cell 0 only, all channels, as is     5.2   reached 100.0%
+      cell 0 only, all channels, rescaled x2.2     3.2   reached 100.0%
+              all cells, top 8 channels, as is     5.6   reached 100.0%
+      all cells, top 8 channels, rescaled x2.6     3.3   reached 100.0%
+              all cells, top 2 channels, as is     6.5   reached 100.0%
+      all cells, top 2 channels, rescaled x4.5     4.2   reached 100.0%
+            cell 0 only, top 2 channels, as is     6.8   reached 100.0%
+    cell 0 only, top 2 channels, rescaled x6.0     5.1   reached 100.0%
+
+  Written at offset +0.40, where the full axis reaches about 2.4 steps
+  and the arm trained there reaches 1.6, against the base's 7.7. 'As is' asks
+  whether these coordinates suffice at their own size; 'rescaled' asks whether
+  the direction inside them is right once the lost magnitude is put back.

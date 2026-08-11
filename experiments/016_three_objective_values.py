@@ -59,6 +59,9 @@ from goalmisgen.analysis.weights import cosine, fit_axis_and_drift
 from goalmisgen.configs.env import MazeConfig
 
 BASE_VALUES = (1.0, 0.65, 0.3)
+"""What the base agent was trained at. Overridden by --base-values, since the
+grid was rerun on (1.0, 0.55, 0.4) and a hardcoded triple would silently
+mislabel every arm's offset."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -72,7 +75,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--at", type=int, default=-1)
     parser.add_argument("--skip-behaviour", action="store_true")
-    return parser.parse_args()
+    parser.add_argument("--base-values", type=float, nargs="+", default=None, help="What the base agent was trained at.")
+    args = parser.parse_args()
+    if args.base_values:
+        global BASE_VALUES
+        BASE_VALUES = tuple(args.base_values)
+    return args
 
 
 def eval_config(args: argparse.Namespace) -> MazeConfig:

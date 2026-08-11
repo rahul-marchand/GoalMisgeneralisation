@@ -1,4 +1,37 @@
-# The value-axis line: what was asked, what came back
+# Experiments
+
+Runnable scripts, numbered in the order they were written. Each is standalone and
+prints its own reasoning; the docstring at the top of a file says what question
+it asks and what would refute it.
+
+| script | asks |
+|---|---|
+| `001_maze_repro.py` | Trains a DRC agent on multi-objective mazes. Every base agent came from here. |
+| `002_measure_proxy.py` | How much does the agent follow colour rather than value, swept across correlations? |
+| `003_probe_plan.py` | Is the route the agent will walk already linearly decodable before it moves? |
+| `005_outcome_keyed_distance.py` | Are distances represented, keyed by which outcome they belong to? |
+| `006_psychometric.py` | What exchange rate between value and distance did the agent actually learn? |
+| `007_steer_distance.py` | Does writing a distance into the state move the decision? |
+| `008_steer_at_the_head.py` | The same, at the readout rather than in the recurrence. |
+| `009_value_representation.py` | Has an objective's value travelled to where the decision is made? |
+| `010_choice_direction.py` | Does a direction built from the agent's own choices steer it? |
+| `011_target_probe.py` | Is the objective it will take already decided before it moves? |
+| `012_rewrite_the_plan.py` | Write a whole alternative route into the cell state; does it walk it? |
+| `013_value_axis.py` | Fine-tune onto a new objective value, and keep the weight change. |
+| `014_value_axis_analysis.py` | Do those changes share a direction, and can it be written to? |
+| `015_value_or_gap.py` | Is the knob a value, or the gap between two values? |
+| `016_three_objective_values.py` | With three objectives, does moving two values equal the sum of moving each? |
+| `017_where_the_axis_lives.py` | How much of a fine-tune is shared, and where does the axis sit? |
+| `018_which_channels.py` | Which gates and channels, and do two independent sweeps agree? |
+| `019_restrict_the_axis.py` | Keep only the enriched channels — what still reads, what still writes? |
+| `020_are_they_value_channels.py` | Do those channels carry the decision in the agent's own activations? |
+
+`004` does not exist; the numbering has a gap rather than a renumbering, so
+references in older results files still resolve.
+
+---
+
+## The value-axis line: what was asked, what came back
 
 A record of the questions in the order they were asked, because each one exists
 only because of how the previous one turned out, and that chain is not
@@ -8,7 +41,7 @@ recoverable from the code. `results/README.md` says what each output file is;
 Mistakes are included. Three of the results below were wrong the first time and
 the reasons are more useful than the corrections.
 
-## The question underneath
+### The question underneath
 
 Do agents develop modular goal representations — something like a value per
 objective, separable from the machinery that compares them — without being
@@ -22,7 +55,7 @@ That also makes it unprobeable in the usual way. With constants there is no
 per-episode value to regress against, so the correlational toolkit is
 unavailable by construction.
 
-## 013, 014 — manufacture the variance, fit an axis
+### 013, 014 — manufacture the variance, fit an axis
 
 **Question.** Is there a direction in weight space that sets what an objective is
 worth?
@@ -48,7 +81,7 @@ moved 14.41. Forcing through zero did not remove the shared component, it
 absorbed it, and the axis then read back the same offset for every arm. Fitting
 an intercept fixed it. `tests/test_weights.py` builds that exact situation.
 
-## 015 — is it a value, or the gap?
+### 015 — is it a value, or the gap?
 
 **Question.** With two objectives the choice turns on a single difference, so "the
 agent holds what colour 1 is worth" and "the agent holds a threshold on the
@@ -68,7 +101,7 @@ argued that no behavioural test can separate them. The flag is kept, with its
 docstring corrected, as the record of a test that does not do what it was built
 to do.
 
-## 016 and the three-objective grid — composition
+### 016 and the three-objective grid — composition
 
 **Question.** Three objectives make the choice depend on two independent
 differences, so one scalar is not enough. Does moving two values equal the sum of
@@ -89,7 +122,7 @@ task. Composition is not forced, which is why it is the test.
 Every weight-space number in that run is uninformative: reliability came out at
 0.04 to 0.09. The grid was rerun wide (`threeobj2`) with doubled offsets.
 
-## 017, 018 — what is moving, and where
+### 017, 018 — what is moving, and where
 
 **Every arm moves the same distance whatever it learned**: 14.74 with a spread of
 0.36, the null arm included at 14.41. The size of a fine-tune is set by the
@@ -120,7 +153,7 @@ two-objective task, where one scalar suffices.
 ceiling built from three-arm fits, which understates the ceiling and inflates the
 correction. Matching the arm counts is what turned −1.7 into −1.00.
 
-## 019 — keep only the enriched channels
+### 019 — keep only the enriched channels
 
 **Reading improves, writing degrades, monotonically, in the same table.**
 
@@ -145,7 +178,7 @@ arms being projected, each weighted by its own offset, so each arm's own noise
 dominates its own projection and the offsets come back because the estimator put
 them there. Held out, the full axis is flat.
 
-## 020 — are they value channels?
+### 020 — are they value channels?
 
 **No.** Three tests, none using a fitted axis:
 
@@ -171,7 +204,7 @@ inside a step can rebuild whatever was zeroed. A null here shows no small channe
 set is necessary *at that granularity*. Separating "distributed" from
 "recomputed within the step" needs an intervention inside the tick loop.
 
-## A practical finding about the method
+### A practical finding about the method
 
 **Shorter fine-tunes give a cleaner axis.** Split-half reliability falls
 monotonically with arm length — 0.228 at 750k steps, 0.177 at 1.5M, 0.160 at
@@ -184,7 +217,7 @@ offsets buys more than adding arms — `Σ` grows with the square of the offset 
 only linearly with the count — but it is bounded by nonlinearity, which shows up
 as composition degrading at ±0.2 and extrapolation failing outside the grid.
 
-## Open
+### Open
 
 - **Everything here is one agent, one seed.** The most valuable remaining
   experiment is a second base agent at a different seed — not to transfer the

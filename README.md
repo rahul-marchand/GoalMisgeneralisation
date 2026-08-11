@@ -10,11 +10,10 @@ behaviour.
 
 | Path | Contents |
 |---|---|
-| `EXPERIMENTS.md` | The chain of questions behind the value-axis work, and what came back |
 | `MANIFEST.md` | Every dataset and trained agent on the data volume, generated from `RUNS.toml` |
 | `RUNS.toml` | Why each of those exists — the part a saved config cannot recover |
 | `goalmisgen/` | The maze environment, training configs, and analysis code |
-| `experiments/` | Runnable experiment scripts |
+| `experiments/` | Runnable experiment scripts, and the chain of questions behind them |
 | `tests/` | Unit and integration tests |
 | `third_party/train-learned-planner` | far.ai's JAX/cleanba DRC training stack, as a pinned submodule |
 

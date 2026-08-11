@@ -107,6 +107,17 @@ def fit(offsets, arms, base, which: str):
     return axis.reshape(shape), drift.reshape(shape)
 
 
+def enrichment(axis: np.ndarray, drift: np.ndarray, split) -> np.ndarray:
+    """Per-part share of the axis over the same part's share of the shared component.
+
+    Divided through by the two directions' overall lengths, so 1.0 means "this
+    part moves for the value exactly as much as it moves for nothing in
+    particular". Without that division the numbers carry the ratio of the axis's
+    length to the drift's — around ten here — and every part looks enriched.
+    """
+    return (split(axis) / split(axis).sum()) / (split(drift) / split(drift).sum())
+
+
 def by_gate(kernel: np.ndarray) -> np.ndarray:
     """Squared length per gate, summing over space and inputs."""
     per_output = (kernel**2).sum(axis=tuple(range(kernel.ndim - 1)))
@@ -155,40 +166,50 @@ def main() -> None:
         channels = {}
         for prefix, (offsets, arms) in sweeps.items():
             axis, drift = fit(offsets, arms, base, which)
-            enrichment = by_gate(axis) / by_gate(drift)
-            print(f"  {prefix:>8}" + "".join(f"{e:>13.2f}" for e in enrichment))
-            channels[prefix] = by_channel(axis) / by_channel(drift)
+            print(f"  {prefix:>8}" + "".join(f"{e:>13.2f}" for e in enrichment(axis, drift, by_gate)))
+            channels[prefix] = enrichment(axis, drift, by_channel)
         print(
             "\n  Enrichment over the shared fine-tuning component: 1.0 means this gate moves\n"
             "  for the value exactly as much as it moves for nothing in particular."
         )
 
         print(f"\n=== cell_list_{args.cell}/{which}: which of the 32 hidden channels? ===\n")
-        for prefix, enrichment in channels.items():
-            order = np.argsort(enrichment)[::-1][: args.top]
-            print(f"  {prefix:>8} top {args.top}: " + "  ".join(f"ch{c:02d}({enrichment[c]:.2f})" for c in order))
+        for prefix, values in channels.items():
+            order = np.argsort(values)[::-1][: args.top]
+            print(f"  {prefix:>8} top {args.top}: " + "  ".join(f"ch{c:02d}({values[c]:.2f})" for c in order))
+            print(f"  {'':>8} spread:  min {values.min():.2f}  median {np.median(values):.2f}  max {values.max():.2f}")
 
         if len(channels) == 2:
             (first, a), (second, b) = channels.items()
             overlap = len(set(np.argsort(a)[::-1][: args.top]) & set(np.argsort(b)[::-1][: args.top]))
             chance = args.top * args.top / len(a)
-            print(f"\n  profile correlation between sweeps {first!r} and {second!r}: {np.corrcoef(a, b)[0, 1]:+.3f}")
-            print(f"  top-{args.top} overlap: {overlap} of {args.top}, against {chance:.1f} expected by chance")
+            print(f"\n  top-{args.top} overlap between sweeps: {overlap} of {args.top}, against {chance:.1f} by chance")
 
-        # The ceiling: split one sweep and correlate its halves, where the
-        # underlying direction is identical by construction. Cross-sweep
-        # agreement means nothing except relative to this.
-        prefix, (offsets, arms) = next(iter(sweeps.items()))
-        order = np.argsort(offsets)
-        halves = [order[0::2], order[1::2]]
-        if all(len(h) >= 3 for h in halves):
-            profiles = []
-            for half in halves:
-                axis, drift = fit(offsets[half], [arms[i] for i in half], base, which)
-                profiles.append(by_channel(axis) / by_channel(drift))
-            print(f"  within-sweep ceiling ({prefix!r}, halves): {np.corrcoef(*profiles)[0, 1]:+.3f}")
-        else:
-            print(f"  within-sweep ceiling: {prefix!r} has too few arms to split")
+        # Agreement has to be read against how well a profile replicates at all,
+        # and that comparison has to be like for like. Correlating two six-arm
+        # fits against a ceiling measured from three-arm fits understates the
+        # ceiling and flatters the result, so every number here uses three arms.
+        print("\n  profile correlations, every fit from three arms:\n")
+        halves = {}
+        for prefix, (offsets, arms) in sweeps.items():
+            order = np.argsort(offsets)
+            for label, index in (("a", order[0::2]), ("b", order[1::2])):
+                if len(index) >= 3:
+                    axis, drift = fit(offsets[index], [arms[i] for i in index], base, which)
+                    halves[f"{prefix}{label}"] = enrichment(axis, drift, by_channel)
+        names = sorted(halves)
+        for i, first in enumerate(names):
+            for second in names[i + 1 :]:
+                kind = "within sweep" if first[0] == second[0] else "ACROSS sweeps"
+                print(f"    {first} vs {second}   {np.corrcoef(halves[first], halves[second])[0, 1]:+.3f}   {kind}")
+        if len(channels) == 2:
+            (first, a), (second, b) = channels.items()
+            print(f"\n    full fits, six arms each: {first} vs {second}   {np.corrcoef(a, b)[0, 1]:+.3f}   ACROSS sweeps")
+        print(
+            "\n  Across-sweep agreement matching within-sweep agreement means the two sweeps\n"
+            "  pick the same channels as well as the method can resolve. Falling short of it\n"
+            "  means they do not."
+        )
 
     print(
         "\n\nA handful of channels carrying the axis in both sweeps would be the first thing\n"

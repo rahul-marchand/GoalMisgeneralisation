@@ -60,7 +60,7 @@ from goalmisgen.configs.writers import CsvWriter
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("checkpoint", type=Path, help="The trained agent to fine-tune from.")
-    parser.add_argument("--value", type=float, required=True, help="What colour 1 is worth.")
+    parser.add_argument("--value", type=float, default=None, help="What colour 1 is worth.")
     parser.add_argument(
         "--value-zero",
         type=float,
@@ -100,7 +100,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoints", type=int, default=4, help="Evenly spaced, the last at the final update.")
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=1234)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.objective_values is None and args.value is None:
+        parser.error("give either --value, or --objective-values for more than two objectives")
+    if args.objective_values is not None and len(args.objective_values) < 2:
+        parser.error(f"--objective-values needs one value per objective, got {args.objective_values}")
+    return args
 
 
 def finetune_config(args: argparse.Namespace) -> Args:

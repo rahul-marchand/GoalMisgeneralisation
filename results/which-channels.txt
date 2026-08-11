@@ -1,0 +1,79 @@
+commit b155540
+argv   --base /workspace/data/runs/novalue11/local-files/cp_140206080 --arms /workspace/data/valueaxis/runs --sweep v 0.5 --sweep c 1.0 --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+
+cell_list_0: hh (3, 3, 32, 128), ih (3, 3, 96, 128)
+  sweep 'v': 6 arms at offsets [-0.2, -0.1, 0.1, 0.2, 0.3, 0.4]
+  sweep 'c': 6 arms at offsets [-0.4, -0.3, -0.2, -0.1, 0.1, 0.2]
+
+
+=== cell_list_0/ih: which gates? ===
+
+     sweep        input    candidate       forget       output
+         v         1.02         1.06         0.93         0.96
+         c         1.03         1.00         0.92         1.00
+
+  Enrichment over the shared fine-tuning component: 1.0 means this gate moves
+  for the value exactly as much as it moves for nothing in particular.
+
+=== cell_list_0/ih: which of the 32 hidden channels? ===
+
+         v top 8: ch07(2.29)  ch01(2.21)  ch12(1.31)  ch23(1.29)  ch18(1.26)  ch06(1.23)  ch22(1.15)  ch05(1.11)
+           spread:  min 0.60  median 0.89  max 2.29
+         c top 8: ch07(2.12)  ch01(2.10)  ch23(1.30)  ch22(1.23)  ch18(1.20)  ch05(1.19)  ch24(1.17)  ch06(1.16)
+           spread:  min 0.64  median 0.89  max 2.12
+
+  top-8 overlap between sweeps: 7 of 8, against 2.0 by chance
+
+  profile correlations, every fit from three arms:
+
+    ca vs cb   +0.860   within sweep
+    ca vs va   +0.862   ACROSS sweeps
+    ca vs vb   +0.942   ACROSS sweeps
+    cb vs va   +0.811   ACROSS sweeps
+    cb vs vb   +0.865   ACROSS sweeps
+    va vs vb   +0.830   within sweep
+
+    full fits, six arms each: v vs c   +0.966   ACROSS sweeps
+
+  Across-sweep agreement matching within-sweep agreement means the two sweeps
+  pick the same channels as well as the method can resolve. Falling short of it
+  means they do not.
+
+
+=== cell_list_0/hh: which gates? ===
+
+     sweep        input    candidate       forget       output
+         v         1.01         1.03         0.96         0.99
+         c         0.98         1.03         0.99         0.99
+
+  Enrichment over the shared fine-tuning component: 1.0 means this gate moves
+  for the value exactly as much as it moves for nothing in particular.
+
+=== cell_list_0/hh: which of the 32 hidden channels? ===
+
+         v top 8: ch07(2.11)  ch01(1.77)  ch05(1.54)  ch12(1.32)  ch18(1.20)  ch22(1.17)  ch24(1.17)  ch28(1.14)
+           spread:  min 0.56  median 0.92  max 2.11
+         c top 8: ch07(2.00)  ch01(1.88)  ch05(1.58)  ch12(1.49)  ch18(1.26)  ch06(1.22)  ch28(1.09)  ch14(1.01)
+           spread:  min 0.67  median 0.88  max 2.00
+
+  top-8 overlap between sweeps: 6 of 8, against 2.0 by chance
+
+  profile correlations, every fit from three arms:
+
+    ca vs cb   +0.817   within sweep
+    ca vs va   +0.792   ACROSS sweeps
+    ca vs vb   +0.861   ACROSS sweeps
+    cb vs va   +0.812   ACROSS sweeps
+    cb vs vb   +0.770   ACROSS sweeps
+    va vs vb   +0.766   within sweep
+
+    full fits, six arms each: v vs c   +0.937   ACROSS sweeps
+
+  Across-sweep agreement matching within-sweep agreement means the two sweeps
+  pick the same channels as well as the method can resolve. Falling short of it
+  means they do not.
+
+
+A handful of channels carrying the axis in both sweeps would be the first thing
+here deserving the word circuit. Concentration in one sweep alone would not be:
+a fitted axis is mostly sampling error, and noise concentrates by chance.

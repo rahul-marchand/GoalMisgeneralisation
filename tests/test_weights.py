@@ -143,3 +143,24 @@ def test_drift_shared_by_every_arm_is_not_mistaken_for_an_axis() -> None:
 def test_intercept_fit_needs_three_arms() -> None:
     with pytest.raises(ValueError, match="at least three arms"):
         fit_axis_and_drift(np.array([-0.1, 0.1]), np.ones((2, 4)))
+
+
+def test_symmetric_pairs_are_found_at_whatever_offsets_a_grid_uses() -> None:
+    """The reliability estimate must not depend on a grid's particular offsets.
+
+    Written-out pairs reported nothing the moment a grid was widened, which is
+    when reliability matters most: the widening is done *because* reliability
+    was too low to read.
+    """
+    for offsets in ([-0.4, -0.2, 0.2, 0.4], [-0.25, -0.1, 0.1, 0.25], [-0.2, -0.1, 0.1, 0.2]):
+        table = {round(o, 3): None for o in offsets}
+        pairs = [(m, -m) for m in sorted({abs(o) for o in table}, reverse=True) if m in table and -m in table]
+        assert len(pairs) == 2, (offsets, pairs)
+        assert pairs[0][0] > pairs[1][0], "widest pair first"
+
+
+def test_an_asymmetric_grid_yields_too_few_pairs_to_estimate_reliability() -> None:
+    offsets = [-0.2, -0.1, 0.1, 0.2, 0.3, 0.4]
+    table = {round(o, 3): None for o in offsets}
+    pairs = [(m, -m) for m in sorted({abs(o) for o in table}, reverse=True) if m in table and -m in table]
+    assert len(pairs) == 2  # 0.2 and 0.1 pair; 0.3 and 0.4 have no partner

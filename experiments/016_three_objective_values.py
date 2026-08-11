@@ -182,11 +182,18 @@ def main() -> None:
         # Two disjoint symmetric pairs, each giving an axis by finite difference.
         # Independent estimates of the same thing, so their cosine says how much
         # of the fitted axis is signal rather than fine-tuning noise.
-        table = {round(o, 2): d for o, d in rows}
-        pairs = [(0.2, -0.2), (0.1, -0.1)]
-        if all(hi in table and lo in table for hi, lo in pairs):
-            estimates = [(table[hi] - table[lo]) / (hi - lo) for hi, lo in pairs]
+        #
+        # The pairs are found rather than assumed. They were once written out as
+        # (0.2, -0.2) and (0.1, -0.1), which silently reported nothing at all the
+        # moment a grid used different offsets -- and a grid gets widened exactly
+        # when reliability is the thing under investigation.
+        table = {round(o, 3): d for o, d in rows}
+        pairs = [(m, -m) for m in sorted({abs(o) for o in table}, reverse=True) if m in table and -m in table]
+        if len(pairs) >= 2:
+            estimates = [(table[hi] - table[lo]) / (hi - lo) for hi, lo in pairs[:2]]
             reliability[index] = cosine(*estimates)
+        else:
+            print(f"  objective {index}: {len(pairs)} symmetric pair(s), need two to estimate reliability")
 
     if len(axes) < 3:
         sys.exit("\nNeed an axis for every objective before any of this means anything.")

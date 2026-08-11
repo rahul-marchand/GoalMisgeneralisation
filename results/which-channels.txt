@@ -1,4 +1,4 @@
-commit b155540
+commit f752073
 argv   --base /workspace/data/runs/novalue11/local-files/cp_140206080 --arms /workspace/data/valueaxis/runs --sweep v 0.5 --sweep c 1.0 --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
 
 cell_list_0: hh (3, 3, 32, 128), ih (3, 3, 96, 128)
@@ -72,6 +72,30 @@ cell_list_0: hh (3, 3, 32, 128), ih (3, 3, 96, 128)
   Across-sweep agreement matching within-sweep agreement means the two sweeps
   pick the same channels as well as the method can resolve. Falling short of it
   means they do not.
+
+
+=== do the two sweeps move those channels the same way? ===
+
+  cell_list_0/ih
+        channels   params  across 6v6  across 3v3  within 3v3  corrected
+           top 2    6,912      -0.776      -0.616       0.605     -1.018
+           top 4   13,824      -0.728      -0.552       0.534     -1.034
+           top 8   27,648      -0.669      -0.485       0.474     -1.023
+          top 16   55,296      -0.585      -0.400       0.400     -1.000
+          all 32  110,592      -0.504      -0.328       0.330     -0.994
+  cell_list_0/hh
+        channels   params  across 6v6  across 3v3  within 3v3  corrected
+           top 2    2,304      -0.662      -0.473       0.444     -1.064
+           top 4    4,608      -0.640      -0.450       0.431     -1.045
+           top 8    9,216      -0.566      -0.382       0.375     -1.021
+          top 16   18,432      -0.483      -0.307       0.302     -1.017
+          all 32   36,864      -0.412      -0.251       0.246     -1.018
+
+  'v' moves one objective's value and 'c' moves another's. If the
+  agent holds a single knob -- the gap, or a threshold on it -- raising one value
+  and raising the other must move the weights oppositely, so the corrected cosine
+  belongs near -1. Two separate registers put it near 0. The ceiling is two
+  half-fits of the same sweep, where the answer is +1 by construction.
 
 
 A handful of channels carrying the axis in both sweeps would be the first thing

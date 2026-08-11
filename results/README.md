@@ -91,3 +91,30 @@ signal-to-noise was to be expected before the shorter arms are even counted.
 
 The base agent is `cp_70103040` rather than the 80M steps it trained for; see
 the note in `goalmisgen/configs/presets.py` on `with_final_checkpoint`.
+
+## Where the axis lives, and how many knobs there are
+
+`experiments/017` and `018` describe the two-objective axis rather than testing
+it. Two results from `018` are worth carrying forward.
+
+Channels differ, mildly and repeatably. The axis is enriched about 2.2x in
+channels 7 and 1 of `cell_list_0`, with a secondary set around 1.2 to 1.5 and a
+median channel below 1. Gates show nothing at all: input, candidate, forget and
+output all sit between 0.92 and 1.06. The channel preference replicates across
+the colour-0 and colour-1 sweeps as well as two halves of a single sweep
+replicate each other, so it is structure rather than sampling error.
+
+The signed comparison settles what `015` left open. Restricted to the channels
+that carry the axis, and with both sides fitted from the same number of arms,
+the cosine between the two sweeps' axes is -1.00 within a few per cent, at every
+subset of channels and in both gate convolutions. Raising one objective's value
+and raising the other's move the same weights in exactly opposite directions, so
+this agent holds one knob and not two value registers: what the axis writes to
+is the gap, or equivalently a threshold on the difference in distances.
+
+That is the expected answer for a two-objective task, where the choice turns on
+a single difference and one scalar suffices. It also gives the three-objective
+grid a quantitative prediction. Three axes constrained to hold only differences
+sum to zero, which for symmetric axes puts every pairwise cosine at -0.5; three
+absolute registers put them near 0; one shared knob puts them at -1, where the
+two-objective agent sits.

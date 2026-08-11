@@ -204,17 +204,25 @@ def main() -> None:
             a, _ = fit_axis_and_drift(offsets[keep][half], flat[keep][half])
             half_profiles.append(profile({p: v for p, v in zip(keys, np.split(a, np.cumsum([base[k].size for k in keys])[:-1]))}))
 
-    print(f"  {'module':>26}{'params':>10}{'axis':>9}{'shared':>9}{'axis/params':>13}" + ("{:>16}".format("halves agree") if len(half_profiles) == 2 else ""))
+    print(f"  {'module':>26}{'params':>10}{'axis':>9}{'shared':>9}{'vs params':>11}{'vs shared':>11}" + ("{:>16}".format("halves agree") if len(half_profiles) == 2 else ""))
     for name in sorted(axis_profile, key=lambda n: -axis_profile[n]):
         share = sizes[name] / total_params
-        row = f"  {name:>26}{sizes[name]:>10,}{axis_profile[name]:>9.1%}{drift_profile.get(name, 0):>9.1%}{axis_profile[name] / share:>13.2f}"
+        common = drift_profile.get(name, 0)
+        enrichment = axis_profile[name] / common if common > 0 else float("nan")
+        row = (
+            f"  {name:>26}{sizes[name]:>10,}{axis_profile[name]:>9.1%}{common:>9.1%}"
+            f"{axis_profile[name] / share:>11.2f}{enrichment:>11.2f}"
+        )
         if len(half_profiles) == 2:
             row += f"{half_profiles[0].get(name, 0):>7.1%}{half_profiles[1].get(name, 0):>9.1%}"
         print(row)
     print(
-        "\n  axis/params above 1 means a module carries more of the axis than its share of\n"
-        "  the parameters. The two half-fits are independent estimates of the same\n"
-        "  profile: where they disagree, the number is sampling error, not structure."
+        "\n  'vs params' above 1 means a module carries more of the axis than its share of\n"
+        "  the parameters. 'vs shared' is the one that isolates the value: it compares the\n"
+        "  axis against where fine-tuning moves weights anyway, so 1.0 means this module\n"
+        "  moves for the value exactly as much as it moves for nothing in particular.\n"
+        "  The two half-fits are independent estimates of the same profile: where they\n"
+        "  disagree, the number is sampling error rather than structure."
     )
     if len(half_profiles) == 2:
         names_sorted = sorted(axis_profile)

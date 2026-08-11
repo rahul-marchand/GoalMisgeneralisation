@@ -211,6 +211,45 @@ def main() -> None:
             "  means they do not."
         )
 
+    # Everything above is sign-blind: it says where the two sweeps put their
+    # length, not whether they move it the same way. The signed cosine asks that
+    # directly, and restricting it to the channels that carry the axis is what
+    # makes it answerable -- the global version drowns, because most of the
+    # network is carrying arm-specific movement that behaviour never sees.
+    if len(sweeps) == 2:
+        print("\n\n=== do the two sweeps move those channels the same way? ===\n")
+        (first, (offsets_a, arms_a)), (second, (offsets_b, arms_b)) = sweeps.items()
+        for which in ("ih", "hh"):
+            axis_a, drift_a = fit(offsets_a, arms_a, base, which)
+            axis_b, drift_b = fit(offsets_b, arms_b, base, which)
+            ranking = np.argsort(enrichment(axis_a, drift_a, by_channel))[::-1]
+
+            order = np.argsort(offsets_a)
+            halves = [order[0::2], order[1::2]]
+            ceiling_axes = [fit(offsets_a[h], [arms_a[i] for i in h], base, which)[0] for h in halves if len(h) >= 3]
+
+            print(f"  cell_list_{args.cell}/{which}")
+            print(f"    {'channels kept':>18}{'params':>10}{'cos across':>13}{'ceiling':>10}{'corrected':>12}")
+            for keep in (2, 4, 8, 16, len(ranking)):
+                picked = ranking[:keep]
+                take = lambda k: np.concatenate([k.reshape(*k.shape[:-1], 4, -1)[..., :, c].ravel() for c in picked])
+                across = float(np.dot(take(axis_a), take(axis_b)) / (np.linalg.norm(take(axis_a)) * np.linalg.norm(take(axis_b))))
+                label = f"top {keep}" if keep < len(ranking) else "all 32"
+                if len(ceiling_axes) == 2:
+                    x, y = take(ceiling_axes[0]), take(ceiling_axes[1])
+                    ceiling = float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y)))
+                    corrected = across / ceiling if ceiling > 0 else float("nan")
+                    print(f"    {label:>18}{take(axis_a).size:>10,}{across:>13.3f}{ceiling:>10.3f}{corrected:>12.3f}")
+                else:
+                    print(f"    {label:>18}{take(axis_a).size:>10,}{across:>13.3f}{'—':>10}{'—':>12}")
+        print(
+            f"\n  {first!r} moves one objective's value and {second!r} moves another's. If the\n"
+            "  agent holds a single knob -- the gap, or a threshold on it -- raising one value\n"
+            "  and raising the other must move the weights oppositely, so the corrected cosine\n"
+            "  belongs near -1. Two separate registers put it near 0. The ceiling is two\n"
+            "  half-fits of the same sweep, where the answer is +1 by construction."
+        )
+
     print(
         "\n\nA handful of channels carrying the axis in both sweeps would be the first thing\n"
         "here deserving the word circuit. Concentration in one sweep alone would not be:\n"

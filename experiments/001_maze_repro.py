@@ -26,7 +26,7 @@ import cleanba.cleanba_impala
 from cleanba.cleanba_impala import WandbWriter, train
 
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.configs.presets import maze_drc33
+from goalmisgen.configs.presets import maze_drc33, with_final_checkpoint
 from goalmisgen.configs.writers import CsvWriter
 
 
@@ -96,7 +96,7 @@ def main() -> None:
         overrides["randomise_values"] = True
     if args.hide_values:
         overrides["hide_values"] = True
-    config = maze_drc33(**overrides)
+    config = with_final_checkpoint(maze_drc33(**overrides))
     config.base_run_dir = args.run_dir
 
     evaluated_at = sorted(e.env.feature_value_correlation for e in config.eval_envs.values() if isinstance(e.env, MazeConfig))

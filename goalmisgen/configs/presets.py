@@ -143,6 +143,25 @@ def maze_drc33(
     return out
 
 
+def with_final_checkpoint(config: Args) -> Args:
+    """Make sure the weights a run ends on are actually written to disk.
+
+    Checkpoints are saved when ``learner_policy_version`` lands in
+    ``eval_at_steps``, and that set is inherited from ``boxworld_drc33``, whose
+    entries were chosen for a two-billion-step budget. At our budgets it is
+    sparse near the end: an 80M-step run stops at update 15,625 while the set
+    jumps from 13,692 to 19,560, so the last 10M steps trained an agent that was
+    then thrown away.
+
+    Nothing downstream noticed, because taking the newest checkpoint still gives
+    a coherent agent — just not the one the run ended on. Adding the final update
+    costs one more save and removes the surprise.
+    """
+    batch = int(config.local_num_envs * config.num_steps * config.num_actor_threads * len(config.actor_device_ids))
+    config.eval_at_steps = frozenset(config.eval_at_steps | {config.total_timesteps // batch})
+    return config
+
+
 def maze_smoke_test() -> Args:
     """Tiny configuration that trains on CPU in seconds.
 

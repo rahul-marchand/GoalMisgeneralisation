@@ -449,3 +449,30 @@ def test_the_csv_writer_survives_concurrent_logging(tmp_path):
     writer.flush()
     reloaded = pd.read_csv(writer.csv_path, index_col=0)
     assert len(reloaded) > 0, "the frame must survive in a readable state"
+
+
+def test_a_run_saves_the_weights_it_ends_on():
+    """The inherited eval_at_steps is sparse near the end of our budgets.
+
+    An 80M-step run stops at update 15,625 while the inherited set jumps from
+    13,692 to 19,560, so the final 10M steps produced no checkpoint and the
+    agent that was actually studied was the one from 70M. Nothing failed --
+    taking the newest checkpoint still gives a coherent agent -- which is why
+    this needs a test rather than a comment.
+    """
+    from goalmisgen.configs.presets import with_final_checkpoint
+
+    config = maze_drc33(total_timesteps=80_000_000, min_size=11, max_size=11)
+    batch = config.local_num_envs * config.num_steps * config.num_actor_threads * len(config.actor_device_ids)
+    final = config.total_timesteps // batch
+
+    assert final not in config.eval_at_steps, "the gap this guards against has gone; simplify"
+    assert final in with_final_checkpoint(config).eval_at_steps
+
+
+def test_adding_the_final_checkpoint_keeps_the_earlier_ones():
+    from goalmisgen.configs.presets import with_final_checkpoint
+
+    config = maze_drc33(total_timesteps=80_000_000)
+    before = set(config.eval_at_steps)
+    assert before <= set(with_final_checkpoint(config).eval_at_steps)

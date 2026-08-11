@@ -58,6 +58,27 @@ episode for a probe to read.
 """
 
 [[entry]]
+match = "runs/novalue11_seed*"
+note = """
+A second seed of novalue11, identical in every respect but the seed. Every
+value-axis result rests on one agent, so until this exists none of them can
+distinguish "DRC agents do this" from "this agent does this" -- and every
+question about training dynamics is a claim about typical trajectories, which
+one run cannot support. Compare at cp_140206080, which both runs save.
+"""
+
+[[entry]]
+match = "threeobj_v2/*"
+note = """
+The three-objective experiment on values (1.0, 0.55, 0.4), run on a separate
+pod. Gaps of 0.45 and 0.15 give thresholds of 9 and 3 steps against rank gaps of
+1 and 1, so no single stored constant can generate them and two must be held --
+unlike (1.0, 0.65, 0.3), whose even spacing let one number solve the task and
+produced three collinear axes. Arms are 750k steps, since reliability falls
+monotonically with arm length.
+"""
+
+[[entry]]
 match = "runs/archive/*"
 note = """
 Early debugging runs from 2026-08-03, kept for provenance. Nothing downstream

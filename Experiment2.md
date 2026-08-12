@@ -32,7 +32,7 @@ Trained in the maze with the following inputs
 
 ![](figures/fig9_no_value_task.png)
 
-*Figure 1: what the agent sees. Four channels passed in walls, the agent, and one per
+Figure 1: what the agent sees. Four channels passed in walls, the agent, and one per
 objective. In the rendered maze on the left,
 blue is the agent, red is colour 0 at 11 steps away and green is colour 1 at 4.
 In this case colour 0 is worth the walk.
@@ -69,8 +69,17 @@ Splitting each arm by squared magnitude, as a share of $\lVert\Delta\theta\rVert
 | $o_i$ | drift | axis | $\varepsilon$ | cross |
 |---|---|---|---|---|
 | −0.2 | 37% | 15% | 35% | +13% |
+| −0.1 | 38% | 4% | 50% | +8% |
+| +0.1 | 39% | 4% | 66% | −8% |
 | +0.2 | 38% | 15% | 62% | −14% |
+| +0.3 | 36% | 33% | 51% | −20% |
 | +0.4 | 33% | 54% | 37% | −24% |
+| 0.0, null arm | 38% | 0% | 95% | −33% |
+
+Six arms are fitted. The null arm is held out of the fit — it is the drift
+measurement, so letting it into the fit would be circular — and its row is
+therefore out of sample, which is why its $\varepsilon$ swallows almost
+everything.
 
 $\lVert\mathrm{drift}\rVert = 8.9$ and is near-identical across arms;
 $\lVert\mathrm{axis}\rVert = 28.5$ per unit of value, so the axis part of an
@@ -89,14 +98,12 @@ column. It is linear in $o_i$, so it flips sign with the offset and cancels
 across a balanced grid; the fitted axis is unaffected. $\varepsilon$ is
 orthogonal to both to within $\pm 0.02$.
 
-$\varepsilon$ never becomes small. Even at the widest offset, where
-the axis is finally the majority of the movement, better than a third of that
-arm is still noise. One arm cannot show you the axis.
+$\varepsilon$ never becomes small.
 
 Seed 5678's arms ran 750k steps rather than 3M and everything is smaller:
 $\lVert\Delta\theta\rVert \approx 7$, drift $3.9$, axis $16.4$. Shorter fine-tunes are cleaner: split-half
 reliability 0.27–0.29 against 0.14 here, and seed 1234's own 750k arms sit
-between at 0.23 — so it is the length doing it rather than the seed.
+between at 0.23 so this is consistent.
 
 
 ### Writing a value works

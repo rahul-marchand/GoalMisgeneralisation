@@ -189,8 +189,17 @@ def fig_written_value():
 
     fig, ax = plt.subplots(figsize=(5.8, 3.9))
 
+    # Indifference under discounting. Walking d steps for a reward v is worth
+    # -p(1 - g^d)/(1 - g) + g^d v, so setting the two objectives equal gives
+    # g^D (c + other) = c + v with c = p/(1 - g), and the distance already walked
+    # cancels: the threshold depends on the two values alone, not on how far away
+    # anything is. The undiscounted (other - v)/p is the g -> 1 limit of this and
+    # runs up to 0.9 steps high over the range plotted.
+    gamma = d["discount"]
+    c = penalty / (1 - gamma)
     grid = np.linspace(0.14, 1.18, 100)
-    ax.plot(grid, (other - grid) / penalty, color=MUTED, lw=1.2, ls="--", zorder=1)
+    ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma),
+            color=MUTED, lw=1.2, ls="--", zorder=1)
     ax.annotate("optimal threshold", xy=(0.33, 14.3), color=MUTED, fontsize=8.5)
 
     ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)

@@ -55,6 +55,10 @@ def main() -> None:
         "base_value": 0.5,
         "step_penalty": 0.05,
         "other_objective": 1.0,
+        # cfg.loss.gamma of the agent every arm was fine-tuned from. The optimal
+        # threshold is what the agent is trained to maximise, which is discounted
+        # return, so the undiscounted (value gap)/penalty overstates it.
+        "discount": 0.995,
         "base_exchange_rate": base,
         "trained": [{"value": v, "steps": s} for v, s in trained],
         "written_heldout": [{"value": v, "trained": t, "written": w} for v, t, w in heldout],

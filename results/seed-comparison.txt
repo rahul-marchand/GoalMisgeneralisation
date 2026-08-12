@@ -23,8 +23,12 @@ matters.
     seed 5678   -15.63
     task-optimal would be -20.0
 
-  Both agents undercharge for distance by the same ~22%, which is a fact about
-  what the task teaches rather than about either set of weights.
+  The optimal line is (1.0 - v1)/0.05, so the task pays 20 extra steps per unit
+  of value. Both agents respond at about three quarters of that, which is a fact
+  about what the task teaches rather than about either set of weights. It is an
+  over-valuing of distance, not an under-valuing: each behaves as though a step
+  cost more than it does -- 0.065 and 0.059 against a true 0.05 -- so it gives up
+  on the further objective sooner than it should.
 
 === what does not replicate ===
 

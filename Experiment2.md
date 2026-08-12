@@ -114,10 +114,19 @@ do nothing.
 
 ![](figures/fig10_written_value.png)
 
-Figure 2: writing a value into the unedited agent. Each written point comes
+Figure 2: Writing a value into the unedited agent (seed 1234). Each written point comes
 from an axis fitted on the other five arms, so nothing about the arm it predicts
 went into the direction that produces it. The dotted line is the
 unedited agent.
+
+Both lines sit below the optimum everywhere, which is a property of the base
+agent rather than of the edit. At colour 1's base value of $0.5$ it walks $7.7$
+extra steps for colour 0 where the task pays $10$ — it behaves as though a step
+cost $0.065$ rather than $0.05$, so it gives up on the further objective too
+early. Seed 5678 is the same story at $8.5$ steps, an implied $0.059$. The
+slopes agree closely, $-15.2$ and $-15.6$ extra steps per unit of value against
+the task's $-20$, so the two agents differ in where they sit and not in how they
+trade.
 
 It fails at $v = 1.1$, where colour 1 is worth more than colour 0 and the agent
 should flip preference outright. It does not. The map is locally linear, not
@@ -125,39 +134,23 @@ globally.
 
 Both held-out writes replicate on seed 5678, less cleanly: mean error 0.77 steps
 against 0.53, and every error the same sign rather than scattered around zero.
-Its axis systematically overshoots, worst at both ends of the grid — the
-signature of fitting a straight line to something slightly curved, and the same
-thing that shows up as the failure at $v = 1.1$.
+Its axis systematically overshoots, worst at both ends of the grid (sort of what we see on the first seed).
 
 
-### Where in the weights — reliable, and about one network only
+### Weight Changes Concentrated in Specific Channels
+
+**Not reproduced in seed 5678. No clear gap between channels.**
+
 
 The change concentrates in the input-to-hidden convolution of recurrent layer 0,
 and within it in two of the 32 channels: ch07 at 2.29× and ch01 at 2.21× the
 shared fine-tuning component, then a gap down to 1.31 for everything else.
 
-That measurement is reliable. The colour-0 and colour-1 sweeps are disjoint sets
+The colour-0 and colour-1 sweeps are disjoint sets
 of arms and agree on the channel profile at $r = +0.97$, sharing 7 of their top 8
 channels against 2 by chance.
 
-The answer is not. On seed 5678 the leaders are ch15, ch04, ch25, ch16 —
-flatter, no gap — and neither ch07 nor ch01 appears anywhere in its top eight.
-Across seeds the overlap is 3 of 8 against 2 by chance, i.e. nothing, while
-within that seed the two sweeps still agree at $r = +0.79$. So the method
-replicates and the localisation does not: *the value lives in channels 1 and 7*
-is a fact about novalue11, not about the architecture or the task.
-
-Reading and writing also come apart. Restricting the fit to those 9,216
-parameters takes reading from slope 0.03 to 0.55 — most of the value-carrying
-signal really is in there. Writing only there gives 6.8 steps against a base of
-7.7, where the full axis gives 2.4 — almost nothing. Concentrated enough to read
-from, too distributed to write from, which is [[Hase2023_LocalizationEditing]]
-turning up in our own data rather than borrowed.
-
-The harder negative: ablating those channels in the untouched agent does nothing
-beyond a random pair, and they rank 15th and 30th of 32 at predicting which
-objective it takes. The channels that do predict the decision are equally inert
-when ablated. What a fine-tune moves is not what the agent reads.
+However you can't only write using the weights in those channels. We don't see the threshold changing as we'd like.
 
 
 ### threshold not value store
@@ -168,7 +161,7 @@ Raising colour 0's value and raising colour 1's move the same weights in exactly
 opposite directions.
  
 
-### Three objectives: structure forms only as far as it is forced
+### Three objectives: collapses onto a single axis
 
 |  | (1.0, 0.65, 0.3) | (1.0, 0.55, 0.4) |
 |---|---|---|
@@ -179,11 +172,9 @@ opposite directions.
 | variance in 2nd dimension | 3% | **16%** |
 | base agent chose optimal | 87.4% | 92.2% |
 
-With $\rho = 1$ the colour channels hand over the *ordering* for free, so what has to
-be stored is the magnitudes. Evenly spaced values make every threshold a rank
-gap times one constant, so a single stored number solves the task — and a short
-fine-tune can only move the number that exists. That is the whole explanation
-for three collinear axes, and it is a fact about the task rather than the agent.
+(hypothesised explanation) Evenly spaced values make every threshold a rank
+gap times one constant, so a single stored number solves the original task trained for. A short
+fine-tune can only adjust the circuitry that exists (not build a new threshold "axis" in). 
 
 On the redesign the second dimension appears but does not take over. The
 structure is hierarchical: $\mathrm{axis}_1$ lies 93% along the dominant
@@ -193,8 +184,7 @@ $0.534$ observed (aligned would give $0.968$).
 The 84/16 split tracks how often each comparison decides an episode: predicted
 ratio 1.59, observed 1.60.
 
-*That last figure is $n = 1$ and the model was built after seeing the numbers.
-Agreement to two decimals is better than the data deserve.*
+*That last figure is $n = 1$ and the model was built after seeing the numbers.*
 
 ### Behavioural evidence for the projection account
 
@@ -210,12 +200,7 @@ $$\begin{aligned}
   &\text{partial } r &= -0.41
 \end{aligned}$$
 
-The second was **pre-registered**: the model, the sign, the order of magnitude
-and which term would be larger were all written down before that grid finished
-training. Asymmetry alone is null in both, which is why the covariate is needed.
-
-This test touches no weight-space quantity, so it is independent of every
-estimator in the rest of the experiment.
+This supports the above hypothesis.
 
 ## Links
 

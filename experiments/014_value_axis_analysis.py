@@ -62,7 +62,7 @@ from goalmisgen.analysis.behaviour import indifference_point, value_distance_dec
 from goalmisgen.analysis.weights import cosine, explained, fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
 
-BASE_VALUE = 0.5
+BASE_VALUE = 0.5  # default; --base-value overrides for the colour-0 sweep
 """What colour 1 was worth to the agent before any fine-tuning."""
 
 
@@ -76,6 +76,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--step-penalty", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--prefix",
+        default="v",
+        help="Run-directory prefix naming the sweep: 'v' moves colour 1, 'c' moves colour 0. "
+        "The two are the same analysis pointed at a different objective.",
+    )
+    parser.add_argument(
+        "--base-value",
+        type=float,
+        default=None,
+        help="What the swept objective is worth in the untouched agent, so offsets are "
+        "measured from it. Defaults to 0.5 for the colour-1 sweep, 1.0 for colour 0.",
+    )
     parser.add_argument(
         "--extrapolate",
         type=float,
@@ -114,7 +127,7 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
         min_size=args.size,
         max_size=args.size,
         feature_value_correlation=1.0,
-        objective_values=(1.0, BASE_VALUE),
+        objective_values=(1.0, 0.5),
         value_encoding="none",
         colour_is_the_only_value_cue=True,
         level_dataset=args.levels,
@@ -124,8 +137,8 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
     )
 
 
-def arm_checkpoints(root: Path, at: int = -1) -> dict[float, Path]:
-    """One checkpoint from every ``vXXX`` run directory under ``root``.
+def arm_checkpoints(root: Path, at: int = -1, prefix: str = "v") -> dict[float, Path]:
+    """One checkpoint from every ``<prefix>XXX`` run directory under ``root``.
 
     Arms are only comparable when read at the same number of updates, so the
     caller picks by index and the step each arm resolved to is printed. An arm
@@ -134,7 +147,7 @@ def arm_checkpoints(root: Path, at: int = -1) -> dict[float, Path]:
     """
     found: dict[float, Path] = {}
     for run in sorted(root.iterdir()):
-        match = re.fullmatch(r"v(\d{3})", run.name)
+        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
         if not match or not (run / "local-files").is_dir():
             continue
         checkpoints = sorted((run / "local-files").glob("cp_*"))
@@ -180,7 +193,9 @@ def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, 
 
 
 def main() -> None:
+    global BASE_VALUE
     args = parse_args()
+    BASE_VALUE = args.base_value if args.base_value is not None else (1.0 if args.prefix == "c" else 0.5)
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
 
@@ -190,7 +205,7 @@ def main() -> None:
     print(f"base {args.base.name}  (update {update}, {base_flat.size:,} parameters)\n")
 
     print("arms")
-    selected = arm_checkpoints(args.arms, args.at)
+    selected = arm_checkpoints(args.arms, args.at, args.prefix)
     steps = {int(path.name.removeprefix("cp_")) for path in selected.values()}
     if len(steps) > 1:
         print(f"  WARNING: arms are at different budgets {sorted(steps)}, so their diffs are not comparable")

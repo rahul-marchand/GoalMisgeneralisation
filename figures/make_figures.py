@@ -216,10 +216,8 @@ def fig_written_value():
     # where it goes negative: beyond that point colour 1 is worth more and the
     # agent should take it unless colour 0 is strictly nearer. Clipped at zero
     # the line simply left the axis, which hid the one place the edit fails.
-    ax.set_ylim(-3.0, 15.8)
+    ax.set_ylim(-2.6, 15.8)
     ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
-    ax.annotate("below zero, colour 1 is worth more and should just be taken",
-                xy=(0.155, -2.3), color=MUTED, fontsize=8)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
     ax.set_axisbelow(True)

@@ -191,10 +191,9 @@ def fig_written_value():
 
     grid = np.linspace(0.14, 1.18, 100)
     ax.plot(grid, (other - grid) / penalty, color=MUTED, lw=1.2, ls="--", zorder=1)
-    ax.annotate("what the task pays", xy=(0.33, 14.3), color=MUTED, fontsize=8.5)
+    ax.annotate("optimal threshold", xy=(0.33, 14.3), color=MUTED, fontsize=8.5)
 
     ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)
-    ax.annotate("unedited agent", xy=(1.02, base + 0.35), color=MUTED, fontsize=8)
 
     ax.plot([r["value"] for r in d["trained"]], [r["steps"] for r in d["trained"]],
             "o-", color=BLUE, lw=2, ms=6, zorder=3, label="fine-tuned on that value")

@@ -131,6 +131,100 @@ def fig_task():
     save(fig, "fig1_task")
 
 
+# ---------------------------------------------------------------- figure 9
+def fig_no_value_task():
+    """What the value-axis agent sees. Four channels, and none of them is value."""
+    from goalmisgen.envs.observation import ObservationEncoder
+    from goalmisgen.envs.rendering import render
+    from goalmisgen.envs.sampling import MazeLevelSampler
+    from goalmisgen.envs.solver import objective_distances
+    from goalmisgen.envs.values import FixedValues
+
+    rng = np.random.default_rng(3)
+    level = MazeLevelSampler(size_range=(11, 11), values=FixedValues((1.0, 0.5))).sample(rng)
+    d = objective_distances(level)
+    vals = [o.value for o in level.objectives]
+    best = int(np.argmax([v - 0.05 * dd for v, dd in zip(vals, d)]))
+
+    # value_encoding="none" is the whole point of this agent: what an objective
+    # is worth is a learned constant, not an input, so there is nothing varying
+    # within an episode for a probe to read.
+    enc = ObservationEncoder(max_size=11, n_features=2, value_encoding="none")
+    obs = enc.encode(level, level.agent_start)
+
+    fig = plt.figure(figsize=(8.0, 1.9))
+    gs = fig.add_gridspec(1, 5, width_ratios=[1.55, 1, 1, 1, 1], wspace=0.18)
+
+    ax = fig.add_subplot(gs[0])
+    ax.imshow(render(level, level.agent_start, cell_pixels=14))
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title("not passed to agent", color=INK2, fontsize=8.5, pad=4)
+
+    for i, nm in enumerate(["ch0 walls", "ch1 agent", "ch2 colour 0", "ch3 colour 1"]):
+        a = fig.add_subplot(gs[i + 1])
+        a.imshow(obs[:, :, i], cmap="Greys", vmin=0, vmax=1, interpolation="nearest")
+        a.set_xticks([])
+        a.set_yticks([])
+        a.set_title(nm, color=INK2, fontsize=8, pad=4)
+        for sp in a.spines.values():
+            sp.set_visible(True)
+            sp.set_color(MUTED)
+            sp.set_linewidth(0.6)
+
+    fig.text(
+        0.5, 0.02,
+        f"red = colour 0, always worth {vals[0]:.1f}   ·   green = colour 1, always worth {vals[1]:.1f}   ·   "
+        f"no channel carries either number\n"
+        f"here they are {d[0]} and {d[1]} steps away, so colour {best} is the one to take",
+        ha="center", fontsize=8, color=INK2,
+    )
+    save(fig, "fig9_no_value_task")
+
+
+# ---------------------------------------------------------------- figure 10
+def fig_written_value():
+    """Writing a value into the weights reproduces having trained on it."""
+    d = json.loads((DATA / "value_axis.json").read_text())
+    penalty, other, base = d["step_penalty"], d["other_objective"], d["base_exchange_rate"]
+
+    fig, ax = plt.subplots(figsize=(5.8, 3.9))
+
+    grid = np.linspace(0.14, 1.18, 100)
+    ax.plot(grid, (other - grid) / penalty, color=MUTED, lw=1.2, ls="--", zorder=1)
+    ax.annotate("what the task pays", xy=(0.33, 14.3), color=MUTED, fontsize=8.5)
+
+    ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)
+    ax.annotate("unedited agent", xy=(1.02, base + 0.35), color=MUTED, fontsize=8)
+
+    ax.plot([r["value"] for r in d["trained"]], [r["steps"] for r in d["trained"]],
+            "o-", color=BLUE, lw=2, ms=6, zorder=3, label="fine-tuned on that value")
+    ax.plot([r["value"] for r in d["written_heldout"]], [r["written"] for r in d["written_heldout"]],
+            "s", color=ORANGE, ms=7, mec=SURFACE, mew=1.4, zorder=4, label="written, that arm held out")
+    ax.plot([r["value"] for r in d["written_beyond_grid"]], [r["steps"] for r in d["written_beyond_grid"]],
+            "s", color=SURFACE, ms=7, mec=ORANGE, mew=1.6, zorder=4, label="written, outside the fitted grid")
+
+    # Plotted at the value each edit was scaled to match. The direction is random,
+    # so the sign is arbitrary; what the marker says is that an edit of that size
+    # pointed anywhere else moves the agent nowhere.
+    ax.plot([d["base_value"] + r["magnitude"] for r in d["random_controls"]],
+            [r["steps"] for r in d["random_controls"]],
+            "^", color=INK2, ms=7, zorder=3, label="random direction, same size of edit")
+
+    ax.set_xlabel("what colour 1 is worth")
+    ax.set_ylabel("extra steps walked for colour 0")
+    ax.set_xlim(0.13, 1.19)
+    ax.set_ylim(0, 15.8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
+    ax.set_axisbelow(True)
+    leg = ax.legend(loc="lower left", frameon=False, fontsize=8.2, handletextpad=0.5,
+                    borderpad=0.2, labelspacing=0.35)
+    for t in leg.get_texts():
+        t.set_color(INK2)
+    save(fig, "fig10_written_value")
+
+
 # ---------------------------------------------------------------- figure 2
 def fig_rho_response():
     """The headline: what each agent was actually pursuing.
@@ -604,3 +698,5 @@ if __name__ == "__main__":
     fig_distance_field()
     fig_distance_accuracy()
     fig_intervention()
+    fig_no_value_task()
+    fig_written_value()

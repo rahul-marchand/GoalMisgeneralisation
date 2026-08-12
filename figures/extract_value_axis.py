@@ -51,6 +51,17 @@ def main() -> None:
     # the rest mean anything.
     random = rows(full, r"random, matched to (\d\.\d)\s+(-?\d+\.\d)", 2, "random controls")
 
+    # The axis written far outside the fitted grid, in both directions. Reach is
+    # carried through because it is the whole caveat: past a certain write the
+    # agent stops solving the maze, and a threshold measured on a policy that
+    # fails two thirds of its episodes is not a preference.
+    ood_rows = rows(
+        (RESULTS / "value-axis-ood.txt").read_text(),
+        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+"
+        r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
+        17, "out-of-grid writes",
+    )
+
     payload = {
         "base_value": 0.5,
         "step_penalty": 0.05,
@@ -64,6 +75,10 @@ def main() -> None:
         "written_heldout": [{"value": v, "trained": t, "written": w} for v, t, w in heldout],
         "written_beyond_grid": [{"value": v, "steps": s} for v, s in beyond],
         "random_controls": [{"magnitude": m, "steps": s} for m, s in random],
+        "written_ood": [
+            {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100}
+            for v, st, lo, hi, r in ood_rows
+        ],
     }
     (OUT / "value_axis.json").write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {OUT / 'value_axis.json'}")

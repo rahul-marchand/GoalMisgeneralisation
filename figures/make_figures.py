@@ -152,7 +152,7 @@ def fig_no_value_task():
     enc = ObservationEncoder(max_size=11, n_features=2, value_encoding="none")
     obs = enc.encode(level, level.agent_start)
 
-    fig = plt.figure(figsize=(8.0, 1.9))
+    fig = plt.figure(figsize=(8.0, 1.65))
     gs = fig.add_gridspec(1, 5, width_ratios=[1.55, 1, 1, 1, 1], wspace=0.18)
 
     ax = fig.add_subplot(gs[0])
@@ -172,13 +172,12 @@ def fig_no_value_task():
             sp.set_color(MUTED)
             sp.set_linewidth(0.6)
 
-    fig.text(
-        0.5, 0.02,
-        f"red = colour 0, always worth {vals[0]:.1f}   ·   green = colour 1, always worth {vals[1]:.1f}   ·   "
-        f"no channel carries either number\n"
-        f"here they are {d[0]} and {d[1]} steps away, so colour {best} is the one to take",
-        ha="center", fontsize=8, color=INK2,
-    )
+    # Everything about the values and distances belongs in the caption rather
+    # than on the figure: there is no room for it under the panels without it
+    # colliding with the maze, and it is prose rather than data. Printed here so
+    # that regenerating the figure shows whether the caption still holds.
+    print(f"  fig9 caption check: colour 0 worth {vals[0]:.1f} at {d[0]} steps, "
+          f"colour 1 worth {vals[1]:.1f} at {d[1]} steps, take colour {best}")
     save(fig, "fig9_no_value_task")
 
 

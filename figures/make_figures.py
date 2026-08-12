@@ -212,11 +212,18 @@ def fig_written_value():
     ax.set_xlabel("what colour 1 is worth")
     ax.set_ylabel("extra steps walked for colour 0")
     ax.set_xlim(0.13, 1.19)
-    ax.set_ylim(0, 15.8)
+    # Down to -3 rather than 0 so the optimal line stays on the panel past v=1.0,
+    # where it goes negative: beyond that point colour 1 is worth more and the
+    # agent should take it unless colour 0 is strictly nearer. Clipped at zero
+    # the line simply left the axis, which hid the one place the edit fails.
+    ax.set_ylim(-3.0, 15.8)
+    ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
+    ax.annotate("below zero, colour 1 is worth more and should just be taken",
+                xy=(0.155, -2.3), color=MUTED, fontsize=8)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
     ax.set_axisbelow(True)
-    leg = ax.legend(loc="lower left", frameon=False, fontsize=8.2, handletextpad=0.5,
+    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.5,
                     borderpad=0.2, labelspacing=0.35)
     for t in leg.get_texts():
         t.set_color(INK2)

@@ -63,21 +63,32 @@ Every arm ends up about the same distance from the base:
 
 (including the null arm at 14.4 which did not change behaviour) 
 
-Splitting each arm into the three parts, as a share of its energy:
+Splitting each arm by squared magnitude, as a share of |Δθ|²:
 
-| offset | drift | axis | ε |
-|---|---|---|---|
-| 0.0, the null arm | 38% | 0% | 62% |
-| ±0.2 | 38% | 15% | 47% |
-| +0.4 | 33% | 54% | 13% |
+| offset | drift | axis | ε | cross |
+|---|---|---|---|---|
+| −0.2 | 37% | 15% | 35% | +13% |
+| +0.2 | 38% | 15% | 62% | −14% |
+| +0.4 | 33% | 54% | 37% | −24% |
 
 drift is 8.9 and near-identical across arms; the axis is 28.5 per unit of value,
-so it only overtakes everything else at the wide end of the grid; ε is what is
-left, and at a typical offset it is the largest single part.
+so the axis part of an arm at offset 0.2 is only 5.7, and it only overtakes
+everything else at the wide end of the grid.
+
+The parts do not sum to 100% because drift and the axis are not orthogonal —
+cos(drift, axis) = −0.29 — which is the cross column. It is exactly
+2·offset·(drift·axis), so it flips sign with the offset and cancels across a
+balanced grid; the fitted axis is unaffected. ε is orthogonal to both to within
+±0.02.
+
+What the table is for: ε never becomes small. Even at the widest offset, where
+the axis is finally the majority of the movement, better than a third of that
+arm is still noise. One arm cannot show you the axis.
 
 Seed 5678's arms ran 750k steps rather than 3M and everything is smaller. |Δθ|
-≈ 7, drift 3.9, axis 16.4.  we have similar proportions, tilted slightly
-towards the axis. Shorter fine-tunes seem to be cleaner.
+≈ 7, drift 3.9, axis 16.4. Shorter fine-tunes are cleaner: split-half
+reliability 0.27–0.29 against 0.14 here, and seed 1234's own 750k arms sit
+between at 0.23 — so it is the length doing it rather than the seed.
 
 
 ### Writing a value works
@@ -90,11 +101,8 @@ do nothing.
 
 Figure 2: writing a value into the unedited agent. Each written point comes
 from an axis fitted on the other five arms, so nothing about the arm it predicts
-went into the direction that produces it — the in-sample version cannot tell an
-axis from a lookup of the arms it was built from. The dotted line is the
-unedited agent. Random directions are plotted at the value their magnitude was
-matched to: at v=0.8 the real edit reaches 3.3 steps while a random edit of
-identical size has not moved off that line.
+went into the direction that produces it. The dotted line is the
+unedited agent.
 
 It fails at v=1.1, where colour 1 is worth more than colour 0 and the agent
 should flip preference outright. It does not. The map is locally linear, not

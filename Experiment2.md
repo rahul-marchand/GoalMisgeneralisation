@@ -102,6 +102,45 @@ Our intervention fails at $v = 1.1$, where colour 1 is worth more than colour 0 
 Both held-out writes replicate on seed 5678, less cleanly: mean error 0.77 steps against 0.53, and every error the same sign rather than scattered around zero. Its axis systematically overshoots, worst at both ends of the grid (sort of what we see on the first seed).
 
 
+
+### How far the axis carries
+
+Writing far outside the fitted grid, in both directions and from both sweeps.
+The x axis is the *gap* each write asks for, since moving colour 0 up by $\delta$
+and colour 1 down by $\delta$ ask for the same thing.
+
+![](figures/fig11_ood_writes.png)
+
+Figure 3: both sweeps written well outside their grids. Dashed lines are the
+optimal threshold for each sweep; open markers are writes that cost the agent
+episodes, and the lower panel is why. The two fitted grids happen to cover the
+same gap range, shaded.
+
+Three things.
+
+**The two sweeps land on top of each other.** At matched gaps: 2.4/2.4,
+3.3/3.3, 6.1/6.2, 9.6/9.7, 11.3/11.2, 13.5/13.4, 18.2/18.0. Separately fitted
+directions, separately written weights, agreeing to $0.2$ steps. That is a real
+check on the estimator but *not* independent evidence about representation —
+behaviour depends on the gap under either account, and
+$\cos(\mathrm{axis}_0, \mathrm{axis}_1) = -1$ already says these are the same
+edit. What it buys is range: together they cover a written gap of $-0.7$ to
+$+1.3$ at full competence, against fitted grids spanning $0.1$ to $0.7$.
+
+**Saturation depends on the direction of travel, not on which objective is
+edited.** Pushed to deepen the preference the agent already has, the axis carries
+roughly twice the fitted range and still tracks a curve it was fitted to as a
+line. Pushed toward reversing it, both sweeps flatten at zero while the optimum
+dives to $-33$. The map is locally linear, not globally, and the failure is
+one-sided.
+
+**The apparent flip is a broken agent.** The few negative readings come with
+reach at $83\%$, $69\%$, $35\%$, $8\%$. Writing harder does not invert the
+preference; it destroys the policy. Which is what a threshold predicts and a
+per-objective value register does not: you can slide a threshold further out, but
+making the comparison come out the other way is not a translation along the same
+direction.
+
 ### Weight Changes Concentrated in Specific Channels
 
 **Not reproduced in seed 5678. No clear gap between channels.**

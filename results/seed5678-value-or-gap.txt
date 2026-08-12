@@ -1,0 +1,61 @@
+commit 58e984d
+argv   --base /workspace/data/runs/novalue11_seed5678/local-files/cp_140206080 --arms /workspace/data/valueaxis_s5678/runs --levels /workspace/data/valueaxis_s5678/levels/v050 --skip-behaviour
+
+base cp_140206080  (1,449,605 parameters)
+
+colour 1 swept, colour 0 held at 1.0
+  v030  value 0.30  offset -0.20  |delta| 7.126
+  v040  value 0.40  offset -0.10  |delta| 6.915
+  v050  value 0.50  offset +0.00  |delta| 6.829
+  v060  value 0.60  offset +0.10  |delta| 6.846
+  v070  value 0.70  offset +0.20  |delta| 7.085
+  v080  value 0.80  offset +0.30  |delta| 7.519
+  v090  value 0.90  offset +0.40  |delta| 8.288
+
+colour 0 swept, colour 1 held at 0.5
+  c060  value 0.60  offset -0.40  |delta| 8.482
+  c070  value 0.70  offset -0.30  |delta| 7.591
+  c080  value 0.80  offset -0.20  |delta| 7.237
+  c090  value 0.90  offset -0.10  |delta| 6.881
+  c100  value 1.00  offset +0.00  |delta| 6.751
+  c110  value 1.10  offset +0.10  |delta| 6.939
+  c120  value 1.20  offset +0.20  |delta| 7.06
+
+
+=== the two axes ===
+
+  |axis_1|  (per unit of colour 1's value)  16.39
+  |axis_0|  (per unit of colour 0's value)  16.49
+  |drift_1| 3.943    |drift_0| 3.885
+
+  cos(axis_0, axis_1) = -0.428
+
+  about -1  one knob: raising either objective's value moves the same direction
+            in opposite senses, so what 014 found is the gap, or equivalently a
+            threshold on the difference in distances, and not a value
+  about  0  two knobs, one per objective, which is what a value slot means
+
+
+=== the same gap, reached by moving either colour ===
+
+     gap  colour 1 at  colour 0 at  cos of diffs
+     0.1         0.90         0.60         0.336
+     0.2         0.80         0.70         0.219
+     0.3         0.70         0.80         0.129
+     0.4         0.60         0.90         0.083
+     0.6         0.40         1.10         0.093
+     0.7         0.30         1.20         0.146
+
+  Under one knob these arms are the same agent reached two ways, so their
+  diffs should agree once each sweep's common component is removed.
+
+=== how much of each axis is signal? ===
+
+  split-half reliability of axis_1  +0.292
+  split-half reliability of axis_0  +0.269
+
+  cos corrected for attenuation    -1.527
+
+  Still near -1 after correction means one knob measured through noise.
+  Near 0 means two. The correction can overshoot past -1 when the halves are
+  this small, so it bounds rather than settles the question.

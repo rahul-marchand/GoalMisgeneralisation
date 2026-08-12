@@ -1,0 +1,69 @@
+Two seeds of the same experiment, compared like for like.
+
+novalue11 (seed 1234) and novalue11_seed5678 are independent training runs of the
+same agent on the same task. Each was fine-tuned onto the same grid of values and
+analysed with the same scripts. Caveat on the arms: seed 1234's sweeps ran 3M
+fine-tuning steps, seed 5678's 750k, so anything scaling with fine-tune length is
+not comparable between them. Seed 1234's own 750k numbers are given where that
+matters.
+
+=== what replicates ===
+
+  cos(axis_0, axis_1), disattenuated by split-half reliability
+    seed 1234, 3M arms     raw -0.255   ceilings 0.262/0.252   ->  -0.992
+    seed 1234, 750k arms   raw -0.353   ceilings 0.382/0.371   ->  -0.937
+    seed 5678, 750k arms   raw -0.428   ceilings 0.424/0.452   ->  -0.978
+
+  One knob, in both agents. The raw cosines differ threefold and mean nothing on
+  their own; they are attenuated by how noisy each axis estimate is, and the
+  ceiling correction is what makes them comparable.
+
+  exchange rate, fitted across the fine-tuned arms
+    seed 1234   -15.21 extra steps per unit of value
+    seed 5678   -15.63
+    task-optimal would be -20.0
+
+  Both agents undercharge for distance by the same ~22%, which is a fact about
+  what the task teaches rather than about either set of weights.
+
+=== what does not replicate ===
+
+  where the agent sits when the values are equal
+    seed 1234   7.7 extra steps   implied step penalty 0.065 against a true 0.05
+    seed 5678   8.5 extra steps   implied step penalty 0.059
+
+  Same slope, different intercept. Each agent settles at its own indifference
+  point and then trades at the same rate away from it.
+
+  which channels carry the value  (cell_list_0/ih, enrichment over the shared
+  fine-tuning component)
+    seed 1234   ch07 2.29  ch01 2.21  | then a gap to ch12 1.31
+    seed 5678   ch15 1.75  ch04 1.57  ch25 1.54  ch16 1.50 | no gap
+
+  top-8 overlap ACROSS SEEDS: 3 of 8, against 2.0 by chance -- i.e. nothing.
+  Neither of seed 1234's two leaders appears anywhere in seed 5678's top eight.
+
+  Within a seed the same measurement is highly repeatable. Two disjoint sweeps,
+  one moving each objective, agree on the channel profile:
+    seed 1234   top-8 overlap 7 of 8   profile r +0.81..+0.94   full fits +0.966
+    seed 5678   top-8 overlap 6 of 8   profile r +0.53..+0.78   full fits +0.785
+
+  So the localisation is real and reproducible inside one network, and carries no
+  information about any other network trained the same way. "Channels 1 and 7"
+  is a fact about novalue11, not about the architecture or the task.
+
+=== writing the axis, each arm held out of the axis that predicts it ===
+
+    value   seed 1234 err   seed 5678 err
+     0.30       +0.1            +1.6
+     0.40       +0.6            +1.0
+     0.60       -0.4            +0.2
+     0.70       -0.6            +0.2
+     0.80       +0.1            +0.5
+     0.90       +1.4            +1.1
+    mean |err|   0.53            0.77
+    signed mean +0.20           +0.77
+
+  Writing works in both. On seed 5678 every error has the same sign, so its axis
+  systematically overshoots rather than scattering -- worst at the ends of the
+  grid, which is the signature of fitting a line to something slightly curved.

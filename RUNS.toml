@@ -86,6 +86,23 @@ reads them.
 """
 
 [[entry]]
+match = "valueaxis_s5678/runs/*"
+note = """
+The whole two-objective value sweep repeated on a second, independently trained
+agent — both objectives, fourteen arms, 750k steps each. The point is which of
+the seed-1234 findings are about the method and which are about one particular
+network. The one-knob result replicates (cos = −0.98 disattenuated, against
+−0.99), and so does the exchange rate: both agents pay ~15.4 extra steps per
+unit of value where the task pays 20. What does not replicate is where each
+agent sits when the values are equal (7.7 steps against 8.5) and, more
+importantly, which channels carry the value — seed 1234's ch07 and ch01 do not
+appear anywhere in this agent's top eight, and the overlap is 3 of 8 against 2
+by chance. Shorter arms than the seed-1234 sweep, so anything scaling with
+fine-tune length is not comparable across the two. See
+results/seed-comparison.txt.
+"""
+
+[[entry]]
 match = "valueaxis/runs/v050"
 note = """
 The null arm of the colour-1 sweep: fine-tuned onto the value it already had.

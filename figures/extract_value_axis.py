@@ -62,6 +62,13 @@ def main() -> None:
         17, "out-of-grid writes",
     )
 
+    ood0_rows = rows(
+        (RESULTS / "value-axis-ood-colour0.txt").read_text(),
+        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+"
+        r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
+        18, "colour-0 out-of-grid writes",
+    )
+
     payload = {
         "base_value": 0.5,
         "step_penalty": 0.05,
@@ -75,6 +82,15 @@ def main() -> None:
         "written_heldout": [{"value": v, "trained": t, "written": w} for v, t, w in heldout],
         "written_beyond_grid": [{"value": v, "steps": s} for v, s in beyond],
         "random_controls": [{"magnitude": m, "steps": s} for m, s in random],
+        # Both sweeps, keyed by the value written for the objective each moves.
+        # "held" is what the *other* objective is worth throughout, which is what
+        # turns a written value into a gap — and, because discounting depends on
+        # the absolute values rather than only their difference, is also what
+        # gives each sweep its own optimal curve.
+        "written_ood_colour0": [
+            {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100}
+            for v, st, lo, hi, r in ood0_rows
+        ],
         "written_ood": [
             {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100}
             for v, st, lo, hi, r in ood_rows

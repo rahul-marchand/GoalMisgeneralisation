@@ -86,6 +86,134 @@
       "steps": 7.4
     }
   ],
+  "written_ood_colour0": [
+    {
+      "value": -1.5,
+      "steps": -0.6,
+      "low": -1.9,
+      "high": 0.6,
+      "reached": 0.08199999999999999
+    },
+    {
+      "value": -1.0,
+      "steps": -0.4,
+      "low": -1.0,
+      "high": 0.1,
+      "reached": 0.273
+    },
+    {
+      "value": -0.5,
+      "steps": 0.3,
+      "low": -0.1,
+      "high": 0.7,
+      "reached": 0.6970000000000001
+    },
+    {
+      "value": -0.2,
+      "steps": -0.1,
+      "low": -0.3,
+      "high": 0.2,
+      "reached": 0.9159999999999999
+    },
+    {
+      "value": 0.0,
+      "steps": 0.1,
+      "low": -0.1,
+      "high": 0.3,
+      "reached": 0.986
+    },
+    {
+      "value": 0.2,
+      "steps": 0.6,
+      "low": 0.4,
+      "high": 0.8,
+      "reached": 0.997
+    },
+    {
+      "value": 0.4,
+      "steps": 1.2,
+      "low": 1.0,
+      "high": 1.4,
+      "reached": 1.0
+    },
+    {
+      "value": 0.6,
+      "steps": 2.4,
+      "low": 2.3,
+      "high": 2.6,
+      "reached": 1.0
+    },
+    {
+      "value": 0.7,
+      "steps": 3.3,
+      "low": 3.1,
+      "high": 3.4,
+      "reached": 1.0
+    },
+    {
+      "value": 0.8,
+      "steps": 4.7,
+      "low": 4.5,
+      "high": 4.9,
+      "reached": 1.0
+    },
+    {
+      "value": 0.9,
+      "steps": 6.2,
+      "low": 6.0,
+      "high": 6.4,
+      "reached": 1.0
+    },
+    {
+      "value": 1.1,
+      "steps": 9.7,
+      "low": 9.5,
+      "high": 10.0,
+      "reached": 1.0
+    },
+    {
+      "value": 1.2,
+      "steps": 11.2,
+      "low": 11.0,
+      "high": 11.5,
+      "reached": 1.0
+    },
+    {
+      "value": 1.3,
+      "steps": 13.4,
+      "low": 13.1,
+      "high": 13.8,
+      "reached": 1.0
+    },
+    {
+      "value": 1.5,
+      "steps": 18.0,
+      "low": 17.4,
+      "high": 18.7,
+      "reached": 1.0
+    },
+    {
+      "value": 1.8,
+      "steps": 25.1,
+      "low": 23.5,
+      "high": 27.1,
+      "reached": 0.991
+    },
+    {
+      "value": 2.0,
+      "steps": 25.1,
+      "low": 23.4,
+      "high": 27.2,
+      "reached": 0.9690000000000001
+    },
+    {
+      "value": 2.5,
+      "steps": 14.5,
+      "low": 13.4,
+      "high": 15.7,
+      "reached": 0.649
+    }
+  ],
   "written_ood": [
     {
       "value": -0.5,

@@ -239,67 +239,82 @@ def fig_written_value():
 
 # ---------------------------------------------------------------- figure 11
 def fig_ood_writes():
-    """How far the axis carries, in each direction, and where the agent breaks.
+    """Both sweeps pushed far outside their grids, on a common axis.
 
-    Separate from figure 10 rather than folded into it: the fitted grid spans
-    0.3-0.9 and this runs to 3.0, so putting both on one axis squeezes the actual
-    result into a fifth of the panel.
+    The x axis is the *gap* each write asks for rather than either value, which
+    is what makes the two sweeps comparable: moving colour 0 up by d and colour 1
+    down by d ask for the same thing. Both fitted grids happen to cover the same
+    gap range, 0.1 to 0.7, so one shaded band serves both.
 
-    Reach gets its own panel because it is the caveat that decides how to read the
-    top one. Past a certain write the agent stops solving the maze at all, and a
-    threshold measured on a policy failing most of its episodes is not evidence of
-    a preference -- it is a broken agent. Sharing the x axis rather than twinning
-    the y keeps that legible.
+    Two optimal curves rather than one, because under discounting the threshold
+    is not a function of the gap alone -- gamma^d cancels the distance but not the
+    absolute values, so a gap of 1.0 reached from (1.0, 0.0) and from (1.5, 0.5)
+    has slightly different optima. They separate visibly past a gap of 1.
+
+    Reach gets its own panel because it decides how to read the top one: past a
+    certain write the agent stops solving the maze, and a threshold measured on a
+    policy failing most of its episodes is a broken agent rather than a reversed
+    preference.
     """
     d = json.loads((DATA / "value_axis.json").read_text())
-    penalty, other, gamma = d["step_penalty"], d["other_objective"], d["discount"]
+    penalty, other, base_value = d["step_penalty"], d["other_objective"], d["base_value"]
+    gamma = d["discount"]
     c = penalty / (1 - gamma)
-    ood = d["written_ood"]
-    fitted = [r["value"] for r in d["trained"]]
-    lo_grid, hi_grid = min(fitted), max(fitted)
+    optimal = lambda v0, v1: np.log((c + v1) / (c + v0)) / np.log(gamma)
+
+    # (rows, gap from the written value, optimal at that gap, colour, label)
+    sweeps = [
+        (d["written_ood"], lambda v: other - v, lambda g: optimal(other, other - g),
+         BLUE, "colour 1 written down"),
+        (d["written_ood_colour0"], lambda v: v - base_value, lambda g: optimal(base_value + g, base_value),
+         ORANGE, "colour 0 written up"),
+    ]
 
     fig, (ax, axr) = plt.subplots(
-        2, 1, figsize=(6.4, 5.2), sharex=True, height_ratios=[2.6, 1], gridspec_kw={"hspace": 0.12}
+        2, 1, figsize=(6.8, 5.4), sharex=True, height_ratios=[2.6, 1], gridspec_kw={"hspace": 0.12}
     )
 
+    fitted = [r["value"] for r in d["trained"]]
+    lo_grid, hi_grid = other - max(fitted), other - min(fitted)
     for a in (ax, axr):
-        a.axvspan(lo_grid, hi_grid, color=BLUE, alpha=0.07, lw=0, zorder=0)
+        a.axvspan(lo_grid, hi_grid, color=INK2, alpha=0.06, lw=0, zorder=0)
         a.spines[["top", "right"]].set_visible(False)
         a.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
         a.set_axisbelow(True)
 
-    grid = np.linspace(-0.6, 3.1, 200)
-    ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma),
-            color=MUTED, lw=1.2, ls="--", zorder=2)
     ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
-
-    # Split at the point where the write starts costing episodes. The same line
-    # continues, but dotted, because past here it describes a different agent.
+    grid = np.linspace(-2.15, 2.15, 200)
     WORKS = 0.99
-    ok = [r for r in ood if r["reached"] >= WORKS]
-    ax.plot([r["value"] for r in ok], [r["steps"] for r in ok],
-            "o-", color=BLUE, lw=2, ms=5.5, zorder=4, label="written along the axis")
-    broken = [r for r in ood if r["reached"] < WORKS]
-    bridge = [ok[-1]] + broken
-    ax.plot([r["value"] for r in bridge], [r["steps"] for r in bridge],
-            "o:", color=BLUE, lw=1.6, ms=5.5, mfc=SURFACE, mew=1.4, zorder=4,
-            label="…once the write costs episodes")
+    for rows_, to_gap, opt, colour, label in sweeps:
+        ax.plot(grid, [opt(g) for g in grid], color=colour, lw=1.1, ls="--", alpha=0.55, zorder=2)
+        pts = sorted(((to_gap(r["value"]), r) for r in rows_), key=lambda t: t[0])
+        ok = [(g, r) for g, r in pts if r["reached"] >= WORKS]
+        ax.plot([g for g, _ in ok], [r["steps"] for _, r in ok],
+                "o-", color=colour, lw=2, ms=5, zorder=4, label=label)
+        for side in ([p for p in pts if p[0] < ok[0][0]], [p for p in pts if p[0] > ok[-1][0]]):
+            if not side:
+                continue
+            chain = sorted(side + [ok[0] if side[0][0] < ok[0][0] else ok[-1]], key=lambda t: t[0])
+            ax.plot([g for g, _ in chain], [r["steps"] for _, r in chain],
+                    "o:", color=colour, lw=1.5, ms=5, mfc=SURFACE, mew=1.3, zorder=3)
+        axr.plot([g for g, _ in pts], [100 * r["reached"] for _, r in pts],
+                 "o-", color=colour, lw=1.8, ms=4.5, zorder=3)
 
-    ax.annotate("optimal threshold", xy=(1.72, -7.6), color=MUTED, fontsize=8.5)
-    ax.annotate("fitted grid", xy=(0.34, 26.5), color=INK2, fontsize=8.5, alpha=0.7)
+    ax.annotate("dashed: optimal for that sweep", xy=(-2.05, 30.5), color=MUTED, fontsize=8.5)
+    ax.annotate("fitted grids", xy=(0.12, 30.5), color=INK2, fontsize=8.5, alpha=0.7)
+    ax.annotate("open markers: the write is costing episodes",
+                xy=(-2.05, 27.0), color=MUTED, fontsize=8.5)
     ax.set_ylabel("extra steps walked for colour 0")
-    ax.set_ylim(-12, 33)
-    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.6,
+    ax.set_ylim(-6, 33)
+    leg = ax.legend(loc="lower right", frameon=False, fontsize=8.5, handletextpad=0.6,
                     borderpad=0.2, labelspacing=0.35)
     for t in leg.get_texts():
         t.set_color(INK2)
 
-    axr.plot([r["value"] for r in ood], [100 * r["reached"] for r in ood],
-             "o-", color=ORANGE, lw=2, ms=5.5, zorder=3)
     axr.set_ylabel("% reached\nan objective")
     axr.set_ylim(0, 108)
-    axr.set_xlabel("value written for colour 1")
-    axr.set_xlim(-0.62, 3.12)
+    axr.set_xlabel("value gap written  (colour 0 − colour 1)")
+    axr.set_xlim(-2.2, 2.2)
 
     save(fig, "fig11_ood_writes")
 

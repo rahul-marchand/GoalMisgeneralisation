@@ -89,7 +89,13 @@ Applying the axis to the non finetuned weights produces the desired behaviour, a
 
 Figure 2: Writing a value into the unedited agent (seed 1234). Each written point comes from an axis fitted on the other five arms, so nothing about the arm it predicts went into the direction that produces it. The dotted line is the unedited agent.
 
-Both lines sit below the optimum everywhere, which is a property of the base agent rather than of the edit. At colour 1's base value of $0.5$ it walks $7.7$ extra steps for colour 0 where the task pays $10$. It behaves as though a step cost $0.065$ rather than $0.05$, so it gives up on the further objective too early. Seed 5678 is the same story at $8.5$ steps, an implied $0.059$. The slopes agree closely, $-15.2$ and $-15.6$ extra steps per unit of value against the task's $-20$, so the two agents differ in where they sit and not in how they trade.
+Both lines sit below the optimum everywhere, which is a property of the base agent rather than of the edit. At colour 1's base value of $0.5$ it walks $7.7$ extra steps for colour 0 where the optimum is $9.3$ — $83\%$ of it, behaving as though a step cost $0.061$ rather than $0.05$, so it gives up on the further objective too early. Seed 5678 sits closer at $8.5$ steps, $92\%$, an implied $0.055$. The slopes are the more alike of the two: $-15.2$ and $-15.6$ extra steps per unit of value against the optimum's $-18.8$, so $81\%$ and $83\%$. The agents differ more in where they sit than in how they trade.
+
+The threshold drawn is the one the agent is trained against, which is discounted at $\gamma = 0.995$ rather than the $(v_0 - v_1)/0.05$ the task pays undiscounted. Setting the two discounted returns equal,
+
+$$\gamma^{\,d_1 + \Delta}\,(c + v_0) \;=\; \gamma^{\,d_1}(c + v_1), \qquad c = \frac{0.05}{1-\gamma} = 10$$
+
+so $\Delta = \ln\!\big((c+v_1)/(c+v_0)\big)/\ln\gamma$. Two things fall out. The distance already walked cancels, so the threshold depends on the two values alone and not on how far away anything is — short episodes do not bend it. And it is logarithmic rather than linear, sitting up to $0.9$ steps below the undiscounted line over this range, which is enough to matter for the percentages above. It ignores the 120-step timeout, which is a further penalty on distant objectives and would push the optimum down a little more.
 
 Our intervention fails at $v = 1.1$, where colour 1 is worth more than colour 0 and the agent should flip preference outright. It does not. The map is locally linear, not globally.
 

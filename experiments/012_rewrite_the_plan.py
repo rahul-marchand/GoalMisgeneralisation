@@ -554,7 +554,7 @@ def main() -> None:
     typical = float(
         np.mean(
             [
-                np.linalg.norm(r.cell_state[:, :, : channels][geometry.free_cells(r.observation)], axis=-1).mean()
+                np.linalg.norm(r.cell_state[:, :, :channels][geometry.free_cells(r.observation)], axis=-1).mean()
                 for r in fit_rollouts[:256]
             ]
         )
@@ -589,8 +589,18 @@ def main() -> None:
 
     def run(arm: str, table: dict[int, np.ndarray], alpha: float) -> tuple[dict, list[dict]]:
         records = measure(
-            envs, policy, params, get_action, args.batches, args.seed, table, alpha * typical,
-            arm, fixed_values, channels, args.mode,
+            envs,
+            policy,
+            params,
+            get_action,
+            args.batches,
+            args.seed,
+            table,
+            alpha * typical,
+            arm,
+            fixed_values,
+            channels,
+            args.mode,
         )
         return summarise(records, seed=args.seed, mode=args.mode), records
 
@@ -664,11 +674,7 @@ def main() -> None:
                     switched, reached, other_switched, other_reached, seed=args.seed
                 )
                 against_self = f"{gap:>10.1%}" + f"{f'[{gap_low:+.3f},{gap_high:+.3f}]':>18}"
-            print(
-                f"{arm:>10}{entry['alpha']:>7.2f}{change:>13.1%}"
-                + f"{f'[{low:+.3f},{high:+.3f}]':>18}"
-                + against_self
-            )
+            print(f"{arm:>10}{entry['alpha']:>7.2f}{change:>13.1%}" + f"{f'[{low:+.3f},{high:+.3f}]':>18}" + against_self)
     print(
         "An interval excluding zero is a real shift. 'vs self' is the strongest form of the comparison:\n"
         "identical machinery, identical cells, identical norm, pointed the other way.\n\n"
@@ -711,7 +717,6 @@ def main() -> None:
             "when it is cheap and refused when it is expensive is being weighed against something; one\n"
             "that is followed regardless is overwriting the decision rather than entering it."
         )
-
 
     if args.json is not None:
         args.json.parent.mkdir(parents=True, exist_ok=True)

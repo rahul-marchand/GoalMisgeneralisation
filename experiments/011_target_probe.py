@@ -114,9 +114,7 @@ def score(train, test, seed: int = 0):
 
     episodes = np.arange(len(y_test))
     auc = metrics.roc_auc(y_test, predicted)
-    low, high = metrics.bootstrap_episodes(
-        lambda rows: metrics.roc_auc(y_test[rows], predicted[rows]), episodes, seed=seed
-    )
+    low, high = metrics.bootstrap_episodes(lambda rows: metrics.roc_auc(y_test[rows], predicted[rows]), episodes, seed=seed)
     accuracy = float(((predicted >= 0.5) == y_test).mean())
     return auc, (low, high), accuracy
 
@@ -169,7 +167,13 @@ def main() -> None:
     fit_untrained = rollouts(0, args.fit_episodes, args.fit_split, untrained)
     test_untrained = rollouts(9999, args.test_episodes, args.split, untrained)
 
-    taken = np.array([r.info.get("reached_feature_id") == args.feature for r in test_trained if r.info.get("reached_feature_id") is not None])
+    taken = np.array(
+        [
+            r.info.get("reached_feature_id") == args.feature
+            for r in test_trained
+            if r.info.get("reached_feature_id") is not None
+        ]
+    )
     print(f"\nfeature {args.feature} was taken in {taken.mean():.1%} of {len(taken)} decided episodes")
     print(f"reading {'the last layer only' if args.last_layer_only else 'all layers'}\n")
 

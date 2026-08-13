@@ -46,6 +46,7 @@ from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import parse_arm_dirname, sweep_index
 
 
 def parse_args() -> argparse.Namespace:
@@ -132,13 +133,14 @@ def main() -> None:
 
     offsets, stack = [], []
     for run in sorted(args.arms.iterdir()):
-        match = re.fullmatch(rf"{args.prefix}(\d{{3}})", run.name)
+        parsed = parse_arm_dirname(run.name)
+        match = parsed if parsed and parsed.sweep == f"o{sweep_index(args.prefix)}" else None
         if not match or not (run / "local-files").is_dir():
             continue
         checkpoints = sorted((run / "local-files").glob("cp_*"))
         if not checkpoints:
             continue
-        offset = int(match.group(1)) / 100 - args.base_value
+        offset = parsed.offset
         if abs(offset) < 1e-9:
             continue
         _, _, _, state, _ = load_train_state(checkpoints[args.at], env_cfg=config)
@@ -160,13 +162,14 @@ def main() -> None:
     if args.rank_from:
         other_offsets, other_stack = [], []
         for run in sorted(args.arms.iterdir()):
-            match = re.fullmatch(rf"{args.rank_from}(\d{{3}})", run.name)
+            parsed = parse_arm_dirname(run.name)
+            match = parsed if parsed and parsed.sweep == f"o{sweep_index(args.rank_from)}" else None
             if not match or not (run / "local-files").is_dir():
                 continue
             checkpoints = sorted((run / "local-files").glob("cp_*"))
             if not checkpoints:
                 continue
-            offset = int(match.group(1)) / 100 - (args.rank_base_value if args.rank_base_value is not None else args.base_value)
+            offset = parsed.offset
             if abs(offset) < 1e-9:
                 continue
             _, _, _, state, _ = load_train_state(checkpoints[args.at], env_cfg=config)
@@ -239,7 +242,9 @@ def main() -> None:
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
 
     def measure(params, label):
-        carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+        carry = policy.apply(
+            params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+        )
         state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
         def act(observations, starts):

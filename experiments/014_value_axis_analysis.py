@@ -46,7 +46,6 @@ directions, which measure what a perturbation of that size does by itself.
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from functools import partial
 from pathlib import Path
@@ -61,6 +60,7 @@ from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, explained, fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import discover_arms, sweep_index
 
 BASE_VALUE = 0.5  # default; --base-value overrides for the colour-0 sweep
 """What colour 1 was worth to the agent before any fine-tuning."""
@@ -116,6 +116,12 @@ def parse_args() -> argparse.Namespace:
         "what the arm itself learned. Writing a value the axis was fitted on is in-sample and "
         "cannot separate a real axis from one that memorised the arms it was built from.",
     )
+    parser.add_argument(
+        "--arm-steps",
+        type=int,
+        default=None,
+        help="Which sweep to read when the agent has been swept at more than one arm length.",
+    )
     return parser.parse_args()
 
 
@@ -137,28 +143,15 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
     )
 
 
-def arm_checkpoints(root: Path, at: int = -1, prefix: str = "v") -> dict[float, Path]:
-    """One checkpoint from every ``<prefix>XXX`` run directory under ``root``.
+def arm_checkpoints(root: Path, at: int = -1, prefix: str = "v", steps: int | None = None) -> dict[float, Path]:
+    """One checkpoint from every arm of one sweep, keyed by the value it trained at.
 
     Arms are only comparable when read at the same number of updates, so the
     caller picks by index and the step each arm resolved to is printed. An arm
     that saved a different number of checkpoints would otherwise be silently
     compared at a different budget from the rest.
     """
-    found: dict[float, Path] = {}
-    for run in sorted(root.iterdir()):
-        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
-        if not match or not (run / "local-files").is_dir():
-            continue
-        checkpoints = sorted((run / "local-files").glob("cp_*"))
-        if not checkpoints:
-            print(f"  {run.name}: no checkpoint saved, skipping")
-            continue
-        try:
-            found[int(match.group(1)) / 100] = checkpoints[at]
-        except IndexError:
-            print(f"  {run.name}: only {len(checkpoints)} checkpoints, no index {at}, skipping")
-    return found
+    return discover_arms(root, sweep_index(prefix), BASE_VALUE, steps=steps, at=at)
 
 
 def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, float, float, float]:
@@ -204,7 +197,7 @@ def main() -> None:
     print(f"base {args.base.name}  (update {update}, {base_flat.size:,} parameters)\n")
 
     print("arms")
-    selected = arm_checkpoints(args.arms, args.at, args.prefix)
+    selected = arm_checkpoints(args.arms, args.at, args.prefix, args.arm_steps)
     steps = {int(path.name.removeprefix("cp_")) for path in selected.values()}
     if len(steps) > 1:
         print(f"  WARNING: arms are at different budgets {sorted(steps)}, so their diffs are not comparable")
@@ -235,7 +228,9 @@ def main() -> None:
     residual = {v: fitted[v] - drift for v in values}
     print(f"\ncommon component |drift| {np.linalg.norm(drift):.4g}   axis per unit value |axis| {np.linalg.norm(axis):.4g}")
     if null is not None:
-        print(f"null arm |delta| {np.linalg.norm(null):.4g}, and {cosine(null, drift):.3f} of it is that same common direction")
+        print(
+            f"null arm |delta| {np.linalg.norm(null):.4g}, and {cosine(null, drift):.3f} of it is that same common direction"
+        )
 
     print("\n\n=== collinear? cosine between arms, raw ===\n")
     print("        " + "".join(f"{v:>8.2f}" for v in values))
@@ -255,12 +250,12 @@ def main() -> None:
     )
 
     print("\n=== graded and predictive? ===\n")
-    print(f"  {'value':>7}{'offset':>8}{'|delta|':>10}{'|residual|':>12}{'held-out R^2':>14}{'held-out cos':>14}{'implied offset':>16}")
+    print(
+        f"  {'value':>7}{'offset':>8}{'|delta|':>10}{'|residual|':>12}{'held-out R^2':>14}{'held-out cos':>14}{'implied offset':>16}"
+    )
     for value in values:
         others = [v for v in values if v != value]
-        held_axis, held_drift = fit_axis_and_drift(
-            np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others])
-        )
+        held_axis, held_drift = fit_axis_and_drift(np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others]))
         offset = value - BASE_VALUE
         left = fitted[value] - held_drift
         print(
@@ -270,7 +265,9 @@ def main() -> None:
         )
     if null is not None:
         left = null - drift
-        print(f"  {'null':>7}{0.0:>8.2f}{np.linalg.norm(null):>10.4g}{np.linalg.norm(left):>12.4g}{'—':>14}{cosine(left, axis):>14.3f}{projected_offset(left, axis):>+16.2f}")
+        print(
+            f"  {'null':>7}{0.0:>8.2f}{np.linalg.norm(null):>10.4g}{np.linalg.norm(left):>12.4g}{'—':>14}{cosine(left, axis):>14.3f}{projected_offset(left, axis):>+16.2f}"
+        )
     print(
         "\nThe implied offset is the axis read backwards, fitted without this arm. It\n"
         "should track the offset the arm was trained at, and the null arm's should sit\n"
@@ -292,7 +289,12 @@ def main() -> None:
             others = [v for v in values if v != value]
             held_axis, _ = fit_axis_and_drift(np.array(others) - BASE_VALUE, np.stack([fitted[v] for v in others]))
             written_point, _, _, _ = measure(
-                unravel(base_flat + (value - BASE_VALUE) * held_axis), policy, get_action, envs, args, f"v={value:.2f} written, held out"
+                unravel(base_flat + (value - BASE_VALUE) * held_axis),
+                policy,
+                get_action,
+                envs,
+                args,
+                f"v={value:.2f} written, held out",
             )
             _, _, _, arm_state, _ = load_train_state(selected[value], env_cfg=config)
             arm_point, _, _, _ = measure(arm_state.params, policy, get_action, envs, args, f"v={value:.2f} fine-tuned")

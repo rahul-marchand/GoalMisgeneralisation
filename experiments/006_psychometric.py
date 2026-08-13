@@ -84,7 +84,9 @@ def main() -> None:
 
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     envs = config.make()
-    carry = policy.apply(train_state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+    carry = policy.apply(
+        train_state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+    )
     state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
     def act(observations, starts):

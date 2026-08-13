@@ -221,7 +221,6 @@ def main() -> None:
         logits, _ = policy.apply(params, hidden, method=_actor)
         return carry, jnp.argmax(logits, axis=1)
 
-
     def objective_mask(observations) -> np.ndarray:
         """Ones at the two objectives' cells, zero elsewhere.
 
@@ -232,14 +231,10 @@ def main() -> None:
         marks = obs[:, geometry.FIRST_FEATURE_CHANNEL : geometry.FIRST_FEATURE_CHANNEL + N_FEATURES]
         return (marks.max(axis=1) > 0.5).astype(np.float32)[..., None]
 
-
-
     def measure(direction, alpha: float):
-
         envs = env_config(args.seed, args.split).make()
         key = jax.random.PRNGKey(args.seed)
         state = {"carry": policy.apply(params, key, envs.observation_space.shape, method=policy.initialize_carry)}
-
 
         depth = len(contrast.delta)
         delta = jnp.zeros(depth) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))

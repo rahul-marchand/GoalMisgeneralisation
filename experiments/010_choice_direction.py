@@ -160,9 +160,7 @@ def main() -> None:
     print(f"checkpoint {args.checkpoint.name}  (update {update})\n")
 
     last = layer_slice(Feature("activations", operator.attrgetter("features")), LAST_LAYER, N_LAYERS)
-    fit_rollouts = collect_rollouts(
-        env_config(0, args.fit_split).make(), policy, params, args.fit_episodes, seed=0
-    )
+    fit_rollouts = collect_rollouts(env_config(0, args.fit_split).make(), policy, params, args.fit_episodes, seed=0)
     raw, pairs = choice_contrast(fit_rollouts, last)
     choice = steering.Direction("choice (f0 - f1)", raw / np.linalg.norm(raw))
     print(f"choice direction from {pairs} gap-matched pairs, raw norm {np.linalg.norm(raw):.4f}")

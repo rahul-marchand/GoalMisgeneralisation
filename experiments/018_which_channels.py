@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import itertools
-import re
 from pathlib import Path
 
 import jax
@@ -42,6 +41,7 @@ from cleanba.cleanba_impala import load_train_state
 from goalmisgen import provenance
 from goalmisgen.analysis.weights import fit_axis_and_drift
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import parse_arm_dirname, sweep_index
 
 GATES = ("input", "candidate", "forget", "output")
 """``i, j, f, o = split(gates, 4, axis=-1)`` in cleanba's ConvLSTM cell."""
@@ -62,7 +62,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--levels", type=str, required=True)
     parser.add_argument("--objective-values", type=float, nargs="+", required=True)
-    parser.add_argument("--cell", type=int, default=0, help="Which recurrent layer to open up (cell_list_N is a layer, not a maze cell).")
+    parser.add_argument(
+        "--cell", type=int, default=0, help="Which recurrent layer to open up (cell_list_N is a layer, not a maze cell)."
+    )
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--at", type=int, default=-1)
     parser.add_argument("--top", type=int, default=8)
@@ -83,13 +85,13 @@ def sweep_axis(root: Path, prefix: str, base_value: float, at: int, config, cell
     """Axis and shared component for one sweep, as gate kernels."""
     offsets, arms = [], []
     for run in sorted(root.iterdir()):
-        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
-        if not match or not (run / "local-files").is_dir():
+        parsed = parse_arm_dirname(run.name)
+        if parsed is None or parsed.sweep != f"o{sweep_index(prefix)}":
             continue
         checkpoints = sorted((run / "local-files").glob("cp_*"))
         if not checkpoints:
             continue
-        offset = int(match.group(1)) / 100 - base_value
+        offset = parsed.offset
         if abs(offset) < 1e-9:
             continue
         _, _, _, state, _ = load_train_state(checkpoints[at], env_cfg=config)
@@ -120,9 +122,7 @@ def symmetric_halves(offsets, arms, base, which: str):
     estimates = []
     for magnitude in sorted({abs(o) for o in table}, reverse=True):
         if magnitude in table and -magnitude in table:
-            estimates.append(
-                (table[magnitude][which] - table[-magnitude][which]) / (2 * magnitude)
-            )
+            estimates.append((table[magnitude][which] - table[-magnitude][which]) / (2 * magnitude))
     return estimates
 
 
@@ -244,9 +244,7 @@ def main() -> None:
     if len(sweeps) >= 2:
         print("\n\n=== do the sweeps move the shared channels the same way? ===\n")
         for which in ("ih", "hh"):
-            halves = {
-                name: symmetric_halves(offsets, arms, base, which) for name, (offsets, arms) in sweeps.items()
-            }
+            halves = {name: symmetric_halves(offsets, arms, base, which) for name, (offsets, arms) in sweeps.items()}
             usable = {name: estimates for name, estimates in halves.items() if len(estimates) >= 2}
             if len(usable) < 2:
                 print(f"  cell_list_{args.cell}/{which}: fewer than two sweeps have two symmetric pairs, skipping")
@@ -267,18 +265,16 @@ def main() -> None:
                 def cos(x, y):
                     return float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y)))
 
-                within = {
-                    name: cos(take(estimates[0]), take(estimates[1])) for name, estimates in usable.items()
-                }
+                within = {name: cos(take(estimates[0]), take(estimates[1])) for name, estimates in usable.items()}
                 label = f"top {keep}" if keep < len(ranking) else "all 32"
                 for first, second in itertools.combinations(sorted(usable), 2):
-                    across = float(
-                        np.mean([cos(take(a), take(b)) for a in usable[first] for b in usable[second]])
-                    )
+                    across = float(np.mean([cos(take(a), take(b)) for a in usable[first] for b in usable[second]]))
                     floor = within[first] * within[second]
                     corrected = across / np.sqrt(floor) if floor > 0 else float("nan")
                     flag = "  <- ceiling too small" if min(within[first], within[second]) < 0.05 else ""
-                    print(f"    {f'{first} v {second}':>12}{label:>10}{across:>9.3f}{np.sqrt(max(floor, 0)):>9.3f}{corrected:>11.3f}{flag}")
+                    print(
+                        f"    {f'{first} v {second}':>12}{label:>10}{across:>9.3f}{np.sqrt(max(floor, 0)):>9.3f}{corrected:>11.3f}{flag}"
+                    )
         print(
             "\n  Every estimate here comes from one symmetric pair of arms, so across and\n"
             "  within rest on the same number of arms and the ratio is a disattenuated\n"

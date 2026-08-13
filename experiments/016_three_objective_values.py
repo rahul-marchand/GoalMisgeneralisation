@@ -207,7 +207,9 @@ def main() -> None:
 
     print("\n\n=== how much of each axis is signal? ===\n")
     for index in range(3):
-        print(f"  objective {index}: |axis| {np.linalg.norm(axes[index]):>9.4g}   split-half reliability {reliability.get(index, float('nan')):+.3f}")
+        print(
+            f"  objective {index}: |axis| {np.linalg.norm(axes[index]):>9.4g}   split-half reliability {reliability.get(index, float('nan')):+.3f}"
+        )
     print(
         "\n  Two disjoint symmetric pairs of arms give two estimates of the same axis.\n"
         "  Everything below is attenuated by whatever this falls short of 1."
@@ -226,7 +228,9 @@ def main() -> None:
         floor = full.get(i, float("nan")) * full.get(j, float("nan"))
         corrected = raw / np.sqrt(floor) if floor > 0 else float("nan")
         flag = "  <- too noisy to read" if min(full.get(i, 0), full.get(j, 0)) < 0.1 else ""
-        print(f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}   {full.get(i, float('nan')):.3f}, {full.get(j, float('nan')):.3f}{flag}")
+        print(
+            f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}   {full.get(i, float('nan')):.3f}, {full.get(j, float('nan')):.3f}{flag}"
+        )
     print(
         "\n  One shared knob puts every pair at -1; a representation holding only the\n"
         "  differences puts them at -0.5, since three symmetric vectors summing to zero\n"

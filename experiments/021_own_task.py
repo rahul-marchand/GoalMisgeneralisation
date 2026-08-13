@@ -129,7 +129,9 @@ def evaluate(checkpoint: Path, levels: str, values: tuple[float, ...], args) -> 
     policy, _, _, state, _ = load_train_state(checkpoint, env_cfg=config)
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     envs = config.make()
-    carry = policy.apply(state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+    carry = policy.apply(
+        state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+    )
     holder = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
     def act(observations, starts):

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 # ``o1+020@750k``: the colour-1 sweep, trained at 0.20 above the base value, for
@@ -199,3 +200,75 @@ def parse_dataset_dirname(name: str) -> tuple[tuple[float, ...], int]:
     if not count:
         raise ValueError(f"{name!r} is missing its level count, which is part of what makes a dataset shareable")
     return parse_values_tag(tag), _parse_round_tag(count, "a level count")
+
+
+def discover_arms(
+    arms: Path,
+    objective: int,
+    base_value: float,
+    steps: int | None = None,
+    at: int = -1,
+) -> dict[float, Path]:
+    """One sweep's arms, keyed by the value each was trained at.
+
+    The key is the value rather than the offset because that is what the analysis
+    has always regressed against, so the scripts that consume this did not have
+    to change shape when the directories were renamed.
+
+    ``steps`` is not optional in spirit. An agent's ``arms/`` directory now holds
+    every sweep ever run against it, and arms of different lengths are not
+    comparable -- that is the whole reason the length is in the name. So a
+    directory holding more than one length raises unless the caller says which it
+    means. ``014`` already warned about this within a directory; this makes the
+    mistake unavailable rather than reported.
+    """
+    if not arms.is_dir():
+        return {}
+    found: dict[float, Path] = {}
+    lengths: set[int] = set()
+    for run in sorted(arms.iterdir()):
+        parsed = parse_arm_dirname(run.name)
+        if parsed is None or parsed.sweep != f"o{objective}":
+            continue
+        if steps is not None and parsed.steps != steps:
+            continue
+        checkpoints = sorted((run / "local-files").glob("cp_*"))
+        if not checkpoints:
+            continue
+        try:
+            found[round(base_value + parsed.offset, 10)] = checkpoints[at]
+        except IndexError:
+            print(f"  {run.name}: no checkpoint at index {at}, skipping")
+            continue
+        lengths.add(parsed.steps)
+    if steps is None and len(lengths) > 1:
+        raise ValueError(
+            f"{arms} holds arms at {sorted(lengths)} steps. Fitting them together would mix "
+            "budgets, which is what putting the length in the name exists to prevent -- pass "
+            "steps= to say which sweep you mean."
+        )
+    return found
+
+
+def arm_lengths(arms: Path) -> set[int]:
+    """Every arm budget present in one agent's ``arms/`` directory."""
+    if not arms.is_dir():
+        return set()
+    return {p.steps for run in arms.iterdir() if (p := parse_arm_dirname(run.name)) is not None}
+
+
+def sweep_index(prefix: str) -> int:
+    """Which objective a sweep moves, from however it is named on the command line.
+
+    ``v`` and ``c`` are the old two-objective names -- ``v`` swept colour 1 and
+    ``c`` swept colour 0 -- and are still accepted so that recorded invocations in
+    ``results/`` keep working. ``o0``, ``o1``, ``o2`` are what the directories say
+    now, and generalise past two objectives.
+    """
+    cleaned = prefix.strip().rstrip("_")
+    if cleaned in ("v", "c"):
+        return 1 if cleaned == "v" else 0
+    match = re.fullmatch(r"o?(\d)", cleaned)
+    if match is None:
+        raise ValueError(f"{prefix!r} does not name a sweep; expected 'o0', 'o1', ... (or legacy 'v'/'c')")
+    return int(match.group(1))

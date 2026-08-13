@@ -68,7 +68,6 @@ a single scalar cannot express the problem.
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from functools import partial
 from pathlib import Path
@@ -81,8 +80,9 @@ from jax.flatten_util import ravel_pytree
 from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
-from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value, projected_offset
+from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import discover_arms, sweep_index
 
 COLOUR_ZERO_BASE = 1.0
 COLOUR_ONE_BASE = 0.5
@@ -106,6 +106,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--at", type=int, default=-1, help="Which checkpoint of each arm, in step order.")
+    parser.add_argument(
+        "--arm-steps",
+        type=int,
+        default=None,
+        help="Which sweep to read when the agent has been swept at more than one arm "
+        "length, e.g. 750000. Arms of different lengths are not comparable.",
+    )
     parser.add_argument("--skip-behaviour", action="store_true")
     parser.add_argument(
         "--cross",
@@ -134,31 +141,27 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
     )
 
 
-def arm_checkpoints(root: Path, prefix: str, at: int) -> dict[float, Path]:
-    """The chosen checkpoint of every ``<prefix>XXX`` run directory."""
-    found: dict[float, Path] = {}
-    for run in sorted(root.iterdir()):
-        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
-        if not match or not (run / "local-files").is_dir():
-            continue
-        checkpoints = sorted((run / "local-files").glob("cp_*"))
-        if checkpoints:
-            try:
-                found[int(match.group(1)) / 100] = checkpoints[at]
-            except IndexError:
-                print(f"  {run.name}: no checkpoint at index {at}, skipping")
-    return found
+def arm_checkpoints(root: Path, prefix: str, at: int, base_value: float, steps: int | None) -> dict[float, Path]:
+    """The chosen checkpoint of every arm in one sweep, keyed by the value it trained at.
+
+    ``steps`` picks which sweep is meant when an agent has been swept more than
+    once at different arm lengths, which are not comparable and which
+    ``discover_arms`` refuses to mix silently.
+    """
+    return discover_arms(root, sweep_index(prefix), base_value, steps=steps, at=at)
 
 
-def load_sweep(root: Path, prefix: str, at: int, base_value: float, base_flat, config) -> dict[float, np.ndarray]:
+def load_sweep(
+    root: Path, prefix: str, at: int, base_value: float, base_flat, config, steps: int | None = None
+) -> dict[float, np.ndarray]:
     """Weight diffs for one sweep, keyed by the value the arm was trained at."""
     diffs: dict[float, np.ndarray] = {}
-    for value, checkpoint in sorted(arm_checkpoints(root, prefix, at).items()):
+    for value, checkpoint in sorted(arm_checkpoints(root, prefix, at, base_value, steps).items()):
         _, _, _, state, _ = load_train_state(checkpoint, env_cfg=config)
         flat, _ = ravel_pytree(state.params)
         diffs[value] = np.asarray(flat - base_flat, dtype=np.float64)
         print(
-            f"  {prefix}{int(round(value * 100)):03d}  value {value:.2f}  offset {value - base_value:+.2f}  |delta| {np.linalg.norm(diffs[value]):.4g}"
+            f"  o{sweep_index(prefix)}{value - base_value:+.2f}  value {value:.2f}  offset {value - base_value:+.2f}  |delta| {np.linalg.norm(diffs[value]):.4g}"
         )
     return diffs
 
@@ -199,9 +202,9 @@ def main() -> None:
     print(f"base {args.base.name}  ({base_flat.size:,} parameters)\n")
 
     print("colour 1 swept, colour 0 held at 1.0")
-    one = load_sweep(args.arms, "v", args.at, COLOUR_ONE_BASE, base_flat, config)
+    one = load_sweep(args.arms, "v", args.at, COLOUR_ONE_BASE, base_flat, config, args.arm_steps)
     print("\ncolour 0 swept, colour 1 held at 0.5")
-    zero = load_sweep(args.arms, "c", args.at, COLOUR_ZERO_BASE, base_flat, config)
+    zero = load_sweep(args.arms, "c", args.at, COLOUR_ZERO_BASE, base_flat, config, args.arm_steps)
 
     if len(one) < 4 or len(zero) < 4:
         sys.exit("\nBoth sweeps need at least four arms before the comparison means anything.")

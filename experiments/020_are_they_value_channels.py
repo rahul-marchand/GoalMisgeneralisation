@@ -149,12 +149,24 @@ def main() -> None:
         print("=== ablation: zero those channels in the untouched agent ===\n")
         print(f"  {'':>40}{'steps':>8}")
         run(params, policy, envs, args, "untouched")
-        run(params, policy, envs, args, f"channels {target} zeroed",
-            partial(edit_layer, layer=args.layer, channels=target, mode="zero"))
+        run(
+            params,
+            policy,
+            envs,
+            args,
+            f"channels {target} zeroed",
+            partial(edit_layer, layer=args.layer, channels=target, mode="zero"),
+        )
         for trial in range(args.controls):
             pick = list(rng.choice([c for c in range(32) if c not in target], size=len(target), replace=False))
-            run(params, policy, envs, args, f"random pair {pick} zeroed",
-                partial(edit_layer, layer=args.layer, channels=pick, mode="zero"))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"random pair {pick} zeroed",
+                partial(edit_layer, layer=args.layer, channels=pick, mode="zero"),
+            )
         print(
             "\n  A value comparison removed should push the exchange rate toward zero -- the\n"
             "  agent taking whichever objective is nearest -- while it still reaches one.\n"
@@ -166,12 +178,24 @@ def main() -> None:
         print(f"  {'':>40}{'steps':>8}")
         run(params, policy, envs, args, "untouched")
         for alpha in args.alphas:
-            run(params, policy, envs, args, f"channels {target} {alpha:+.1f}",
-                partial(edit_layer, layer=args.layer, channels=target, mode="shift", amount=alpha))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"channels {target} {alpha:+.1f}",
+                partial(edit_layer, layer=args.layer, channels=target, mode="shift", amount=alpha),
+            )
         pick = list(rng.choice([c for c in range(32) if c not in target], size=len(target), replace=False))
         for alpha in (min(args.alphas), max(args.alphas)):
-            run(params, policy, envs, args, f"random pair {pick} {alpha:+.1f}",
-                partial(edit_layer, layer=args.layer, channels=pick, mode="shift", amount=alpha))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"random pair {pick} {alpha:+.1f}",
+                partial(edit_layer, layer=args.layer, channels=pick, mode="shift", amount=alpha),
+            )
         print(
             "\n  A channel holding what an objective is worth should move the exchange rate\n"
             "  monotonically in the amount added, and the random pair should not."
@@ -184,7 +208,9 @@ def main() -> None:
         batches = -(-args.episodes // args.num_envs)
         for batch in range(batches):
             observations, _ = envs.reset(seed=args.seed + 10_000 + batch)
-            carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+            carry = policy.apply(
+                params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+            )
             key = jax.random.PRNGKey(args.seed)
             starts = np.ones(envs.num_envs, dtype=bool)
             carry, action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
@@ -227,7 +253,10 @@ def main() -> None:
         order = np.argsort(scores)[::-1]
         print("  channels ranked by how well their activation predicts the choice:")
         print("    " + "  ".join(f"ch{c:02d}({0.5 + scores[c]:.3f})" for c in order[:8]))
-        print(f"\n  the weight-space picks {target} sit at ranks " + ", ".join(str(int(np.where(order == c)[0][0]) + 1) for c in target))
+        print(
+            f"\n  the weight-space picks {target} sit at ranks "
+            + ", ".join(str(int(np.where(order == c)[0][0]) + 1) for c in target)
+        )
         print(
             "\n  An independent ranking that puts the same channels on top would be two\n"
             "  unrelated methods agreeing. One that does not means the axis wrote where it\n"

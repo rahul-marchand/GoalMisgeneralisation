@@ -60,11 +60,7 @@ def header(argv: list[str] | None = None) -> str:
     """
     argv = sys.argv if argv is None else argv
     script = Path(argv[0]).name if argv and argv[0] else "unknown"
-    return (
-        f"{'script':<{_LABEL}}{script}\n"
-        f"{'commit':<{_LABEL}}{commit()}\n"
-        f"{'argv':<{_LABEL}}{' '.join(argv[1:])}"
-    )
+    return f"{'script':<{_LABEL}}{script}\n" f"{'commit':<{_LABEL}}{commit()}\n" f"{'argv':<{_LABEL}}{' '.join(argv[1:])}"
 
 
 @dataclass(frozen=True)

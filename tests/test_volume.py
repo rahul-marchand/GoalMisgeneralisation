@@ -18,8 +18,10 @@ import pytest
 from goalmisgen.volume import (
     ArmName,
     arm_dirname,
+    arm_lengths,
     composition_arm_dirname,
     dataset_dirname,
+    discover_arms,
     is_composition_arm,
     offset_tag,
     parse_arm_dirname,
@@ -27,6 +29,7 @@ from goalmisgen.volume import (
     parse_steps_tag,
     parse_values_tag,
     steps_tag,
+    sweep_index,
     values_tag,
 )
 
@@ -132,3 +135,71 @@ def test_dataset_names_round_trip() -> None:
 def test_a_dataset_without_its_level_count_is_refused() -> None:
     with pytest.raises(ValueError, match="missing its level count"):
         parse_dataset_dirname("1.00-0.50")
+
+
+def make_arm(root, name: str, checkpoints: int = 1):
+    arm = root / name / "local-files"
+    arm.mkdir(parents=True)
+    for i in range(checkpoints):
+        (arm / f"cp_{(i + 1) * 1000}").mkdir()
+    return arm
+
+
+def test_discover_arms_keys_by_the_value_each_arm_trained_at(tmp_path) -> None:
+    """The analysis regresses against the value, so renaming did not change its shape."""
+    for name in ("o1+020@750k", "o1-020@750k", "o1+000@750k"):
+        make_arm(tmp_path, name)
+
+    found = discover_arms(tmp_path, objective=1, base_value=0.5, steps=750_000)
+
+    assert sorted(found) == [0.3, 0.5, 0.7]
+
+
+def test_discover_arms_ignores_the_other_sweep(tmp_path) -> None:
+    make_arm(tmp_path, "o1+020@750k")
+    make_arm(tmp_path, "o0+020@750k")
+
+    assert sorted(discover_arms(tmp_path, 1, 0.5, steps=750_000)) == [0.7]
+    assert sorted(discover_arms(tmp_path, 0, 1.0, steps=750_000)) == [1.2]
+
+
+def test_mixing_arm_lengths_is_refused_rather_than_reported(tmp_path) -> None:
+    """An agent's arms/ now holds every sweep ever run against it."""
+    make_arm(tmp_path, "o1+020@750k")
+    make_arm(tmp_path, "o1+020@3M")
+
+    with pytest.raises(ValueError, match="holds arms at"):
+        discover_arms(tmp_path, 1, 0.5)
+
+
+def test_asking_for_one_length_selects_only_that_sweep(tmp_path) -> None:
+    make_arm(tmp_path, "o1+020@750k")
+    make_arm(tmp_path, "o1+040@3M")
+
+    assert sorted(discover_arms(tmp_path, 1, 0.5, steps=750_000)) == [0.7]
+    assert sorted(discover_arms(tmp_path, 1, 0.5, steps=3_000_000)) == [0.9]
+    assert arm_lengths(tmp_path) == {750_000, 3_000_000}
+
+
+def test_discover_arms_picks_the_requested_checkpoint(tmp_path) -> None:
+    make_arm(tmp_path, "o1+020@750k", checkpoints=4)
+
+    assert discover_arms(tmp_path, 1, 0.5, steps=750_000, at=0)[0.7].name == "cp_1000"
+    assert discover_arms(tmp_path, 1, 0.5, steps=750_000, at=-1)[0.7].name == "cp_4000"
+
+
+def test_an_arm_with_no_checkpoints_is_skipped(tmp_path) -> None:
+    (tmp_path / "o1+020@750k").mkdir(parents=True)
+    assert discover_arms(tmp_path, 1, 0.5, steps=750_000) == {}
+
+
+def test_legacy_sweep_prefixes_still_resolve() -> None:
+    """Invocations recorded in results/ named the sweeps v and c."""
+    assert sweep_index("v") == 1
+    assert sweep_index("c") == 0
+    assert sweep_index("o2") == 2
+
+
+def test_an_unrecognised_sweep_name_is_refused() -> None:
+    with pytest.raises(ValueError, match="does not name a sweep"):
+        sweep_index("colour1")

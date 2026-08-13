@@ -293,9 +293,7 @@ def one_split(split, rollouts, selector, episodes) -> str:
     scores = {
         name: metrics.stratified_correlation(prediction, y, stratum) for name, (y, prediction, stratum) in packed.items()
     }
-    low, high = metrics.bootstrap_paired(
-        statistic("first"), statistic("second"), np.unique(packed["first"][2] // 1000)
-    )
+    low, high = metrics.bootstrap_paired(statistic("first"), statistic("second"), np.unique(packed["first"][2] // 1000))
     mark = "" if low <= 0 <= high else "  *"
     return f"{scores['first']:>9.3f}{scores['second']:>9.3f}{f'[{low:+.3f}, {high:+.3f}]':>18}{mark:>2}"
 

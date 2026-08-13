@@ -24,7 +24,7 @@ readout of the raw observation already reaches 0.871 on seven free cells.
 """
 
 [[entry]]
-match = "runs/maze11"
+match = "runs/maze11.s1234"
 note = """
 11x11, rho=1.0, fixed values, value channel present, 150M steps. The first real
 agent. Colour perfectly predicts which objective is worth more, so the proxy is
@@ -32,7 +32,7 @@ available and the agent is free to take it.
 """
 
 [[entry]]
-match = "runs/clean11fv"
+match = "runs/clean11fv.s1234"
 note = """
 11x11, rho=0.5, fixed values, 150M steps. The single-variable control for
 maze11: colour is uninformative, everything else identical, so the difference
@@ -40,7 +40,7 @@ between them is attributable to the correlation and nothing else.
 """
 
 [[entry]]
-match = "runs/clean11"
+match = "runs/clean11.s1234"
 note = """
 11x11, rho=0.5, values redrawn every episode, 130M steps. Randomised values give
 a probe something to correlate against, which the fixed-value runs cannot: with
@@ -48,7 +48,7 @@ constants there is no per-episode value to regress on.
 """
 
 [[entry]]
-match = "runs/novalue11"
+match = "runs/novalue11.s1234"
 note = """
 11x11, rho=1.0, no value channel at all — colour is the only cue to what an
 objective is worth, so the values are learned constants rather than inputs. The
@@ -58,7 +58,32 @@ episode for a probe to read.
 """
 
 [[entry]]
-match = "runs/novalue11_seed*"
+match = "runs/novalue11.s1234.to250M"
+note = """
+novalue11.s1234 carried from its 140.2M checkpoint to roughly 250M. Training
+performance had flattened long before this -- maze11's return over 125-150M is
++0.3579 against +0.3550 over 70-100M, a gain of +0.003 across 50M steps -- so
+this is not an attempt at a better agent. The question is whether the value axis
+keeps compiling after behaviour has stopped changing, which is the same claim as
+the early-warning experiment at the other end of training.
+
+Run at the fine-tune settings rather than the base run's: constant lr 1e-4,
+values unchanged at (1.0, 0.5). That makes it exactly a null arm taken to its
+limit -- same script, same rate, same values, 147x longer than a 750k arm -- so
+its drift is in the units every arm's drift is measured in.
+
+Two things it is not. It is not the agent a 250M anneal would have produced: the
+original run annealed 4e-4 to 4e-6 over 150M and sat near 3e-5 at 140M, so the
+rate steps up at the restart and returns may dip briefly. And it is a warm
+restart, because a checkpoint saves only cfg.json and model -- Adam's moments are
+stored by nothing in the run and start from zero. The transient is confined to
+the first few thousand of 21,484 updates, but it should not be read as a clean
+continuation. Saving optimiser state is worth fixing for future runs; the
+existing checkpoints cannot benefit from it.
+"""
+
+[[entry]]
+match = "runs/novalue11.s5678"
 note = """
 A second seed of novalue11, identical in every respect but the seed. Every
 value-axis result rests on one agent, so until this exists none of them can
@@ -68,7 +93,7 @@ one run cannot support. Compare at cp_140206080, which both runs save.
 """
 
 [[entry]]
-match = "threeobj_v2/*"
+match = "runs/threeobj.uneven.s1234/arms/*"
 note = """
 The three-objective experiment on values (1.0, 0.55, 0.4), run on a separate
 pod. Gaps of 0.45 and 0.15 give thresholds of 9 and 3 steps against rank gaps of
@@ -86,7 +111,7 @@ reads them.
 """
 
 [[entry]]
-match = "valueaxis_s5678/runs/*"
+match = "runs/novalue11.s5678/arms/*"
 note = """
 The whole two-objective value sweep repeated on a second, independently trained
 agent — both objectives, fourteen arms, 750k steps each. The point is which of
@@ -103,7 +128,7 @@ results/seed-comparison.txt.
 """
 
 [[entry]]
-match = "valueaxis/runs/v050"
+match = "runs/novalue11.s1234/arms/o1+000@3M"
 note = """
 The null arm of the colour-1 sweep: fine-tuned onto the value it already had.
 Whatever it moved is the cost of 585 updates rather than the value, and it is
@@ -113,7 +138,7 @@ extra steps, identical to the base.
 """
 
 [[entry]]
-match = "valueaxis/runs/v*"
+match = "runs/novalue11.s1234/arms/o1*@3M"
 note = """
 Colour 1's value swept 0.3 to 0.9 with colour 0 held at 1.0, 3M steps each from
 novalue11, identical in seed, rate and updates. Fits the value axis. Established
@@ -122,11 +147,11 @@ norm-matched random directions do nothing.
 """
 
 [[entry]]
-match = "valueaxis/runs/c100"
+match = "runs/novalue11.s1234/arms/o0+000@3M"
 note = "The null arm of the colour-0 sweep — same role as v050, at the other objective."
 
 [[entry]]
-match = "valueaxis/runs/c*"
+match = "runs/novalue11.s1234/arms/o0*@3M"
 note = """
 Colour 0's value swept 0.6 to 1.2 with colour 1 held at 0.5, covering the same
 gaps as the colour-1 sweep. Exists to separate a value from the gap between two
@@ -136,7 +161,7 @@ one shared knob rather than two registers.
 """
 
 [[entry]]
-match = "threeobj/runs/base"
+match = "runs/threeobj.even.s1234"
 note = """
 Three objectives worth (1.0, 0.65, 0.3), 11x11, no value channel, trained 80M
 steps. Three objectives because with two the choice turns on a single difference
@@ -156,7 +181,7 @@ better subject. See results/three-objective-gate.txt.
 """
 
 [[entry]]
-match = "threeobj/runs/m_*"
+match = "runs/threeobj.even.s1234/arms/m_*@1M"
 note = """
 Two of the three values moved at once, 1M steps. Held out of every fit: these
 are the composition test. If each objective's worth is held separately then
@@ -167,7 +192,7 @@ predicted at 83.0%.
 """
 
 [[entry]]
-match = "threeobj/runs/o*"
+match = "runs/threeobj.even.s1234/arms/o*@1M"
 note = """
 One objective's value moved at a time, offsets +/-0.1 and +/-0.2, 1M steps.
 Fits one axis per objective. Symmetric offsets on purpose: with them balanced
@@ -176,14 +201,14 @@ which is what produced a confident-looking null in the first two-objective grid.
 """
 
 [[entry]]
-match = "threeobj2/runs/m_*"
+match = "runs/threeobj.even.s1234/arms/m_*@3M"
 note = """
 The composition arms again at the wider offsets, plus one moving all three
 values at once. Held out of every fit, as before.
 """
 
 [[entry]]
-match = "threeobj2/runs/*"
+match = "runs/threeobj.even.s1234/arms/*@3M"
 note = """
 The three-objective grid rerun wide: same base agent, offsets doubled to +/-0.2
 and +/-0.4, arms tripled to 3M steps. The first grid answered composition
@@ -198,11 +223,11 @@ wider grid.
 """
 
 [[entry]]
-match = "levels11"
+match = "levels/values/1.00-0.50@1M"
 note = "The 1M-level dataset every 11x11 fixed-value agent trained on. Fingerprint d0e70f346ac4a46a."
 
 [[entry]]
-match = "levels11rv"
+match = "levels/randomised/levels11rv"
 note = "As levels11, with values redrawn per level. Used by clean11."
 
 [[entry]]
@@ -210,7 +235,7 @@ match = "archive/*"
 note = "Datasets generated before the 2026-08-04 fix; they do not load against current code."
 
 [[entry]]
-match = "valueaxis/levels/*"
+match = "levels/values/*@500k"
 note = """
 One dataset per point of the two-objective sweeps. Values are drawn at
 generation and stored per level, so sweeping them needs one dataset each.
@@ -220,15 +245,39 @@ split membership included, are byte-identical across the grid.
 """
 
 [[entry]]
-match = "threeobj/levels/base"
+match = "levels/values/1.00-0.65-0.30@1M"
 note = "1M levels at (1.0, 0.65, 0.3), for training the three-objective base agent."
 
 [[entry]]
-match = "threeobj*/levels/*"
+match = "levels/values/*@150k"
 note = """
 Arm datasets for the three-objective grids, 150k levels each. Far smaller than
 the base dataset because the arms are far shorter runs: 1M steps is about 100k
 episodes, so 140k training levels is already more than one apiece. Three
 objectives cost 1.75 ms a level against 0.42 for two, so 500k-level arms would
 have put nearly three hours of generation in front of the training run.
+"""
+
+[[entry]]
+match = "levels/values/*@400k"
+note = """
+Arm datasets for the three-objective grid rerun wide, 400k levels each because
+those arms are 3M steps rather than 1M. Same library, keyed by what the
+objectives pay and how many levels there are, so the size is part of the key:
+two datasets at the same values and different counts are not interchangeable,
+since split membership is stored in the dataset itself.
+"""
+
+[[entry]]
+match = "levels/values/1.00-0.55-0.40@1M"
+note = "1M levels at the uneven three-objective values, for training threeobj.uneven.s1234."
+
+[[entry]]
+match = "retired/*"
+note = """
+The pre-migration layout, set aside by `scripts/migrate_volume.py --retire` on
+2026-08-13 after every copy verified byte-identical (146/146). Nothing here is
+referenced by anything; it exists so the rename is reversible by a human who has
+looked at what is in it. Delete it once the analysis has run against the new
+layout, which frees about half the volume.
 """

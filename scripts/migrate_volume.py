@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -126,13 +127,44 @@ def run_config(run: Path) -> dict:
     return {}
 
 
-def arm_name(base_values: tuple[float, ...], arm_values: tuple[float, ...], steps: int) -> str:
+# Old arm names, and which objective each sweep moved. Needed only for the null
+# arms; every other arm says which objective it moved by having moved it.
+_OLD_SWEEP = re.compile(r"^(?:(?P<colour>[vc])\d{3}|o(?P<objective>\d)_\d{3})$")
+
+
+def sweep_objective(old_name: str) -> int | None:
+    """Which objective an old arm directory belonged to, or ``None``.
+
+    ``v`` swept colour 1 and ``c`` swept colour 0; the three-objective grids say
+    it outright.
+    """
+    match = _OLD_SWEEP.fullmatch(old_name)
+    if match is None:
+        return None
+    if match.group("colour"):
+        return 1 if match.group("colour") == "v" else 0
+    return int(match.group("objective"))
+
+
+def arm_name(
+    base_values: tuple[float, ...],
+    arm_values: tuple[float, ...],
+    steps: int,
+    null_objective: int | None = None,
+) -> str:
     """What one arm is called, from what it was trained on rather than its old name.
 
     An arm that moved exactly one objective is that objective's sweep at the
     offset it moved by. An arm that moved several is a composition arm, held out
     of every fit, and is named for the values it carries because it has no
     single offset to be named for.
+
+    The null arms are the exception, and the only place this has to fall back on
+    the old name. Each sweep has one, fine-tuned onto the value the agent already
+    had, and their configurations are identical to the base and to each other --
+    so nothing in what they were trained on says which sweep they measure the
+    drift of. That information exists only in what they were called. Both are
+    real and distinct runs, so collapsing them would silently throw one away.
     """
     if len(base_values) != len(arm_values):
         raise ValueError(f"arm has {len(arm_values)} objectives against the base's {len(base_values)}")
@@ -141,10 +173,12 @@ def arm_name(base_values: tuple[float, ...], arm_values: tuple[float, ...], step
         index = moved[0]
         return arm_dirname(f"o{index}", arm_values[index] - base_values[index], steps)
     if not moved:
-        # The null arm: fine-tuned onto the value it already had, so it measures
-        # drift. Objective 0's sweep by convention; the offset of zero is what
-        # actually identifies it.
-        return arm_dirname("o0", 0.0, steps)
+        if null_objective is None:
+            raise ValueError(
+                "this arm was trained at the base values, so it is a null arm, but its old name "
+                "does not say which sweep it belongs to and its configuration cannot"
+            )
+        return arm_dirname(f"o{null_objective}", 0.0, steps)
     return composition_arm_dirname(arm_values, steps)
 
 
@@ -181,7 +215,7 @@ def plan_runs(root: Path) -> Plan:
                 plan.unaccounted.append((run.relative_to(root), "no readable cfg.json"))
                 continue
             try:
-                name = arm_name(base_values[tag], config["values"], config["steps"])
+                name = arm_name(base_values[tag], config["values"], config["steps"], sweep_objective(run.name))
             except ValueError as error:
                 plan.unaccounted.append((run.relative_to(root), str(error)))
                 continue

@@ -102,8 +102,9 @@ def test_arms_are_named_from_what_they_trained_on(volume: Path) -> None:
 
 
 def test_the_null_arm_is_named_by_its_zero_offset(volume: Path) -> None:
+    """v050 is colour 1's null arm, so it keeps colour 1's sweep and a zero offset."""
     moves = destinations(migrate.plan_runs(volume), volume)
-    assert moves["valueaxis/runs/v050"] == "runs/novalue11.s1234/arms/o0+000@3M"
+    assert moves["valueaxis/runs/v050"] == "runs/novalue11.s1234/arms/o1+000@3M"
 
 
 def test_arm_length_lands_in_the_path(volume: Path) -> None:
@@ -284,3 +285,30 @@ def test_retire_moves_rather_than_deletes(volume: Path) -> None:
 
     assert not (volume / "valueaxis" / "runs" / "v070").exists()
     assert (volume / "retired" / "valueaxis" / "runs" / "v070" / "local-files" / "model").is_file()
+
+
+def test_each_sweeps_null_arm_survives_the_move(volume: Path) -> None:
+    """v050 and c100 are both trained at the base values, so nothing in their
+    configuration says which sweep's drift they measure. Naming both from the
+    values alone collapsed them onto one path and would have thrown one away."""
+    write_run(volume, "valueaxis/runs/c100", [1.0, 0.5], 3_000_000, arm=True)
+
+    plan = migrate.plan_runs(volume)
+    moves = destinations(plan, volume)
+
+    assert plan.collisions() == {}
+    assert moves["valueaxis/runs/v050"] == "runs/novalue11.s1234/arms/o1+000@3M"
+    assert moves["valueaxis/runs/c100"] == "runs/novalue11.s1234/arms/o0+000@3M"
+
+
+def test_old_sweep_prefixes_map_to_the_objective_they_moved() -> None:
+    assert migrate.sweep_objective("v050") == 1
+    assert migrate.sweep_objective("c100") == 0
+    assert migrate.sweep_objective("o2_040") == 2
+    assert migrate.sweep_objective("m_120_045_030") is None
+
+
+def test_a_null_arm_whose_sweep_cannot_be_told_is_refused() -> None:
+    """Better to report it than to guess which drift measurement it is."""
+    with pytest.raises(ValueError, match="does not say which sweep"):
+        migrate.arm_name((1.0, 0.5), (1.0, 0.5), 750_000, None)

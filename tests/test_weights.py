@@ -11,7 +11,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.weights import cosine, explained, fit_axis, fit_axis_and_drift, projected_offset
+from goalmisgen.analysis.weights import (
+    cosine,
+    explained,
+    fit_axis,
+    fit_axis_and_drift,
+    permutation_cosines,
+    permutation_p_value,
+    projected_offset,
+)
 
 
 def linear_family(rng: np.random.Generator, offsets: np.ndarray, noise: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
@@ -164,3 +172,65 @@ def test_an_asymmetric_grid_yields_too_few_pairs_to_estimate_reliability() -> No
     table = {round(o, 3): None for o in offsets}
     pairs = [(m, -m) for m in sorted({abs(o) for o in table}, reverse=True) if m in table and -m in table]
     assert len(pairs) == 2  # 0.2 and 0.1 pair; 0.3 and 0.4 have no partner
+
+
+def test_permutation_null_is_not_centred_on_zero_when_the_diffs_share_drift() -> None:
+    """The whole reason for a permutation null rather than assuming zero.
+
+    Every arm carries the same common component, so two axes fitted from the same
+    agent share structure whether or not value is represented. A null of zero
+    would read that shared drift as evidence.
+    """
+    rng = np.random.default_rng(7)
+    offsets = np.array([-0.4, -0.2, -0.1, 0.1, 0.2, 0.4])
+    drift = 40.0 * rng.normal(size=64)
+    diffs = drift + np.outer(offsets, rng.normal(size=64)) + 0.5 * rng.normal(size=(len(offsets), 64))
+
+    null = permutation_cosines(offsets, diffs, rng.normal(size=64), resamples=200, seed=1)
+
+    assert null.std() > 0.05, "a degenerate null would make every observation look significant"
+
+
+def test_a_real_axis_beats_its_own_permutation_null() -> None:
+    rng = np.random.default_rng(3)
+    offsets = np.array([-0.4, -0.3, -0.2, 0.2, 0.3, 0.4])
+    axis, diffs = linear_family(rng, offsets, noise=0.3)
+
+    observed = cosine(fit_axis_and_drift(offsets, diffs)[0], axis)
+    null = permutation_cosines(offsets, diffs, axis, resamples=400, seed=2)
+
+    assert permutation_p_value(observed, null, alternative="greater") < 0.01
+
+
+def test_shuffled_data_does_not_beat_the_null() -> None:
+    """Guards the test above: the procedure must not declare everything significant."""
+    rng = np.random.default_rng(4)
+    offsets = np.array([-0.4, -0.3, -0.2, 0.2, 0.3, 0.4])
+    reference = rng.normal(size=64)
+    diffs = rng.normal(size=(len(offsets), 64))
+
+    observed = cosine(fit_axis_and_drift(offsets, diffs)[0], reference)
+    null = permutation_cosines(offsets, diffs, reference, resamples=400, seed=5)
+
+    assert permutation_p_value(observed, null, alternative="greater") > 0.05
+
+
+def test_the_null_is_reproducible_from_its_seed() -> None:
+    rng = np.random.default_rng(11)
+    offsets = np.array([-0.3, -0.1, 0.1, 0.3])
+    _, diffs = linear_family(rng, offsets)
+    reference = rng.normal(size=64)
+
+    first = permutation_cosines(offsets, diffs, reference, resamples=50, seed=9)
+    assert np.array_equal(first, permutation_cosines(offsets, diffs, reference, resamples=50, seed=9))
+
+
+def test_p_value_can_never_be_exactly_zero() -> None:
+    """A finite number of resamples cannot license a p of 0."""
+    null = np.zeros(100)
+    assert permutation_p_value(-1.0, null, alternative="less") == pytest.approx(1 / 101)
+
+
+def test_an_unknown_alternative_is_refused() -> None:
+    with pytest.raises(ValueError, match="'less', 'greater' or 'two-sided'"):
+        permutation_p_value(0.0, np.zeros(10), alternative="sideways")

@@ -94,6 +94,68 @@ def cosine(a: np.ndarray, b: np.ndarray) -> float:
     return float(a @ b) / denominator
 
 
+def permutation_cosines(
+    offsets: np.ndarray,
+    diffs: np.ndarray,
+    reference: np.ndarray,
+    resamples: int = 1000,
+    seed: int = 0,
+) -> np.ndarray:
+    """Cosines against ``reference`` when the offsets are shuffled among the diffs.
+
+    The null this builds is *not* "the cosine is zero". Every arm's diff contains
+    a large common component — the cost of running the updates, which the null
+    arm measures and which is the same whatever value was trained — so two axes
+    fitted from two sweeps of the same agent share structure whether or not
+    anything about value is in there. Assuming a null of zero ignores that and
+    reads the shared drift as evidence.
+
+    Shuffling which offset belongs to which diff destroys the association between
+    the parameter and the direction while leaving that shared structure exactly
+    where it was. What comes back is the distribution of cosines obtainable from
+    these diffs with no value signal in them, which is the thing an observed
+    cosine has to beat.
+
+    This replaces dividing by split-half reliability as the load-bearing
+    statistic. That correction reached ×7 on the first grid, and in
+    ``results/three-objective.txt`` it returned cosines outside the range a
+    cosine can take — a correction announcing that it has broken down. A
+    permutation null assumes nothing about how noise scales.
+    """
+    offsets = np.asarray(offsets, dtype=np.float64)
+    diffs = np.asarray(diffs, dtype=np.float64)
+    if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
+        raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
+    rng = np.random.default_rng(seed)
+    drawn = np.empty(resamples, dtype=np.float64)
+    for index in range(resamples):
+        shuffled = rng.permutation(offsets)
+        axis, _ = fit_axis_and_drift(shuffled, diffs)
+        drawn[index] = cosine(axis, reference)
+    return drawn
+
+
+def permutation_p_value(observed: float, null: np.ndarray, alternative: str = "less") -> float:
+    """How often the null reaches at least as far as the observation.
+
+    ``less`` for the one-knob prediction, where the interesting direction is
+    toward −1; ``greater`` for the hierarchical three-objective prediction, whose
+    whole content is that the cosine is *positive*. The +1 in numerator and
+    denominator is the standard correction that stops a p-value of exactly zero
+    being reported from a finite number of resamples.
+    """
+    null = np.asarray(null, dtype=np.float64)
+    if alternative == "less":
+        extreme = int(np.sum(null <= observed))
+    elif alternative == "greater":
+        extreme = int(np.sum(null >= observed))
+    elif alternative == "two-sided":
+        extreme = int(np.sum(np.abs(null) >= abs(observed)))
+    else:
+        raise ValueError(f"alternative should be 'less', 'greater' or 'two-sided', got {alternative!r}")
+    return (extreme + 1) / (len(null) + 1)
+
+
 def projected_offset(diff: np.ndarray, axis: np.ndarray) -> float:
     """How far along ``axis`` a diff reaches, in units of the axis's parameter.
 

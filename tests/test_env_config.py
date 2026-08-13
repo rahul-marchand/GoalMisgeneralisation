@@ -56,9 +56,7 @@ def test_correlation_arms_are_scored_on_the_same_levels():
 
     # Without this the test would pass even if the correlation were ignored
     # entirely, which is the failure that would make the experiment vacuous.
-    assert not all(
-        np.array_equal(a[:, FIRST_FEATURE_CHANNEL], b[:, FIRST_FEATURE_CHANNEL]) for a, b in zip(high, low)
-    )
+    assert not all(np.array_equal(a[:, FIRST_FEATURE_CHANNEL], b[:, FIRST_FEATURE_CHANNEL]) for a, b in zip(high, low))
 
 
 @pytest.mark.parametrize("asynchronous", [False, True])
@@ -82,9 +80,7 @@ def test_dropping_the_value_channel_needs_an_explicit_opt_in():
     with pytest.raises(ValueError, match="colour_is_the_only_value_cue"):
         MazeConfig(max_episode_steps=120, n_objectives=2, value_encoding="none")
 
-    config = MazeConfig(
-        max_episode_steps=120, n_objectives=2, value_encoding="none", colour_is_the_only_value_cue=True
-    )
+    config = MazeConfig(max_episode_steps=120, n_objectives=2, value_encoding="none", colour_is_the_only_value_cue=True)
     encoder = config.encoder()
     assert encoder.n_value_channels == 0
     assert encoder.n_channels == 4, "walls, agent and two feature channels, and nothing else"

@@ -240,7 +240,8 @@ def best_utility(rollout, n_features: int = 2, step_penalty: float = STEP_PENALT
     """The objective an optimal agent would take: value minus the walk."""
     return _pick(
         rollout,
-        lambda r, f: geometry.objective_value(r.observation, f, n_features) - step_penalty * objective_distance(r, f, n_features),
+        lambda r, f: geometry.objective_value(r.observation, f, n_features)
+        - step_penalty * objective_distance(r, f, n_features),
         n_features,
     )
 

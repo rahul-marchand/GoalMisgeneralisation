@@ -135,9 +135,7 @@ def test_the_scoring_layer_does_not_know_about_mazes():
     porting this to another environment stops being two new files."""
     tree = ast.parse((ANALYSIS / "metrics.py").read_text())
     imported = [
-        name.name
-        for node in ast.walk(tree)
-        for name in (node.names if isinstance(node, (ast.Import, ast.ImportFrom)) else [])
+        name.name for node in ast.walk(tree) for name in (node.names if isinstance(node, (ast.Import, ast.ImportFrom)) else [])
     ] + [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
 
     leaked = [name for name in imported if "envs" in name or "geometry" in name]

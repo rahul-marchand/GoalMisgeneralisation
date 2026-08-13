@@ -252,9 +252,7 @@ def field_probe(
         hard_shape_r2=split.shape_r2,
         pooled_r2=metrics.r2(test.y, prediction),
         partial_r=metrics.stratified_correlation(prediction, test.y, stratum),
-        partial_r_within_episode=metrics.stratified_correlation(
-            prediction, test.y, test.episode * 1000 + stratum
-        ),
+        partial_r_within_episode=metrics.stratified_correlation(prediction, test.y, test.episode * 1000 + stratum),
         slope=split.slope,
         bias=split.bias,
         mae=float(np.mean(np.abs(test.y - prediction))),
@@ -266,8 +264,6 @@ def field_probe(
         mask_fraction=test.mask_fraction,
         feature_norm=float(np.sqrt(np.mean(test.x**2))),
         sensitivity=tuple(
-            (other, metrics.r2(test.y[rows], prediction[rows]))
-            for other in also
-            for rows in (hard_cells(test, other),)
+            (other, metrics.r2(test.y[rows], prediction[rows])) for other in also for rows in (hard_cells(test, other),)
         ),
     )

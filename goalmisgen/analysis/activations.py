@@ -204,12 +204,8 @@ def collect_rollouts(
         if probe_params is None:
             probe_carry = carry
         else:
-            probe_carry = policy.apply(
-                probe_params, key, envs.observation_space.shape, method=policy.initialize_carry
-            )
-            probe_carry, _, _, _ = get_action(
-                features_params, probe_carry, observations, starts, key, temperature=0.0
-            )
+            probe_carry = policy.apply(probe_params, key, envs.observation_space.shape, method=policy.initialize_carry)
+            probe_carry, _, _, _ = get_action(features_params, probe_carry, observations, starts, key, temperature=0.0)
         # Applied *before* the extra passes, so probe_steps_to_think measures
         # how much of the displacement survives them. Steering the arithmetic is
         # easy; showing the shift outlives nine gated recurrent updates is what
@@ -220,9 +216,7 @@ def collect_rollouts(
             probe_carry = apply_to_carry(probe_carry, steer_delta)
 
         for _ in range(probe_steps_to_think):
-            probe_carry, _, _, _ = get_action(
-                features_params, probe_carry, observations, starts, key, temperature=0.0
-            )
+            probe_carry, _, _, _ = get_action(features_params, probe_carry, observations, starts, key, temperature=0.0)
 
         initial_carry = jax.tree_util.tree_map(np.asarray, probe_carry)
         initial_obs = np.asarray(observations)
@@ -281,8 +275,8 @@ def collect_rollouts(
                 break
         else:
             raise RuntimeError(
-                f'episodes did not finish within {step_budget} steps; the step limit could not be read '
-                'from the environment, so the capture loop would have retried this seed forever'
+                f"episodes did not finish within {step_budget} steps; the step limit could not be read "
+                "from the environment, so the capture loop would have retried this seed forever"
             )
 
         for index in range(envs.num_envs):

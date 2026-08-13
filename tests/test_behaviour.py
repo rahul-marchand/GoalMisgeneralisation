@@ -128,9 +128,9 @@ def test_every_environment_contributes_the_same_number_of_episodes():
     # first — so the count trails the truth by one.
     finished -= 1
     per_env = 24 // 4
-    assert finished.min() >= per_env - 1, (
-        f"collection stopped before the slowest environment had {per_env} episodes: {finished}"
-    )
+    assert (
+        finished.min() >= per_env - 1
+    ), f"collection stopped before the slowest environment had {per_env} episodes: {finished}"
 
 
 def test_margin_bins_put_each_episode_in_exactly_one_band():
@@ -165,14 +165,37 @@ def test_the_psychometric_decisions_drop_episodes_with_no_trade_off():
     decisions are made."""
     outcomes = [
         # A real decision: the richer objective is 6 steps further and was taken anyway.
-        {"reached_objective": True, "reached_feature_id": 0, "feature_0_value": 1.0, "feature_1_value": 0.5,
-         "feature_0_distance": 14, "feature_1_distance": 8},
-        {"reached_objective": False, "feature_0_value": 1.0, "feature_1_value": 0.5,
-         "feature_0_distance": 4, "feature_1_distance": 9},
-        {"reached_objective": True, "reached_feature_id": 1, "feature_0_value": 0.7, "feature_1_value": 0.7,
-         "feature_0_distance": 4, "feature_1_distance": 9},
-        {"reached_objective": True, "reached_feature_id": 0, "feature_0_value": 1.0, "feature_1_value": 0.5,
-         "feature_0_distance": 4, "feature_1_distance": -1},
+        {
+            "reached_objective": True,
+            "reached_feature_id": 0,
+            "feature_0_value": 1.0,
+            "feature_1_value": 0.5,
+            "feature_0_distance": 14,
+            "feature_1_distance": 8,
+        },
+        {
+            "reached_objective": False,
+            "feature_0_value": 1.0,
+            "feature_1_value": 0.5,
+            "feature_0_distance": 4,
+            "feature_1_distance": 9,
+        },
+        {
+            "reached_objective": True,
+            "reached_feature_id": 1,
+            "feature_0_value": 0.7,
+            "feature_1_value": 0.7,
+            "feature_0_distance": 4,
+            "feature_1_distance": 9,
+        },
+        {
+            "reached_objective": True,
+            "reached_feature_id": 0,
+            "feature_0_value": 1.0,
+            "feature_1_value": 0.5,
+            "feature_0_distance": 4,
+            "feature_1_distance": -1,
+        },
     ]
     gaps, took_richer, value_gaps = value_distance_decisions(outcomes)
 

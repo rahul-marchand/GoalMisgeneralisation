@@ -221,9 +221,7 @@ def select_rows(episode: np.ndarray, chosen: np.ndarray) -> np.ndarray:
     return np.concatenate([rows_of[value] for value in chosen if value in rows_of])
 
 
-def bootstrap_paired(
-    statistic_a, statistic_b, episodes: np.ndarray, resamples: int = 200, seed: int = 0, level: float = 0.95
-):
+def bootstrap_paired(statistic_a, statistic_b, episodes: np.ndarray, resamples: int = 200, seed: int = 0, level: float = 0.95):
     """Interval for ``a - b`` over a common resample of *episodes*.
 
     Two overlapping confidence intervals do not mean two quantities are equal.

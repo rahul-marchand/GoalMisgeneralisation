@@ -44,8 +44,6 @@ import dataclasses
 import json
 import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import cleanba.cleanba_impala
@@ -53,6 +51,7 @@ import farconf
 from cleanba.cleanba_impala import WandbWriter, train
 from cleanba.config import Args
 
+from goalmisgen import provenance
 from goalmisgen.configs.presets import maze_drc33
 from goalmisgen.configs.writers import CsvWriter
 
@@ -193,8 +192,7 @@ def reset_checkpoint(base: Path, destination: Path, config: Args) -> Path:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     config = finetune_config(args)
     updates = config.total_timesteps // local_batch_size(config)

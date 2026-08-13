@@ -58,8 +58,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -68,6 +66,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_rollouts, geometry, metrics, plans, steering
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import (
@@ -479,8 +478,7 @@ def switch_by_gap(records: list[dict], edges=(0.0, 0.15, 0.35, 0.75, 10.0)) -> l
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     fixed_values = args.feature_values
     if args.hide_values and fixed_values is None:
@@ -720,7 +718,7 @@ def main() -> None:
         args.json.write_text(
             json.dumps(
                 {
-                    "commit": commit,
+                    "commit": provenance.commit(),
                     "mode": args.mode,
                     "checkpoint": str(args.checkpoint),
                     "update": update,

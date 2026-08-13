@@ -62,8 +62,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -71,6 +69,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
 
@@ -146,8 +145,7 @@ def evaluate(checkpoint: Path, levels: str, values: tuple[float, ...], args) -> 
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     base_values = tuple(args.base_values)
     print(f"  {'arm':>16}{'values':>24}{'asymmetry':>11}{'optimal':>10}{'reached':>10}")

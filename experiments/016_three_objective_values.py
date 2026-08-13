@@ -43,7 +43,6 @@ from __future__ import annotations
 import argparse
 import itertools
 import re
-import subprocess
 import sys
 from functools import partial
 from pathlib import Path
@@ -53,6 +52,7 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift
@@ -159,8 +159,7 @@ def measure(params, policy, get_action, envs, args, label: str) -> float:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = eval_config(args)
     policy, _, _, base_state, _ = load_train_state(args.base, env_cfg=config)

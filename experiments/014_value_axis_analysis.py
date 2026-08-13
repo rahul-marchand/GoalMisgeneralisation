@@ -47,7 +47,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from functools import partial
 from pathlib import Path
@@ -57,6 +56,7 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, explained, fit_axis_and_drift, projected_offset
@@ -196,8 +196,7 @@ def main() -> None:
     global BASE_VALUE
     args = parse_args()
     BASE_VALUE = args.base_value if args.base_value is not None else (1.0 if args.prefix == "c" else 0.5)
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = eval_config(args)
     policy, _, _, base_state, update = load_train_state(args.base, env_cfg=config)

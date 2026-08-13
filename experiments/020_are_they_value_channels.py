@@ -36,8 +36,6 @@ objective wins, and that is what a value comparison would have to produce.
 from __future__ import annotations
 
 import argparse
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -45,6 +43,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import roc_auc
@@ -136,8 +135,7 @@ def run(params, policy, envs, args, label, transform=None):
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = config_for(args)
     policy, _, _, state, _ = load_train_state(args.base, env_cfg=config)

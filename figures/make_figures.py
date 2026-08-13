@@ -351,8 +351,8 @@ def fig_written_ood():
 
     grid = np.linspace(-0.62, 3.12, 300)
     ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma),
-            color=MUTED, lw=1.2, ls="--", zorder=1)
-    ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)
+            color=MUTED, lw=1.2, ls="--", zorder=1, label="optimal threshold")
+    ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0, label="unedited agent")
     ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
 
     pts = sorted(d["written_ood"], key=lambda r: r["value"])
@@ -368,26 +368,17 @@ def fig_written_ood():
                        key=lambda r: r["value"])
         ax.plot([r["value"] for r in chain], [r["steps"] for r in chain],
                 "s:", color=ORANGE, lw=1.5, ms=6, mfc=SURFACE, mew=1.5, zorder=3,
-                label="written, but the agent is failing episodes" if side is not None and side[0]["value"] > ok[-1]["value"] else None)
+                label="written, agent failing episodes" if side is not None and side[0]["value"] > ok[-1]["value"] else None)
 
     ax.plot([r["value"] for r in d["trained"]], [r["steps"] for r in d["trained"]],
             "o-", color=BLUE, lw=2, ms=6, zorder=5, label="fine-tuned on that value")
 
     # The elbow lands exactly here, which is the point of drawing it: the write
     # keeps working while colour 0 is still the richer of the two and stops the
-    # moment it is not.
+    # moment it is not. Left unlabelled -- the rule at parity and the band over
+    # the fitted values are one sentence each in the text, and spelling them out
+    # on the panel cost more in small print than they returned.
     ax.axvline(other, color=INK2, lw=0.8, ls=(0, (2, 3)), alpha=0.45, zorder=1)
-    ax.annotate("the two written as equal", xy=(1.06, -33.4), color=INK2,
-                fontsize=8.5, alpha=0.75)
-
-    ax.annotate("optimal threshold", xy=(1.62, -7.0), color=MUTED, fontsize=8.5)
-    ax.annotate("values the axis was fitted on", xy=(0.6, -30.0), color=INK2,
-                fontsize=8.5, alpha=0.75, ha="center")
-    ax.annotate("", xy=(0.32, -32.0), xytext=(0.88, -32.0),
-                arrowprops=dict(arrowstyle="<->", color=INK2, alpha=0.5, lw=0.9))
-    ax.annotate("unedited agent", xy=(2.62, 9.2), color=MUTED, fontsize=8.5, ha="right")
-    ax.annotate("past parity the write buys nothing.\nThe agent walks to indifference\nand stops there, while what the\ntask pays keeps falling away.",
-                xy=(-0.55, -13.5), color=INK2, fontsize=8.5, alpha=0.8)
 
     ax.set_xlabel("what colour 1 is written as worth")
     ax.set_ylabel("extra steps walked for colour 0")
@@ -396,8 +387,14 @@ def fig_written_ood():
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
     ax.set_axisbelow(True)
-    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.5,
-                    borderpad=0.2, labelspacing=0.35)
+    handles, labels = ax.get_legend_handles_labels()
+    order = [labels.index(k) for k in
+             ["fine-tuned on that value", "written from the axis",
+              "written, agent failing episodes",
+              "optimal threshold", "unedited agent"]]
+    leg = ax.legend([handles[i] for i in order], [labels[i] for i in order],
+                    loc="upper right", frameon=False, fontsize=8.2,
+                    handletextpad=0.5, borderpad=0.2, labelspacing=0.35)
     for t in leg.get_texts():
         t.set_color(INK2)
     save(fig, "fig12_written_ood")

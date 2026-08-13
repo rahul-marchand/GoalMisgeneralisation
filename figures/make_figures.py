@@ -319,6 +319,90 @@ def fig_ood_writes():
     save(fig, "fig11_ood_writes")
 
 
+# ---------------------------------------------------------------- figure 12
+def fig_written_ood():
+    """Figure 10's panel, with the written values run off the end of the grid.
+
+    Same x axis as figure 10 -- one sweep, one optimal curve, what colour 1 is
+    worth -- so the two panels can be read against each other. The only change is
+    that the writing is not stopped at the values the axis was fitted on.
+
+    The y limit is set by the optimal curve rather than by the data. It reaches
+    -33 steps at the right-hand edge, and clipping it would hide the whole result
+    on that side: the agent does not go a third of the way there, it goes nowhere.
+    Squashing the fitted region to a fifth of the panel is the price, and figure
+    10 is the panel that shows that region properly.
+
+    Open markers are writes where the agent stopped finishing episodes. A
+    threshold measured on a policy that fails two episodes in three is not a
+    preference, and past a gap of about 1.5 in either direction it falls rather
+    than saturating -- which is what a broken policy looks like and not what a
+    weaker one does.
+    """
+    d = json.loads((DATA / "value_axis.json").read_text())
+    penalty, other, base = d["step_penalty"], d["other_objective"], d["base_exchange_rate"]
+    gamma = d["discount"]
+    c = penalty / (1 - gamma)
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+
+    fitted = [r["value"] for r in d["trained"]]
+    ax.axvspan(min(fitted), max(fitted), color=INK2, alpha=0.06, lw=0, zorder=0)
+
+    grid = np.linspace(-0.62, 3.12, 300)
+    ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma),
+            color=MUTED, lw=1.2, ls="--", zorder=1)
+    ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)
+    ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
+
+    pts = sorted(d["written_ood"], key=lambda r: r["value"])
+    WORKS = 0.99
+    ok = [r for r in pts if r["reached"] >= WORKS]
+    ax.plot([r["value"] for r in ok], [r["steps"] for r in ok],
+            "s-", color=ORANGE, lw=2, ms=6, zorder=4, label="written from the axis")
+    for side in ([r for r in pts if r["value"] < ok[0]["value"]],
+                 [r for r in pts if r["value"] > ok[-1]["value"]]):
+        if not side:
+            continue
+        chain = sorted(side + [ok[0] if side[0]["value"] < ok[0]["value"] else ok[-1]],
+                       key=lambda r: r["value"])
+        ax.plot([r["value"] for r in chain], [r["steps"] for r in chain],
+                "s:", color=ORANGE, lw=1.5, ms=6, mfc=SURFACE, mew=1.5, zorder=3,
+                label="written, but the agent is failing episodes" if side is not None and side[0]["value"] > ok[-1]["value"] else None)
+
+    ax.plot([r["value"] for r in d["trained"]], [r["steps"] for r in d["trained"]],
+            "o-", color=BLUE, lw=2, ms=6, zorder=5, label="fine-tuned on that value")
+
+    # The elbow lands exactly here, which is the point of drawing it: the write
+    # keeps working while colour 0 is still the richer of the two and stops the
+    # moment it is not.
+    ax.axvline(other, color=INK2, lw=0.8, ls=(0, (2, 3)), alpha=0.45, zorder=1)
+    ax.annotate("the two written as equal", xy=(1.06, -33.4), color=INK2,
+                fontsize=8.5, alpha=0.75)
+
+    ax.annotate("optimal threshold", xy=(1.62, -7.0), color=MUTED, fontsize=8.5)
+    ax.annotate("values the axis was fitted on", xy=(0.6, -30.0), color=INK2,
+                fontsize=8.5, alpha=0.75, ha="center")
+    ax.annotate("", xy=(0.32, -32.0), xytext=(0.88, -32.0),
+                arrowprops=dict(arrowstyle="<->", color=INK2, alpha=0.5, lw=0.9))
+    ax.annotate("unedited agent", xy=(2.62, 9.2), color=MUTED, fontsize=8.5, ha="right")
+    ax.annotate("past parity the write buys nothing.\nThe agent walks to indifference\nand stops there, while what the\ntask pays keeps falling away.",
+                xy=(-0.55, -13.5), color=INK2, fontsize=8.5, alpha=0.8)
+
+    ax.set_xlabel("what colour 1 is written as worth")
+    ax.set_ylabel("extra steps walked for colour 0")
+    ax.set_xlim(-0.65, 3.15)
+    ax.set_ylim(-35, 35)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
+    ax.set_axisbelow(True)
+    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.5,
+                    borderpad=0.2, labelspacing=0.35)
+    for t in leg.get_texts():
+        t.set_color(INK2)
+    save(fig, "fig12_written_ood")
+
+
 # ---------------------------------------------------------------- figure 2
 def fig_rho_response():
     """The headline: what each agent was actually pursuing.
@@ -795,3 +879,4 @@ if __name__ == "__main__":
     fig_no_value_task()
     fig_written_value()
     fig_ood_writes()
+    fig_written_ood()

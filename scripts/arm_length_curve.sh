@@ -32,15 +32,9 @@ cd "$(dirname "$0")/.."
 DATA="${1:-/workspace/data}"
 OUT="${OUT:-results/arm-length-curve.txt}"
 RESAMPLES="${RESAMPLES:-2000}"
+LEVELS="${DATA}/levels/values/1.00-0.50@500k"
 
 mkdir -p "$(dirname "${OUT}")"
-
-# agent tag : arms directory : levels at the base values
-AGENTS=(
-    "novalue11.s1234"
-    "novalue11.s5678"
-)
-
 {
     echo "How reliability depends on arm length, from checkpoints already on disk."
     echo
@@ -49,27 +43,26 @@ AGENTS=(
     echo
 } > "${OUT}"
 
-for agent in "${AGENTS[@]}"; do
-    base_json="${DATA}/runs/${agent}/BASE.json"
-    if [ ! -f "${base_json}" ]; then
-        echo "  ${agent}: no BASE.json, skipping (run migrate_volume.py first)" | tee -a "${OUT}"
-        continue
-    fi
-    checkpoint="${DATA}/runs/${agent}/$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['checkpoint'])" "${base_json}")"
+for agent in novalue11.s1234 novalue11.s5678; do
     arms="${DATA}/runs/${agent}/arms"
-    levels="${DATA}/levels/values/1.00-0.50@150k"
-    [ -d "${levels}" ] || levels="${DATA}/levels/values/1.00-0.50@500k"
+    base="${DATA}/runs/${agent}/BASE.json"
+    [ -d "${arms}" ] || { echo "  ${agent}: no arms, skipping" | tee -a "${OUT}"; continue; }
+
+    checkpoint="${DATA}/runs/${agent}/$(uv run python -c "import json,sys;print(json.load(open(sys.argv[1]))['checkpoint'])" "${base}")"
+    # One sweep length per agent today; ask the directory rather than assume.
+    steps=$(uv run python -c "
+from pathlib import Path
+from goalmisgen.volume import arm_lengths
+print(sorted(arm_lengths(Path('${arms}')))[0])")
 
     for at in 0 1 2 3; do
-        echo "=== ${agent}, checkpoint index ${at} ===" | tee -a "${OUT}"
+        budget=$(uv run python -c "print(f'{${steps} * (${at} + 1) // 4:,}')")
+        echo "=== ${agent}, arms of ${steps} steps read at index ${at} (~${budget} steps) ===" | tee -a "${OUT}"
         # --skip-behaviour: this asks about the weight estimate only, and the
         # behavioural pass is most of the runtime.
         uv run python experiments/015_value_or_gap.py \
-            --base "${checkpoint}" \
-            --arms "${arms}" \
-            --levels "${levels}" \
-            --at "${at}" \
-            --resamples "${RESAMPLES}" \
+            --base "${checkpoint}" --arms "${arms}" --levels "${LEVELS}" \
+            --arm-steps "${steps}" --at "${at}" --resamples "${RESAMPLES}" \
             --skip-behaviour >> "${OUT}" 2>&1 || echo "  failed at index ${at}" >> "${OUT}"
     done
 done

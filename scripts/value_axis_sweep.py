@@ -65,6 +65,23 @@ def parse_args() -> argparse.Namespace:
         "behavioural can, since the choice turns on the difference alone.",
     )
     parser.add_argument("--steps", type=int, default=750_000, help="Per arm. Shorter arms have been the cleaner ones.")
+    parser.add_argument(
+        "--offsets",
+        type=float,
+        nargs="+",
+        default=None,
+        help="The positive side of the grid; each is mirrored. Defaults to the design in "
+        "goalmisgen/design.py. Give this to reproduce an earlier grid exactly, which a "
+        "replication has to do.",
+    )
+    parser.add_argument(
+        "--allow-reorder",
+        action="store_true",
+        help="Permit arms whose values reorder the objectives. Refused by default: with two "
+        "objectives that is the agent being asked to hold the opposite preference, and the "
+        "writes fail there. With three it is deliberate -- the grid has to span rank changes, "
+        "because a task whose choice reduces to one difference cannot need two dimensions.",
+    )
     parser.add_argument("--arm-levels", type=int, default=150_000)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--checkpoints", type=int, default=4)
@@ -134,8 +151,12 @@ def main() -> None:
     checkpoint, base_values = read_base(args.data, args.agent)
     objectives = args.objectives if args.objectives is not None else list(range(len(base_values)))
 
-    arms = [arm for objective in objectives for arm in sweep_arms(objective)]
+    offsets = tuple(args.offsets) if args.offsets else None
+    arms = [arm for objective in objectives for arm in sweep_arms(objective, offsets=offsets)]
     problems = check_no_preference_flip(base_values, arms)
+    if problems and args.allow_reorder:
+        print(f"  {len(problems)} arms reorder the objectives, allowed explicitly")
+        problems = []
     if problems:
         print("These arms reorder the objectives, which makes them a different task:")
         for problem in problems:

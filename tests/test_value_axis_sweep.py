@@ -195,6 +195,35 @@ def test_sweeping_one_objective_is_allowed_but_halves_the_arms(volume: Path) -> 
 
 
 def test_the_estimate_scales_with_arm_length(volume: Path) -> None:
-    short = dry_run(volume, "novalue11.s1234", "--steps", "400000")
-    assert "50 x 400,000 steps" in short
-    assert "~1.3 h" in short
+    """Asserted as a ratio, not a literal: the hours depend on MEASURED_SPS, which
+    is a property of the hardware and was retuned once already."""
+    import re
+
+    def hours(out: str) -> float:
+        return float(re.search(r"~([\d.]+) h", out).group(1))
+
+    for steps in (400_000, 800_000):
+        expected = 50 * steps / sweep.MEASURED_SPS / 3600
+        assert hours(dry_run(volume, "novalue11.s1234", "--steps", str(steps))) == pytest.approx(expected, abs=0.05)
+
+
+def test_offsets_can_be_given_to_reproduce_an_earlier_grid(volume: Path) -> None:
+    """A replication has to use the grid it is replicating, not the current default."""
+    out = dry_run(volume, "novalue11.s1234", "--objectives", "1", "--offsets", "0.2", "0.4")
+
+    assert "o1+040@750k" in out
+    assert "o1-020@750k" in out
+    assert "o1+045@750k" not in out
+    assert "arms         5 x 750,000 steps" in out
+
+
+def test_reordering_can_be_allowed_explicitly(volume: Path) -> None:
+    """Refused by default; deliberate for three objectives, where the grid must
+    span rank changes because a one-difference task cannot need two dimensions."""
+    # Objective 0 down by 0.55 lands at 0.45, below objective 1's 0.5, so the
+    # ranking changes. Swept the other way it would mirror to a negative reward,
+    # which values_tag refuses outright.
+    out = dry_run(volume, "novalue11.s1234", "--objectives", "0", "--offsets", "0.55", "--allow-reorder")
+
+    assert "reorder the objectives, allowed explicitly" in out
+    assert "o0-055@750k" in out

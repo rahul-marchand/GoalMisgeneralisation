@@ -193,4 +193,37 @@ Stated now so it cannot be renegotiated later:
 
 ## Amendments
 
-*(none yet)*
+**2026-08-14 — Phase 7 ran early, and one premise it was written on was wrong.**
+
+Recorded because the value of this file is that departures from it are visible.
+No prediction below has been changed; these are deviations in procedure and one
+correction of fact.
+
+1. **Phase 7 ran before Phase 3.** It was written as gated on the
+   base-checkpoint ladder, on the reasoning that if the axis is settled by
+   cp_70M then Phase 7 is a predicted null. It was run first at the author's
+   request. Phase 3 is still outstanding, so the gate that would have made this
+   run's outcome predictable was never evaluated. That weakens what a null
+   result here would mean, and should be stated wherever it is reported.
+
+2. **It is not a warm restart.** Phase 7 above says any extension "is a warm
+   restart and must be labelled as one", inferred from a checkpoint directory
+   holding only `cfg.json` and `model`. That inference was wrong: `model` is the
+   serialised `TrainState`, which carries `opt_state`. The base checkpoint holds
+   87 opt_state leaves, 60 non-zero, at step 219072, and
+   `finetune_with_noop_head` is False so the optimiser is never rebuilt. Adam's
+   moments were carried across.
+
+3. **Learning rate was not specified in advance and had to be chosen.** The
+   original run annealed 4e-4 to 4e-6 over 150M and sat near 3e-5 at 140M, and
+   the schedule is undefined past 150M. A constant 1e-4 was chosen — the
+   fine-tuning rate — which makes the run exactly a null arm taken to its limit
+   and puts its drift in the units every arm's drift is measured in. It does not
+   produce the agent a 250M anneal would have.
+
+4. **Recorded before the axis is fitted, so it cannot be read post-hoc:**
+   return fell from +0.3735 to a minimum of +0.2956 at the rate change and
+   recovered to +0.3573, against the base run's ~+0.358. Training performance
+   ended where it started, which is the premise the experiment rests on.
+
+*(no further amendments)*

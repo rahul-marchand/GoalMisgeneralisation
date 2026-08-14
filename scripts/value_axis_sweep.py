@@ -39,10 +39,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from goalmisgen.design import arm_values, check_no_preference_flip, leverage, sweep_arms  # noqa: E402
 from goalmisgen.volume import dataset_dirname  # noqa: E402
 
-# Median ``charts/0/SPS`` across maze11, clean11fv and clean11, all of which
-# trained 150M steps on one GPU. Used only to print an estimate before a sweep
-# commits hours to it.
-MEASURED_SPS = 4_200
+# Median ``charts/0/SPS`` measured on an RTX 4090, which is what the campaign
+# runs on. The original 150M runs managed 4,200 on whatever they used; the
+# bottleneck is the learner update, so a faster card converts almost linearly
+# into throughput and a 4090 is 2.33x the original. Used only to print an
+# estimate before a sweep commits hours to it.
+MEASURED_SPS = 9_800
 
 # Seconds to construct one level, by objective count: a maze plus a
 # breadth-first search per objective, and a mutual reachability check beyond two.

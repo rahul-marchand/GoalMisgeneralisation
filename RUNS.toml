@@ -290,3 +290,64 @@ referenced by anything; it exists so the rename is reversible by a human who has
 looked at what is in it. Delete it once the analysis has run against the new
 layout, which frees about half the volume.
 """
+
+[[entry]]
+match = "runs/*/arms/*@400k"
+note = """
+The wide value grid, 25 arms an objective at offsets spanning +/-0.45 with most
+of them in a tight band at the extremes. Leverage 3.05 against the first grid's
+0.28, because the axis is a fitted slope and its precision goes as the spread of
+the offsets, not their number -- see goalmisgen/design.py.
+
+400k steps with eight checkpoints each, so every sweep carries its own
+arm-length curve and the read-out length is chosen when the axis is fitted
+rather than guessed beforehand. That mattered: reliability rose monotonically at
+every length measured, from 0.14 at 3M to 0.51 at 187k, and never turned over,
+so no length could be defended in advance.
+"""
+
+[[entry]]
+match = "runs/novalue11.s1234.at*"
+note = """
+A view of an earlier checkpoint of novalue11.s1234, so a grid can be fine-tuned
+from it: local-files is a symlink and only BASE.json is real. Asks whether the
+value axis is settled long before base training ends, which is what the 250M
+extension should have been gated on and was not.
+"""
+
+[[entry]]
+match = "runs/novalue11.s9012"
+note = """
+A third seed of novalue11, identical but for the seed. Two seeds cannot put an
+interval on anything, so this is the smallest number that lets "DRC agents
+trained this way do X" be said at all. Predictions for it were registered in
+Preregistration.md before it was trained, including two expected to fail: its
+indifference point should match neither existing seed, and its channel
+localisation should overlap theirs at chance.
+"""
+
+[[entry]]
+match = "runs/threeobj.uneven.s*"
+note = """
+Further seeds of the uneven three-objective task (1.0, 0.55, 0.4), testing out
+of sample a hierarchical account that was fitted to one agent after seeing its
+numbers. The registered prediction is cos(axis_1, axis_2) = 0.53 +/- 0.12 with
+12-22% of the variance in the second dimension. Sign alone separates it from
+every rival: absolute value registers predict ~0, difference-only axes -0.5, one
+shared knob -1, and only the hierarchical account predicts a positive cosine.
+
+Swept at the original grid rather than the current default -- +/-0.2 and +/-0.4,
+and +/-0.15 and +/-0.3 for objective 2 -- because a replication has to use the
+design it is replicating. Those offsets cross rank boundaries deliberately.
+"""
+
+[[entry]]
+match = "runs/maze11.s1234/arms/*"
+note = """
+The value grid on an agent that has a value channel, against novalue11 which
+does not. maze11 can read what an objective is worth off its input, so it has no
+reason to compile the constant into its weights, and the registered prediction
+is an axis under half the size at comparable drift. This is the only place
+Experiment 1's agents and Experiment 2's method meet.
+"""
+

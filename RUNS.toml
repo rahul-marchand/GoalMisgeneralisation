@@ -72,14 +72,23 @@ values unchanged at (1.0, 0.5). That makes it exactly a null arm taken to its
 limit -- same script, same rate, same values, 147x longer than a 750k arm -- so
 its drift is in the units every arm's drift is measured in.
 
-Two things it is not. It is not the agent a 250M anneal would have produced: the
-original run annealed 4e-4 to 4e-6 over 150M and sat near 3e-5 at 140M, so the
-rate steps up at the restart and returns may dip briefly. And it is a warm
-restart, because a checkpoint saves only cfg.json and model -- Adam's moments are
-stored by nothing in the run and start from zero. The transient is confined to
-the first few thousand of 21,484 updates, but it should not be read as a clean
-continuation. Saving optimiser state is worth fixing for future runs; the
-existing checkpoints cannot benefit from it.
+One thing it is not: the agent a 250M anneal would have produced. The original
+run annealed 4e-4 to 4e-6 over 150M and sat near 3e-5 at 140M, so the rate steps
+up here. That step is visible -- return fell from +0.3735 to a minimum of +0.2956
+before recovering to +0.3573, against the base run's ~+0.358. So 110M further
+steps at the fine-tune rate left training performance where it found it, which is
+the premise the experiment rests on.
+
+It is *not* a warm restart, contrary to what was assumed when it was launched.
+``save_train_state`` serialises the whole TrainState, so ``model`` carries
+``opt_state`` and not merely the parameters: the base checkpoint holds 87
+opt_state leaves, 60 of them non-zero, with step=219072. ``reset_checkpoint``
+copies that file byte for byte and resets only the two counters that would
+otherwise end the run before it began, and ``finetune_with_noop_head`` is False
+so the branch that rebuilds the optimiser never runs. Adam's moments were
+carried across. The learning rate is genuinely the constant 1e-4 that was asked
+for, confirmed against ``losses/learning_rate`` rather than assumed -- the
+restored hyperparameter is overwritten each update by ``inject_hyperparams``.
 """
 
 [[entry]]

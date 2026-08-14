@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -88,6 +89,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--dry-run", action="store_true", help="Print the plan and the estimate, run nothing.")
     return parser.parse_args()
+
+
+def is_complete(run_dir: Path, steps: int) -> bool:
+    """Did this arm reach the length its name claims?
+
+    Presence of *a* checkpoint is not enough. An arm killed part way leaves the
+    ones it had already saved, and resuming would skip it and then fit it as
+    though it had run the full budget -- a 200k arm sitting in the grid under a
+    @400k name, which is precisely the silent incomparability the naming scheme
+    exists to prevent. Checkpoints are named in steps, so the last one says how
+    far the arm actually got.
+    """
+    saved = [int(p.name[3:]) for p in run_dir.glob("local-files/cp_*") if p.name[3:].isdigit()]
+    return bool(saved) and max(saved) >= 0.98 * steps
 
 
 def read_base(data: Path, agent: str) -> tuple[Path, tuple[float, ...]]:
@@ -192,9 +207,17 @@ def main() -> None:
     for index, arm in enumerate(arms, start=1):
         values = arm_values(base_values, arm)
         run_dir = args.data / "runs" / args.agent / "arms" / arm.dirname(args.steps)
-        if list(run_dir.glob("local-files/cp_*")):
-            print(f"  [{index:>3}/{len(arms)}] {run_dir.name} already has a checkpoint")
+        if is_complete(run_dir, args.steps):
+            print(f"  [{index:>3}/{len(arms)}] {run_dir.name} already complete")
             continue
+        if run_dir.exists():
+            reached = [int(p.name[3:]) for p in run_dir.glob("local-files/cp_*") if p.name[3:].isdigit()]
+            print(
+                f"  [{index:>3}/{len(arms)}] {run_dir.name} stopped at "
+                f"{max(reached, default=0):,} of {args.steps:,}, retraining"
+            )
+            if not args.dry_run:
+                shutil.rmtree(run_dir)
         print(f"  [{index:>3}/{len(arms)}] {run_dir.name}  values {values}  seed {arm.seed}")
         if args.dry_run:
             continue

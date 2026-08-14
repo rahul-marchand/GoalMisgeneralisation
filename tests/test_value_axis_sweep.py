@@ -107,14 +107,18 @@ def test_an_existing_dataset_is_reused_rather_than_regenerated(volume: Path) -> 
     assert "generate 1.00-0.95@150k" not in out
 
 
-def test_an_arm_that_already_has_a_checkpoint_is_skipped(volume: Path) -> None:
-    """So an interrupted sweep can be re-run without repeating work."""
-    done = volume / "runs" / "novalue11.s1234" / "arms" / "o1+045@750k" / "local-files" / "cp_1"
+def test_a_finished_arm_is_skipped(volume: Path) -> None:
+    """So an interrupted sweep can be re-run without repeating work.
+
+    Completion is judged by the length reached, not by a checkpoint existing —
+    see test_an_arm_that_stopped_early_is_retrained_not_counted.
+    """
+    done = volume / "runs" / "novalue11.s1234" / "arms" / "o1+045@750k" / "local-files" / "cp_748800"
     done.mkdir(parents=True)
 
     out = dry_run(volume, "novalue11.s1234")
 
-    assert "o1+045@750k already has a checkpoint" in out
+    assert "o1+045@750k already complete" in out
 
 
 def test_a_grid_that_would_reorder_the_objectives_stops_the_sweep(tmp_path: Path) -> None:
@@ -227,3 +231,25 @@ def test_reordering_can_be_allowed_explicitly(volume: Path) -> None:
 
     assert "reorder the objectives, allowed explicitly" in out
     assert "o0-055@750k" in out
+
+
+def test_an_arm_that_stopped_early_is_retrained_not_counted(volume: Path) -> None:
+    """A killed arm leaves the checkpoints it had. Skipping it would fit a 200k
+    arm as though it had run to 400k, under a name claiming 400k."""
+    arm = volume / "runs" / "novalue11.s1234" / "arms" / "o1+045@400k" / "local-files"
+    arm.mkdir(parents=True)
+    (arm / "cp_046080").mkdir()
+    (arm / "cp_199680").mkdir()
+
+    out = dry_run(volume, "novalue11.s1234", "--steps", "400000")
+
+    assert "o1+045@400k stopped at 199,680 of 400,000, retraining" in out
+    assert "o1+045@400k already complete" not in out
+
+
+def test_an_arm_that_reached_its_length_is_left_alone(volume: Path) -> None:
+    arm = volume / "runs" / "novalue11.s1234" / "arms" / "o1+045@400k" / "local-files"
+    arm.mkdir(parents=True)
+    (arm / "cp_399360").mkdir()
+
+    assert "o1+045@400k already complete" in dry_run(volume, "novalue11.s1234", "--steps", "400000")

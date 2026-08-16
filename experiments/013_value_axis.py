@@ -130,6 +130,14 @@ def base_hides_values(checkpoint: Path) -> bool:
     except (OSError, json.JSONDecodeError):
         return True
     env = payload.get("cfg", payload).get("train_env", {})
+    # ``value_encoding`` is the field to read: every run records it, and it says
+    # directly whether the observation carries a value channel. The first attempt
+    # at this read ``colour_is_the_only_value_cue``, which maze11's config does
+    # not contain at all -- so the lookup returned its default and the fix
+    # silently kept the behaviour it was meant to correct.
+    encoding = env.get("value_encoding")
+    if encoding is not None:
+        return encoding == "none"
     return bool(env.get("colour_is_the_only_value_cue", True))
 
 

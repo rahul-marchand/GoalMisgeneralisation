@@ -89,3 +89,20 @@ def test_the_value_channel_is_read_from_the_base_not_assumed(tmp_path) -> None:
 def test_an_unreadable_base_config_keeps_the_old_behaviour(tmp_path) -> None:
     """Every existing sweep was on an agent without a value channel."""
     assert value_axis.base_hides_values(tmp_path) is True
+
+
+def test_an_agent_recording_only_value_encoding_is_read_correctly(tmp_path) -> None:
+    """maze11's config has no colour_is_the_only_value_cue key at all, so a
+    lookup with a default silently returned the wrong answer. value_encoding is
+    recorded by every run and says directly whether there is a value channel."""
+    import json
+
+    withvalue = tmp_path / "withvalue"
+    withvalue.mkdir()
+    (withvalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"value_encoding": "at_objective"}}}))
+    novalue = tmp_path / "novalue"
+    novalue.mkdir()
+    (novalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"value_encoding": "none"}}}))
+
+    assert value_axis.base_hides_values(withvalue) is False
+    assert value_axis.base_hides_values(novalue) is True

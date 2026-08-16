@@ -344,10 +344,10 @@ design it is replicating. Those offsets cross rank boundaries deliberately.
 [[entry]]
 match = "runs/maze11.s1234/arms/*"
 note = """
-The value grid on an agent that has a value channel, against novalue11 which
-does not. maze11 can read what an objective is worth off its input, so it has no
-reason to compile the constant into its weights, and the registered prediction
-is an axis under half the size at comparable drift. This is the only place
-Experiment 1's agents and Experiment 2's method meet.
+Abandoned. This was to be the value grid on an agent that has a value channel,
+as a control against novalue11 which does not, but fine-tuning a value-channel
+agent is not a question this project wants to spend on. Any partial arms here
+were deleted; the directory should not exist. See the 2026-08-16 amendment in
+Preregistration.md.
 """
 

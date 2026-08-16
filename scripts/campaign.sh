@@ -19,9 +19,13 @@
 #
 #   1  seed 5678's wide sweep      ~0.3 h   makes the headline claim n=2 at high leverage
 #   2  base-checkpoint ladder      ~0.6 h   was meant to gate the 250M extension
-#   3  maze11 bridge               ~0.3 h   the only genuinely new question in the campaign
-#   4  third two-objective seed    ~4.8 h   takes every Experiment 2 claim to n=3
-#   5  two three-objective seeds   ~5.5 h   takes the n=1 post-hoc hierarchy to n=3
+#   3  third two-objective seed    ~4.8 h   takes every Experiment 2 claim to n=3
+#   4  two three-objective seeds   ~5.5 h   takes the n=1 post-hoc hierarchy to n=3
+#
+# The maze11 bridge was removed on request. It fine-tuned the one agent that has
+# a value channel, as a control on whether an agent that can *read* what an
+# objective is worth bothers to compile it into its weights. Every value-axis
+# result is and remains on four-channel agents.
 
 set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
@@ -128,17 +132,12 @@ for cp in cp_070103040 cp_100146560; do
     fi
 done
 
-echo "############ 3. maze11 bridge ############"
-# maze11 has a value channel, so it can read what an objective is worth instead
-# of compiling it in. The prediction is a much smaller axis at comparable drift.
-sweep maze11.s1234
-
-echo "############ 4. third two-objective seed ############"
+echo "############ 3. third two-objective seed ############"
 SEED=9012 NOTE="A third seed of novalue11, identical but for the seed. Takes the one-knob, exchange-rate and channel-localisation claims to n=3, which is the smallest number that supports an interval." \
     train_base novalue11.s9012 150000000 1.0 0.5
 sweep novalue11.s9012
 
-echo "############ 5. two more three-objective seeds ############"
+echo "############ 4. two more three-objective seeds ############"
 # The grid has to be the one being replicated, not the current default. The
 # original threeobj_v2 swept objectives 0 and 1 at +/-0.2 and +/-0.4 and
 # objective 2 at +/-0.15 and +/-0.3 -- narrower because 0.4 sits close to its

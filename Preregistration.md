@@ -226,4 +226,16 @@ correction of fact.
    recovered to +0.3573, against the base run's ~+0.358. Training performance
    ended where it started, which is the premise the experiment rests on.
 
+**2026-08-16 — Phase 4, the Exp1/Exp2 bridge, will not be run.**
+
+Dropped at the author's direction: it is the one measurement that fine-tunes an
+agent with a value channel, and that is not a question this project wants to
+spend on. Recorded rather than deleted, because a registered prediction that
+goes untested should be visibly untested rather than quietly absent.
+
+The predictions stand unevaluated: that `‖axis‖` on `maze11` would be under half
+of `novalue11`'s at comparable drift, and that the axis's loading on the colour
+channels might predict the ρ collapse. Nothing else depends on them — every
+value-axis claim rests on four-channel agents, and still does.
+
 *(no further amendments)*

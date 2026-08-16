@@ -33,12 +33,22 @@ CHECKPOINTS="${CHECKPOINTS:-4}"
 LOGS="${DATA}/logs"
 mkdir -p "${LOGS}"
 
+# A stage that fails must not take the stages after it with it. The maze11
+# bridge died on every attempt because 013 assumed every agent had no value
+# channel, and `set -e` meant the third seed and both three-objective seeds --
+# the bulk of the campaign -- never started at all.
+FAILED_STAGES=""
+
 sweep() {  # agent [extra args...]
     local agent="$1"; shift
     echo "=== sweep ${agent} at ${ARM_STEPS} steps ==="
-    uv run python scripts/value_axis_sweep.py --data "${DATA}" --agent "${agent}" \
+    if ! uv run python scripts/value_axis_sweep.py --data "${DATA}" --agent "${agent}" \
         --steps "${ARM_STEPS}" --checkpoints "${CHECKPOINTS}" "$@" \
-        >> "${LOGS}/sweep-${agent}.log" 2>&1
+        >> "${LOGS}/sweep-${agent}.log" 2>&1; then
+        echo "  !! sweep ${agent} FAILED -- see ${LOGS}/sweep-${agent}.log"
+        FAILED_STAGES="${FAILED_STAGES} sweep:${agent}"
+        return 0
+    fi
 }
 
 train_base() {  # tag steps values... ; trains only if absent
@@ -59,7 +69,9 @@ print(values_tag([$(echo "$@" | tr ' ' ',')]))")@1M"
         --min-size 11 --max-size 11 --n-objectives "${n}" --objective-values "$@" \
         --hide-values --seed "${SEED:-1234}" \
         --run-dir "${DATA}/runs/${tag}" \
-        --note "${NOTE:-Campaign base agent ${tag}.}" >> "${LOGS}/train-${tag}.log" 2>&1
+        --note "${NOTE:-Campaign base agent ${tag}.}" >> "${LOGS}/train-${tag}.log" 2>&1 || {
+            echo "  !! training ${tag} FAILED -- see ${LOGS}/train-${tag}.log"
+            FAILED_STAGES="${FAILED_STAGES} train:${tag}"; return 0; }
     uv run python - "${DATA}/runs/${tag}" <<'PY'
 import json, sys
 from pathlib import Path
@@ -141,4 +153,8 @@ for seed in 5678 9012; do
 done
 
 echo
+if [ -n "${FAILED_STAGES}" ]; then
+    echo "CAMPAIGN_INCOMPLETE -- failed:${FAILED_STAGES}"
+    exit 1
+fi
 echo "CAMPAIGN_COMPLETE"

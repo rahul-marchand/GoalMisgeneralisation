@@ -67,3 +67,25 @@ def test_the_agent_never_sees_a_value_channel():
     env = value_axis.finetune_config(args).train_env
     assert env.value_encoding == "none"
     assert env.colour_is_the_only_value_cue is True
+
+
+def test_the_value_channel_is_read_from_the_base_not_assumed(tmp_path) -> None:
+    """013 was written for novalue11 and hardcoded hide_values=True, so
+    fine-tuning maze11 -- which has a value channel -- built a four-channel
+    network against five-channel weights and died on a shape error."""
+    import json
+
+    novalue = tmp_path / "novalue"
+    novalue.mkdir()
+    (novalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"colour_is_the_only_value_cue": True}}}))
+    withvalue = tmp_path / "withvalue"
+    withvalue.mkdir()
+    (withvalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"colour_is_the_only_value_cue": False}}}))
+
+    assert value_axis.base_hides_values(novalue) is True
+    assert value_axis.base_hides_values(withvalue) is False
+
+
+def test_an_unreadable_base_config_keeps_the_old_behaviour(tmp_path) -> None:
+    """Every existing sweep was on an agent without a value channel."""
+    assert value_axis.base_hides_values(tmp_path) is True

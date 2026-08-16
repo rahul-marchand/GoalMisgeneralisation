@@ -115,6 +115,24 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def base_hides_values(checkpoint: Path) -> bool:
+    """Whether the agent being fine-tuned was trained without a value channel.
+
+    Read from the base rather than assumed. This script was written for
+    ``novalue11``, which has no value channel, and hardcoded that -- so
+    fine-tuning ``maze11``, which has one, built a four-channel network against
+    five-channel weights and died on
+    ``ScopeParamShapeError: expected (3, 3, 5, 32) but got (3, 3, 4, 32)``.
+    The observation format belongs to the agent, not to the fine-tune.
+    """
+    try:
+        payload = json.loads((checkpoint / "cfg.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return True
+    env = payload.get("cfg", payload).get("train_env", {})
+    return bool(env.get("colour_is_the_only_value_cue", True))
+
+
 def finetune_config(args: argparse.Namespace) -> Args:
     """The base run's configuration, with the value swapped and the schedule flattened."""
     values = tuple(args.objective_values) if args.objective_values else (args.value_zero, args.value)
@@ -124,7 +142,7 @@ def finetune_config(args: argparse.Namespace) -> Args:
         max_size=args.size,
         n_objectives=len(values),
         objective_values=values,
-        hide_values=True,
+        hide_values=base_hides_values(args.checkpoint),
         total_timesteps=args.steps,
         level_dataset=args.levels,
         seed=args.seed,

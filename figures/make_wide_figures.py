@@ -50,20 +50,23 @@ mpl.rcParams.update(
 )
 
 
-def optimal_threshold(values: np.ndarray, other: float, penalty: float, gamma: float) -> np.ndarray:
-    """Extra steps worth walking for the richer objective, under discounting.
+def optimal_threshold(v0: np.ndarray, v1: np.ndarray, penalty: float, gamma: float) -> np.ndarray:
+    """Extra steps worth walking for colour 0 rather than colour 1.
 
-    Setting the two discounted returns equal gives g^D (c + other) = c + v with
-    c = penalty/(1-g). The distance already walked cancels, so the threshold
-    depends on the two values alone and not on how far away anything is.
-    The measurement is "extra steps walked for whichever objective is richer",
-    which is a magnitude: ``value_distance_decisions`` picks the richer one per
-    episode. So this is the absolute value. Without it the curve is correct only
-    while the swept objective is the poorer of the two, and inverts the moment it
-    overtakes -- which the colour-0 sweep does over its whole range.
+    Setting the two discounted returns equal gives g^D (c + v0) = c + v1 with
+    c = penalty/(1-g), so D = log((c+v1)/(c+v0))/log g. The distance already
+    walked cancels: the threshold depends on the two values alone.
+
+    Signed, and relative to colour 0 specifically. Every arm is scored on one
+    held-out set at the *base* values, where colour 0 is the richer objective, so
+    that is what ``value_distance_decisions`` measures against for every arm
+    whatever it was trained on. Negative therefore means something real -- the
+    agent should prefer colour 1 -- and an absolute value here would fold the
+    arms trained past the flip back up on top of the ones before it, hiding the
+    one thing they were trained to show.
     """
     c = penalty / (1 - gamma)
-    return np.abs(np.log((c + values) / (c + other)) / np.log(gamma))
+    return np.log((c + v1) / (c + v0)) / np.log(gamma)
 
 
 def band(ax, points, colour, label, marker="o"):
@@ -94,13 +97,16 @@ def main() -> None:
         trained = entry["trained"]
         v = np.array([p["value"] for p in trained])
 
+        swept = int(entry["sweep"][1:])
         grid = np.linspace(v.min() - 0.02, v.max() + 0.02, 200)
-        ax.plot(grid, optimal_threshold(grid, other, d["step_penalty"], d["discount"]),
-                color=MUTED, lw=1.1, ls="--", zorder=1)
-        opt = optimal_threshold(grid, other, d["step_penalty"], d["discount"])
-        peak = int(np.argmax(opt))
+        # The swept objective takes the grid value; the other keeps its fixed one.
+        v0, v1 = (grid, np.full_like(grid, other)) if swept == 0 else (np.full_like(grid, other), grid)
+        opt = optimal_threshold(v0, v1, d["step_penalty"], d["discount"])
+        ax.plot(grid, opt, color=MUTED, lw=1.1, ls="--", zorder=1)
+        peak = int(np.argmax(np.abs(opt)))
         ax.annotate("optimal", xy=(grid[peak], opt[peak]), xytext=(8, -10),
                     textcoords="offset points", color=MUTED, fontsize=8)
+        ax.axhline(0, color=INK2, lw=0.8, alpha=0.45, zorder=1)
 
         base = d["base_exchange_rate"].get(entry["agent"])
         if base is not None:
@@ -112,7 +118,6 @@ def main() -> None:
                  "predicted: axis written in, that value held out", marker="s")
 
         n = entry["n"]
-        swept = int(entry["sweep"][1:])
         seed = entry["agent"].split(".")[-1]
         ax.set_title(
             f"colour {swept} swept, colour {1 - swept} fixed at {other:g}"

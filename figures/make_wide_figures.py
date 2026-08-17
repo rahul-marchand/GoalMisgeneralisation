@@ -121,6 +121,14 @@ def main() -> None:
 
         band(ax, trained, BLUE, "trained: one fine-tune per value")
         if beyond:
+            # Only the *trained* arms are negated. Their sign is known from what
+            # they were trained at -- colour 1 worth more than colour 0, so the
+            # agent prefers colour 1. A written point has no training value to
+            # read a sign off, and the estimator does not carry one: writing this
+            # axis at +0.45 produced 16.6, a strong colour-0 preference, so
+            # positive offsets push toward colour 0 and the written points belong
+            # above the line, not below it.
+            #
             # Plotted below the axis because the estimator is unsigned: a logistic
             # whose slope flips with the preference returns the mirror of the
             # crossing, not a negative one. These arms were trained with the swept
@@ -148,53 +156,35 @@ def main() -> None:
         # The main axis extrapolated past the flip: same orange as the other
         # written points, same diamond as the other past-the-flip points. Shape
         # says which regime, colour says trained or written.
-        # Only where there are trained arms past the flip to compare against.
-        # 014's --extrapolate defaults to [1.1, 0.2], so every sweep carries a
-        # stray point on the far side of the crossing; plotting those put an
-        # extrapolation on three panels where nothing was ever trained there, and
-        # a written point with nothing to check it against says nothing.
+        # The main axis, written. Inside the grid each point holds its own arm
+        # out of the fit; past the grid there is no arm to hold out, so those are
+        # simply written from the whole fit. Same axis, same operation, one line.
+        written = list(entry.get("written_heldout") or [])
         unseen = (entry.get("written_unseen") or []) if beyond else []
-        flipped_side = [r for r in unseen if (r["value"] > other if swept == 1 else r["value"] < other)]
-        if flipped_side:
-            v_u = np.array([r["value"] for r in flipped_side])
-            s_u = -np.array([r["steps"] for r in flipped_side])
-            ax.plot(
-                v_u,
-                s_u,
-                "D--",
-                color=ORANGE,
-                ms=4.8,
-                lw=1.4,
-                mfc=SURFACE,
-                mec=ORANGE,
-                mew=1.5,
-                zorder=4,
-                label="axis written past the flip (extrapolated)",
-            )
-
-        # The axis fitted on the flipped arms alone, held out against its own
-        # arms. Same negation as everything past the flip, though for these the
-        # sign is the least of it: the fit predicts twenty steps where its arms
-        # sit at three. Kept on the plot because a fit that fails this visibly is
-        # worth seeing next to one that does not.
-        if beyond and beyond.get("written_heldout"):
-            f = beyond["written_heldout"]
-            ax.plot(
-                [r["value"] for r in f],
-                [-r["steps"] for r in f],
-                "s:",
-                color=ORANGE,
-                ms=5.0,
-                lw=1.2,
-                mfc=SURFACE,
-                mec=ORANGE,
-                mew=1.5,
-                zorder=4,
-                label="axis fitted only past the flip, held out (fails)",
-            )
-
-        if entry.get("written_heldout"):
-            band(ax, entry["written_heldout"], ORANGE, "predicted: axis written in, that value held out", marker="s")
+        written += [r for r in unseen if (r["value"] > other if swept == 1 else r["value"] < other)]
+        if written:
+            inside = [r for r in written if r not in unseen]
+            outside = [r for r in written if r in unseen]
+            band(ax, sorted(inside, key=lambda r: r["value"]), ORANGE, "the axis, written (that value held out)", marker="s")
+            if outside:
+                # Same axis, same write, but no arm was trained there to hold
+                # out: extrapolation rather than a prediction with a matching
+                # fine-tune to check it. Hollow, same size, joined to the last
+                # solid point so the continuation is visible.
+                bridge = sorted(inside, key=lambda r: r["value"])[-1:] + sorted(outside, key=lambda r: r["value"])
+                ax.plot(
+                    [r["value"] for r in bridge],
+                    [r["steps"] for r in bridge],
+                    "s--",
+                    color=ORANGE,
+                    ms=4.2,
+                    lw=0.9,
+                    mfc=SURFACE,
+                    mec=ORANGE,
+                    mew=1.3,
+                    zorder=5,
+                    label="the same axis, written beyond the grid",
+                )
 
         n = entry["n"]
         seed = entry["agent"].split(".")[-1]

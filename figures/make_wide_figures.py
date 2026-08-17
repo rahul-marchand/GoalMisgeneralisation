@@ -82,6 +82,10 @@ def band(ax, points, colour, label, marker="o"):
 def main() -> None:
     d = json.loads((DATA / "wide_value_axis.json").read_text())
     entries = [e for e in d["series"] if e.get("trained")]
+    # x sweeps extend an o sweep past the flip; they belong on its panel, not
+    # on one of their own.
+    past = {(e["agent"], "o" + e["sweep"][1:]): e for e in entries if e["sweep"].startswith("x")}
+    entries = [e for e in entries if not e["sweep"].startswith("x")]
     if not entries:
         raise SystemExit("no series with trained arms — run figures/extract_wide_axis.py first")
 
@@ -89,7 +93,7 @@ def main() -> None:
     rows = -(-len(entries) // cols)
     fig, axes = plt.subplots(rows, cols, figsize=(5.9 * cols, 4.1 * rows), squeeze=False, sharey=True)
     flat = [a for row in axes for a in row]
-    for ax in flat[len(entries):]:
+    for ax in flat[len(entries) :]:
         ax.set_visible(False)
 
     for ax, entry in zip(flat, entries):
@@ -98,14 +102,17 @@ def main() -> None:
         v = np.array([p["value"] for p in trained])
 
         swept = int(entry["sweep"][1:])
-        grid = np.linspace(v.min() - 0.02, v.max() + 0.02, 200)
+        beyond = past.get((entry["agent"], entry["sweep"]))
+        span = list(v) + ([p["value"] for p in beyond["trained"]] if beyond else [])
+        grid = np.linspace(min(span) - 0.02, max(span) + 0.02, 300)
         # The swept objective takes the grid value; the other keeps its fixed one.
         v0, v1 = (grid, np.full_like(grid, other)) if swept == 0 else (np.full_like(grid, other), grid)
         opt = optimal_threshold(v0, v1, d["step_penalty"], d["discount"])
         ax.plot(grid, opt, color=MUTED, lw=1.1, ls="--", zorder=1)
         peak = int(np.argmax(np.abs(opt)))
-        ax.annotate("optimal", xy=(grid[peak], opt[peak]), xytext=(8, -10),
-                    textcoords="offset points", color=MUTED, fontsize=8)
+        ax.annotate(
+            "optimal", xy=(grid[peak], opt[peak]), xytext=(8, -10), textcoords="offset points", color=MUTED, fontsize=8
+        )
         ax.axhline(0, color=INK2, lw=0.8, alpha=0.45, zorder=1)
 
         base = d["base_exchange_rate"].get(entry["agent"])
@@ -113,9 +120,32 @@ def main() -> None:
             ax.axhline(base, color=MUTED, lw=0.7, ls=":", zorder=0)
 
         band(ax, trained, BLUE, "trained: one fine-tune per value")
+        if beyond:
+            # Plotted below the axis because the estimator is unsigned: a logistic
+            # whose slope flips with the preference returns the mirror of the
+            # crossing, not a negative one. These arms were trained with the swept
+            # colour worth MORE than the other, so the sign is known from the
+            # training values even though the measurement cannot carry it.
+            b = beyond["trained"]
+            v_b = np.array([p["value"] for p in b])
+            s_b = -np.array([p["steps"] for p in b])
+            ax.fill_between(
+                v_b, -np.array([p["hi"] for p in b]), -np.array([p["lo"] for p in b]), color=AQUA, alpha=0.18, lw=0, zorder=2
+            )
+            ax.plot(
+                v_b,
+                s_b,
+                "D-",
+                color=AQUA,
+                ms=4.2,
+                lw=1.6,
+                mec=SURFACE,
+                mew=0.7,
+                zorder=3,
+                label="past the flip: swept colour now the richer one",
+            )
         if entry.get("written_heldout"):
-            band(ax, entry["written_heldout"], ORANGE,
-                 "predicted: axis written in, that value held out", marker="s")
+            band(ax, entry["written_heldout"], ORANGE, "predicted: axis written in, that value held out", marker="s")
 
         n = entry["n"]
         seed = entry["agent"].split(".")[-1]
@@ -130,7 +160,9 @@ def main() -> None:
 
     for row in axes:
         row[0].set_ylabel("extra steps walked for the richer objective")
-    flat[0].legend(loc="upper center", fontsize=8.5)
+    richest = max(flat[: len(entries)], key=lambda a: len(a.get_legend_handles_labels()[0]))
+    handles, labels = richest.get_legend_handles_labels()
+    flat[0].legend(handles, labels, loc="upper center", fontsize=8.5)
 
     fig.tight_layout()
     for ext in ("pdf", "png"):
@@ -139,9 +171,11 @@ def main() -> None:
 
     for entry in entries:
         t = entry["trained"]
-        print(f"  {entry['agent']} {entry['sweep']}: values {t[0]['value']:.2f}-{t[-1]['value']:.2f}, "
-              f"steps {t[-1]['steps']:.1f}-{t[0]['steps']:.1f}, "
-              f"min reach {min(p['reach'] for p in t):.1f}%")
+        print(
+            f"  {entry['agent']} {entry['sweep']}: values {t[0]['value']:.2f}-{t[-1]['value']:.2f}, "
+            f"steps {t[-1]['steps']:.1f}-{t[0]['steps']:.1f}, "
+            f"min reach {min(p['reach'] for p in t):.1f}%"
+        )
 
 
 if __name__ == "__main__":

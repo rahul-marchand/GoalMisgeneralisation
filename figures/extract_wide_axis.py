@@ -32,8 +32,9 @@ ROW = re.compile(
     re.MULTILINE,
 )
 BASE = re.compile(r"^\s+base, untouched\s+(-?\d+\.\d)", re.MULTILINE)
-# results/wide-novalue11.s1234-o1-heldout.txt -> seed 1234, sweep o1
-NAME = re.compile(r"^wide-(?P<agent>[\w.]+?)-(?P<sweep>o\d)(?P<heldout>-heldout)?$")
+# results/wide-novalue11.s1234-o1-heldout.txt -> seed 1234, sweep o1.
+# ``x`` sweeps are the one-sided arms past the flip, held out of every fit.
+NAME = re.compile(r"^wide-(?P<agent>[\w.]+?)-(?P<sweep>[ox]\d)(?P<heldout>-heldout)?$")
 
 KIND = {
     "fine-tuned": "trained",

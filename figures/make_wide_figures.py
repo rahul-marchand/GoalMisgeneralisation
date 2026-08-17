@@ -130,19 +130,20 @@ def main() -> None:
             v_b = np.array([p["value"] for p in b])
             s_b = -np.array([p["steps"] for p in b])
             ax.fill_between(
-                v_b, -np.array([p["hi"] for p in b]), -np.array([p["lo"] for p in b]), color=AQUA, alpha=0.18, lw=0, zorder=2
+                v_b, -np.array([p["hi"] for p in b]), -np.array([p["lo"] for p in b]), color=BLUE, alpha=0.18, lw=0, zorder=2
             )
             ax.plot(
                 v_b,
                 s_b,
                 "D-",
-                color=AQUA,
-                ms=4.2,
+                color=BLUE,
+                ms=4.8,
                 lw=1.6,
-                mec=SURFACE,
-                mew=0.7,
+                mfc=SURFACE,
+                mec=BLUE,
+                mew=1.5,
                 zorder=3,
-                label="past the flip: swept colour now the richer one",
+                label="trained past the flip (held out of the fit)",
             )
         if entry.get("written_heldout"):
             band(ax, entry["written_heldout"], ORANGE, "predicted: axis written in, that value held out", marker="s")

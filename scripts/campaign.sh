@@ -55,9 +55,20 @@ sweep() {  # agent [extra args...]
     fi
 }
 
-train_base() {  # tag steps values... ; trains only if absent
+train_base() {  # tag steps values... ; trains only if not already finished
     local tag="$1" steps="$2"; shift 2
-    if [ -d "${DATA}/runs/${tag}/local-files" ]; then echo "  ${tag} present"; return; fi
+    # Finished means a saved checkpoint, not a directory. cleanba creates
+    # local-files as soon as it starts, so a run killed before its first save
+    # leaves an empty one -- and checking for the directory declared it done,
+    # skipped it on every retry, and left the sweep failing forty times on a base
+    # that did not exist. Same mistake as judging an arm by a file existing.
+    if [ -n "$(ls "${DATA}/runs/${tag}/local-files" 2>/dev/null | grep '^cp_')" ]; then
+        echo "  ${tag} present"; return
+    fi
+    if [ -d "${DATA}/runs/${tag}" ]; then
+        echo "  ${tag} has no saved checkpoint, restarting it"
+        rm -rf "${DATA}/runs/${tag}"
+    fi
     local n=$#; local levels="${DATA}/levels/values/$(uv run python -c "
 from goalmisgen.volume import values_tag
 print(values_tag([$(echo "$@" | tr ' ' ',')]))")@1M"

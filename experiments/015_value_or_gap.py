@@ -1,9 +1,9 @@
 """Is the knob a value, or the gap between two values?
 
     uv run python experiments/015_value_or_gap.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs \
-        --levels /workspace/data/valueaxis/levels/v050
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms \
+        --levels /workspace/data/levels/values/1.00-0.50@500k
 
 ``014`` found a direction that sets the agent's exchange rate, and showed it
 writes values it was never fitted on. That is weaker than it sounds, because on
@@ -92,7 +92,7 @@ COLOUR_ONE_BASE = 0.5
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base", type=Path, required=True)
-    parser.add_argument("--arms", type=Path, required=True, help="Holds both the vXXX and cXXX run directories.")
+    parser.add_argument("--arms", type=Path, required=True, help="An agent's arms/ directory, holding both objectives' sweeps.")
     parser.add_argument("--levels", type=str, required=True, help="Levels at the base values; the test split is used.")
     parser.add_argument("--episodes", type=int, default=2048)
     parser.add_argument(

@@ -1,6 +1,6 @@
 """Mean optimal utility of the levels an evaluation arm actually scores.
 
-    uv run python scripts/optimum.py --levels /workspace/data/levels11rv --randomise-values
+    uv run python scripts/optimum.py --levels /workspace/data/levels/randomised/levels11rv --randomise-values
 
 An evaluation curve only means something against the best score achievable on
 the levels it was scored on. cleanba's evaluator re-creates its environments

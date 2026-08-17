@@ -1,8 +1,8 @@
 """Fine-tune onto a new objective value, and keep the weight change.
 
     uv run python experiments/013_value_axis.py CHECKPOINT --value 0.7 \
-        --levels /workspace/data/valueaxis/levels/v070 \
-        --run-dir /workspace/data/valueaxis/runs/v070
+        --levels /workspace/data/levels/values/1.00-0.70@500k \
+        --run-dir /workspace/data/runs/novalue11.s1234/arms/v070
 
 ``novalue11`` never saw a value channel. Its objectives were worth the constants
 (1.0, 0.5), bound to colour, every single episode. So there is no per-episode

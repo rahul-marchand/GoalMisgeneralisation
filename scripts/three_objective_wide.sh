@@ -28,7 +28,7 @@ set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 cd "$(dirname "$0")/.."
 
-BASE="${BASE:-/workspace/data/threeobj2}"
+BASE="${BASE:-/workspace/data/runs/threeobj.even.s1234}"
 DONOR="${DONOR:-/workspace/data/threeobj}"
 CHECKPOINT="${CHECKPOINT:-$(ls -d "${DONOR}"/runs/base/local-files/cp_* | tail -1)}"
 ARM_STEPS="${ARM_STEPS:-3000000}"

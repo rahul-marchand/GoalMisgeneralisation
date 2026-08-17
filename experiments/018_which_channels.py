@@ -1,10 +1,10 @@
 """Does the value axis use particular ConvLSTM channels, and the same ones twice?
 
     uv run python experiments/018_which_channels.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs \
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms \
         --sweep v 0.5 --sweep c 1.0 \
-        --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+        --levels /workspace/data/levels/values/1.00-0.50@500k --objective-values 1.0 0.5
 
 ``017`` found the axis spread over the whole network and only mildly enriched in
 the first recurrent layer, which is a long way short of a circuit. This looks

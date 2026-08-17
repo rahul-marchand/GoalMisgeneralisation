@@ -40,7 +40,7 @@ set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 cd "$(dirname "$0")/.."
 
-BASE="${BASE:-/workspace/data/threeobj_v2}"
+BASE="${BASE:-/workspace/data/runs/threeobj.uneven.s1234}"
 STEPS="${STEPS:-80000000}"
 ARM_STEPS="${ARM_STEPS:-750000}"
 LR="${LR:-1e-4}"

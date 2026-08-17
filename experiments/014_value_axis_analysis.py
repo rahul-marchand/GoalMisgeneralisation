@@ -1,9 +1,9 @@
 """Is what an objective is worth held in a slot, or compiled into a threshold?
 
     uv run python experiments/014_value_axis_analysis.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs \
-        --levels /workspace/data/valueaxis/levels/v050
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms \
+        --levels /workspace/data/levels/values/1.00-0.50@500k
 
 ``013`` fine-tunes the same agent onto a grid of values for colour 1, producing
 one weight change per value. This asks what those changes have in common.
@@ -69,7 +69,7 @@ BASE_VALUE = 0.5  # default; --base-value overrides for the colour-0 sweep
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base", type=Path, required=True, help="The checkpoint every arm was fine-tuned from.")
-    parser.add_argument("--arms", type=Path, required=True, help="Directory of 013 run directories, named vXXX.")
+    parser.add_argument("--arms", type=Path, required=True, help="An agent's arms/ directory, holding runs named like o1+020@400k.")
     parser.add_argument("--levels", type=str, required=True, help="Levels at the base values; the test split is used.")
     parser.add_argument("--episodes", type=int, default=2048)
     parser.add_argument("--num-envs", type=int, default=64)

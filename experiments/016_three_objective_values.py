@@ -1,9 +1,9 @@
 """With three objectives, does the agent hold a value per objective?
 
     uv run python experiments/016_three_objective_values.py \
-        --base /workspace/data/threeobj/runs/base/local-files/cp_XXXXXXXX \
-        --arms /workspace/data/threeobj/runs \
-        --levels /workspace/data/threeobj/levels/base
+        --base /workspace/data/runs/threeobj.even.s1234/local-files/cp_XXXXXXXX \
+        --arms /workspace/data/runs/threeobj.even.s1234/arms \
+        --levels /workspace/data/levels/values/1.00-0.65-0.30@1M
 
 ``015`` could not decide between a value per objective and a single threshold on
 the distance gap, because with two objectives the choice turns on one difference

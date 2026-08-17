@@ -1,9 +1,9 @@
 """Do the enriched channels carry the decision, in the agent's own activations?
 
     uv run python experiments/020_are_they_value_channels.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
         --channels 7 1 --layer 0 \
-        --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+        --levels /workspace/data/levels/values/1.00-0.50@500k --objective-values 1.0 0.5
 
 Everything so far is about weights. ``018`` found two channels of the first
 recurrent layer carrying about twice their share of the value axis, and ``019``

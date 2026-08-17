@@ -13,8 +13,8 @@ set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 cd "$(dirname "$0")/.."
 
-BASE="${1:-/workspace/data/valueaxis}"
-CHECKPOINT="${CHECKPOINT:-/workspace/data/runs/novalue11/local-files/cp_140206080}"
+BASE="${1:-/workspace/data/runs/novalue11.s1234}"
+CHECKPOINT="${CHECKPOINT:-/workspace/data/runs/novalue11.s1234/local-files/cp_140206080}"
 DEADLINE=$(( SECONDS + ${WAIT_SECONDS:-14400} ))
 
 while ! grep -q GRID_COMPLETE "${BASE}/logs/grid.log" 2>/dev/null; do

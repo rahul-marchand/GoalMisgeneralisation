@@ -1,9 +1,9 @@
 """Keep only the channels that carry the axis, and see what still works.
 
     uv run python experiments/019_restrict_the_axis.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs --prefix v --base-value 0.5 \
-        --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms --prefix v --base-value 0.5 \
+        --levels /workspace/data/levels/values/1.00-0.50@500k --objective-values 1.0 0.5
 
 ``018`` found the axis enriched about twice over in a couple of hidden channels
 of each recurrent layer. This asks what happens if the rest is thrown away.

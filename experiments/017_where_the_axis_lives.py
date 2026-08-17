@@ -1,8 +1,8 @@
 """What is actually moving: the shared part, and where the value axis sits.
 
     uv run python experiments/017_where_the_axis_lives.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs --prefix v --base-value 0.5
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms --prefix v --base-value 0.5
 
 Two questions the behavioural work leaves open.
 

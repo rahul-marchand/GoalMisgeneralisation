@@ -1,9 +1,9 @@
 """Is each arm actually good at the task it was fine-tuned on?
 
     uv run python experiments/021_own_task.py \
-        --arms /workspace/data/threeobj2/runs --levels /workspace/data/threeobj2/levels \
-        --base /workspace/data/threeobj/runs/base/local-files/cp_70103040 \
-        --base-levels /workspace/data/threeobj/levels/base --base-values 1.0 0.65 0.3
+        --arms /workspace/data/runs/threeobj.even.s1234/arms --levels /workspace/data/levels/values \
+        --base /workspace/data/runs/threeobj.even.s1234/local-files/cp_70103040 \
+        --base-levels /workspace/data/levels/values/1.00-0.65-0.30@1M --base-values 1.0 0.65 0.3
 
 Every three-objective grid so far produced three collinear axes, and the
 explanation on offer is that the base task admitted a one-parameter solution and

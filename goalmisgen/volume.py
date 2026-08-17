@@ -152,6 +152,36 @@ def composition_arm_dirname(values: Iterable[float], steps: int) -> str:
     return f"m{tags}@{steps_tag(steps)}"
 
 
+def composition_arm_values(name: str) -> tuple[float, ...] | None:
+    """The values a composition arm was trained at, or ``None`` if it is not one.
+
+    The inverse of :func:`composition_arm_dirname`. Composition arms carry their
+    values outright rather than an offset, because they move several at once and
+    so have no single offset to be named for.
+    """
+    if not is_composition_arm(name):
+        return None
+    return tuple(int(part) / 100 for part in name.split("@")[0].split("_")[1:])
+
+
+def arm_trained_values(name: str, base_values: tuple[float, ...]) -> tuple[float, ...] | None:
+    """What an arm's objectives paid, from its directory name alone.
+
+    Reading them from the name keeps the analysis honest if a grid is edited: a
+    table in a script can drift out of step with what was actually run, a
+    directory name cannot.
+    """
+    parsed = parse_arm_dirname(name)
+    if parsed is not None:
+        index = int(parsed.sweep[1:])
+        if not 0 <= index < len(base_values):
+            return None
+        values = list(base_values)
+        values[index] = round(values[index] + parsed.offset, 10)
+        return tuple(values)
+    return composition_arm_values(name)
+
+
 def values_tag(values: Iterable[float]) -> str:
     """``(1.0, 0.5)`` -> ``1.00-0.50``, the key of a shared level dataset.
 

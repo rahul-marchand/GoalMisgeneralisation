@@ -19,7 +19,9 @@ from goalmisgen.volume import (
     ArmName,
     arm_dirname,
     arm_lengths,
+    arm_trained_values,
     composition_arm_dirname,
+    composition_arm_values,
     dataset_dirname,
     discover_arms,
     is_composition_arm,
@@ -203,3 +205,30 @@ def test_legacy_sweep_prefixes_still_resolve() -> None:
 def test_an_unrecognised_sweep_name_is_refused() -> None:
     with pytest.raises(ValueError, match="does not name a sweep"):
         sweep_index("colour1")
+
+
+def test_arm_trained_values_reads_an_offset_arm() -> None:
+    """016 and 021 parsed the retired names with their own regexes and so found
+    nothing on the migrated volume. One function now answers for both."""
+    assert arm_trained_values("o1-020@1M", (1.0, 0.65, 0.3)) == (1.0, 0.45, 0.3)
+    assert arm_trained_values("o0+020@3M", (1.0, 0.5)) == (1.2, 0.5)
+
+
+def test_arm_trained_values_reads_a_composition_arm() -> None:
+    assert arm_trained_values("m_120_045_030@1M", (1.0, 0.65, 0.3)) == (1.2, 0.45, 0.3)
+    assert composition_arm_values("m_120_045_030@1M") == (1.2, 0.45, 0.3)
+
+
+def test_composition_values_round_trip() -> None:
+    values = (1.2, 0.45, 0.3)
+    assert composition_arm_values(composition_arm_dirname(values, 1_000_000)) == values
+
+
+def test_arm_trained_values_refuses_a_sweep_the_agent_does_not_have() -> None:
+    """A two-objective agent has no objective 2."""
+    assert arm_trained_values("o2+020@1M", (1.0, 0.5)) is None
+
+
+def test_arm_trained_values_ignores_things_that_are_not_arms() -> None:
+    assert arm_trained_values("logs", (1.0, 0.5)) is None
+    assert arm_trained_values("v070", (1.0, 0.5)) is None

@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import itertools
-import re
 import sys
 from functools import partial
 from pathlib import Path
@@ -53,10 +52,11 @@ from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
 from goalmisgen import provenance
-from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
+from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import arm_trained_values
 
 BASE_VALUES = (1.0, 0.65, 0.3)
 """What the base agent was trained at. Overridden by --base-values, since the
@@ -109,15 +109,7 @@ def arm_values(name: str) -> tuple[float, ...] | None:
     the analysis honest if a grid is edited: a table here could drift out of
     step with what was actually run, a directory name cannot.
     """
-    if (single := re.fullmatch(r"o(\d)_(\d{3})", name)) is not None:
-        index, value = int(single.group(1)), int(single.group(2)) / 100
-        values = list(BASE_VALUES)
-        values[index] = value
-        return tuple(values)
-    if (mixed := re.fullmatch(r"m(?:_(\d{3})){3}", name)) is not None:
-        del mixed
-        return tuple(int(part) / 100 for part in name.split("_")[1:])
-    return None
+    return arm_trained_values(name, BASE_VALUES)
 
 
 def load_arms(root: Path, at: int, base_flat, config) -> dict[str, tuple[tuple[float, ...], np.ndarray]]:

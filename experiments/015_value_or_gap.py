@@ -305,7 +305,7 @@ def main() -> None:
         print("\n\n=== can colour 1's axis write colour 0's arms? ===\n")
         print(f"  {'':>32}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
         measure(base_state.params, policy, get_action, envs, args, "base, untouched")
-        checkpoints = arm_checkpoints(args.arms, "c", args.at)
+        checkpoints = arm_checkpoints(args.arms, "c", args.at, COLOUR_ZERO_BASE, args.arm_steps)
         crossed: list[tuple[float, float, float, float]] = []
         for value in values_zero:
             offset = value - COLOUR_ZERO_BASE
@@ -357,7 +357,9 @@ def main() -> None:
             args,
             f"colour 0 = {value:.2f} written, held out",
         )
-        _, _, _, arm_state, _ = load_train_state(arm_checkpoints(args.arms, "c", args.at)[value], env_cfg=config)
+        _, _, _, arm_state, _ = load_train_state(
+            arm_checkpoints(args.arms, "c", args.at, COLOUR_ZERO_BASE, args.arm_steps)[value], env_cfg=config
+        )
         trained = measure(arm_state.params, policy, get_action, envs, args, f"colour 0 = {value:.2f} fine-tuned")
         rows.append((value, trained, written))
 

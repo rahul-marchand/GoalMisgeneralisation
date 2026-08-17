@@ -61,7 +61,6 @@ grids are a fact about the measurement rather than about the agent.
 from __future__ import annotations
 
 import argparse
-import re
 from functools import partial
 from pathlib import Path
 
@@ -72,6 +71,7 @@ from cleanba.cleanba_impala import load_train_state
 from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import arm_trained_values
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,13 +90,7 @@ def parse_args() -> argparse.Namespace:
 
 def values_of(tag: str, base: tuple[float, ...]) -> tuple[float, ...] | None:
     """The value triple an arm trained at, from its directory name."""
-    if (single := re.fullmatch(r"o(\d)_(\d{3})", tag)) is not None:
-        values = list(base)
-        values[int(single.group(1))] = int(single.group(2)) / 100
-        return tuple(values)
-    if re.fullmatch(r"m(?:_\d{3}){%d}" % len(base), tag) is not None:
-        return tuple(int(part) / 100 for part in tag.split("_")[1:])
-    return None
+    return arm_trained_values(tag, base)
 
 
 def asymmetry(values: tuple[float, ...]) -> float:

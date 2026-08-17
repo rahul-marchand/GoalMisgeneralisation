@@ -1,0 +1,80 @@
+commit 9e5c49f
+argv   --base /workspace/data/threeobj/runs/base/local-files/cp_70103040 --arms /workspace/data/threeobj2/runs --levels /workspace/data/threeobj/levels/base
+
+base cp_70103040  (1,449,893 parameters)  values (1.0, 0.65, 0.3)
+
+arms
+     m_080_085_030  values (0.8, 0.85, 0.3)  offset (-0.2, 0.2, 0.0)  |delta| 13.5
+     m_100_085_010  values (1.0, 0.85, 0.1)  offset (0.0, 0.2, -0.2)  |delta| 13.62
+     m_120_045_030  values (1.2, 0.45, 0.3)  offset (0.2, -0.2, 0.0)  |delta| 14.57
+     m_120_045_050  values (1.2, 0.45, 0.5)  offset (0.2, -0.2, 0.2)  |delta| 13.99
+     m_120_065_010  values (1.2, 0.65, 0.1)  offset (0.2, 0.0, -0.2)  |delta| 14.35
+            o0_060  values (0.6, 0.65, 0.3)  offset (-0.4, 0.0, 0.0)  |delta| 13.98
+            o0_080  values (0.8, 0.65, 0.3)  offset (-0.2, 0.0, 0.0)  |delta| 13.87
+            o0_120  values (1.2, 0.65, 0.3)  offset (0.2, 0.0, 0.0)  |delta| 14.19
+            o0_140  values (1.4, 0.65, 0.3)  offset (0.4, 0.0, 0.0)  |delta| 14.66
+            o1_025  values (1.0, 0.25, 0.3)  offset (0.0, -0.4, 0.0)  |delta| 14.1
+            o1_045  values (1.0, 0.45, 0.3)  offset (0.0, -0.2, 0.0)  |delta| 13.75
+            o1_085  values (1.0, 0.85, 0.3)  offset (0.0, 0.2, 0.0)  |delta| 13.79
+            o1_105  values (1.0, 1.05, 0.3)  offset (0.0, 0.4, 0.0)  |delta| 13.32
+            o2_005  values (1.0, 0.65, 0.05)  offset (0.0, 0.0, -0.25)  |delta| 13.92
+            o2_020  values (1.0, 0.65, 0.2)  offset (0.0, 0.0, -0.1)  |delta| 13.96
+            o2_040  values (1.0, 0.65, 0.4)  offset (0.0, 0.0, 0.1)  |delta| 13.43
+            o2_055  values (1.0, 0.65, 0.55)  offset (0.0, 0.0, 0.25)  |delta| 13.39
+
+
+=== how much of each axis is signal? ===
+
+  objective 0: |axis|     23.22   split-half reliability +0.160
+  objective 1: |axis|     21.01   split-half reliability +0.077
+  objective 2: |axis|     33.62   split-half reliability +0.033
+
+  Two disjoint symmetric pairs of arms give two estimates of the same axis.
+  Everything below is attenuated by whatever this falls short of 1.
+
+=== are the three axes distinct directions? ===
+
+        pair    cosine   corrected
+      0 vs 1    -0.194      -1.746
+      0 vs 2    -0.134      -1.846
+      1 vs 2     0.067       1.330
+
+  |axis_0 + axis_1 + axis_2| / mean|axis| = 1.638
+  Adding a constant to every value changes no choice, so a representation that
+  holds only differences should put this near zero, and absolute per-objective
+  registers need not. Three unrelated directions would give about 1.7.
+
+
+=== composition: two values moved at once ===
+
+               arm               offsets   cos(sum, actual)  |sum|/|actual|
+     m_080_085_030      (-0.2, 0.2, 0.0)              0.145           0.507
+     m_100_085_010      (0.0, 0.2, -0.2)              0.002           0.564
+     m_120_045_030      (0.2, -0.2, 0.0)              0.216           0.470
+     m_120_045_050      (0.2, -0.2, 0.2)              0.128           0.639
+     m_120_065_010      (0.2, 0.0, -0.2)              0.145           0.604
+
+  These arms were held out of every fit. A value held per objective makes the
+  sum of two single-value axes the right prediction for moving both; a policy
+  rebuilt per configuration makes it the wrong one. Read the cosine against the
+  reliability ceiling above, not against 1.
+
+
+=== and does the composed edit behave like the arm? ===
+
+                                       steps          optimal          reached
+                     base, untouched     5.8   optimal  87.4%   reached 100.0%
+              m_080_085_030 composed     1.6   optimal  78.8%   reached 100.0%
+            m_080_085_030 fine-tuned     1.7   optimal  79.8%   reached 100.0%
+              m_100_085_010 composed     6.3   optimal  87.4%   reached 100.0%
+            m_100_085_010 fine-tuned     5.3   optimal  86.1%   reached 100.0%
+              m_120_045_030 composed    11.6   optimal  86.5%   reached 100.0%
+            m_120_045_030 fine-tuned    11.3   optimal  87.4%   reached 100.0%
+              m_120_045_050 composed     9.5   optimal  87.7%   reached 100.0%
+            m_120_045_050 fine-tuned     9.6   optimal  88.3%   reached 100.0%
+              m_120_065_010 composed    12.3   optimal  86.2%   reached 100.0%
+            m_120_065_010 fine-tuned    10.6   optimal  88.1%   reached 100.0%
+
+  The exchange rate is a two-objective summary and three objectives do not
+  reduce to one, so read `optimal` alongside it: an edit that sets the values
+  right should pick the best objective as often as the arm trained to.

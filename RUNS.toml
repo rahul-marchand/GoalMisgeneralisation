@@ -10,6 +10,12 @@
 # style, most specific first: the first match wins, so a single run can override
 # the group it belongs to.
 #
+# Patterns are matched most-specific-first and the FIRST match wins, so a
+# per-agent glob placed above a per-campaign one silently claims runs the
+# campaign note describes. That already happened: `runs/novalue11.s5678/arms/*`
+# took every 400k wide arm and labelled it "fourteen arms, 750k steps each".
+# `scripts/manifest.py` now warns when a path matches more than one entry.
+#
 # Add an entry when you launch something. `013 --note` and `001 --note` write the
 # same text onto the volume at launch, and that copy is the fallback when
 # nothing here matches.
@@ -102,7 +108,7 @@ one run cannot support. Compare at cp_140206080, which both runs save.
 """
 
 [[entry]]
-match = "runs/threeobj.uneven.s1234/arms/*"
+match = "runs/threeobj.uneven.s1234/arms/*@750k"
 note = """
 The three-objective experiment on values (1.0, 0.55, 0.4), run on a separate
 pod. Gaps of 0.45 and 0.15 give thresholds of 9 and 3 steps against rank gaps of
@@ -120,7 +126,7 @@ reads them.
 """
 
 [[entry]]
-match = "runs/novalue11.s5678/arms/*"
+match = "runs/novalue11.s5678/arms/*@750k"
 note = """
 The whole two-objective value sweep repeated on a second, independently trained
 agent — both objectives, fourteen arms, 750k steps each. The point is which of
@@ -258,7 +264,7 @@ match = "levels/values/1.00-0.65-0.30@1M"
 note = "1M levels at (1.0, 0.65, 0.3), for training the three-objective base agent."
 
 [[entry]]
-match = "levels/values/*@150k"
+match = "levels/values/*-*-*@150k"
 note = """
 Arm datasets for the three-objective grids, 150k levels each. Far smaller than
 the base dataset because the arms are far shorter runs: 1M steps is about 100k

@@ -1,0 +1,26 @@
+script 014_value_axis_analysis.py
+commit 94cb9dc
+argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --arms /workspace/data/runs/novalue11.s1234/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix x1 --base-value 0.5 --arm-steps 400000 --at -1
+
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+2026-08-17 10:44:49.370861: W external/xla/xla/service/gpu/nvptx_compiler.cc:930] The NVIDIA driver's CUDA version is 12.8 which is older than the PTX compiler version 12.9.86. Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+base cp_140206080  (update 27384, 1,449,605 parameters)
+
+arms
+Traceback (most recent call last):
+  File "/root/repo/experiments/014_value_axis_analysis.py", line 355, in <module>
+    main()
+  File "/root/repo/experiments/014_value_axis_analysis.py", line 200, in main
+    selected = arm_checkpoints(args.arms, args.at, args.prefix, args.arm_steps)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/repo/experiments/014_value_axis_analysis.py", line 154, in arm_checkpoints
+    return discover_arms(root, sweep_index(prefix), BASE_VALUE, steps=steps, at=at)
+                               ^^^^^^^^^^^^^^^^^^^
+  File "/root/repo/goalmisgen/volume.py", line 273, in sweep_index
+    raise ValueError(f"{prefix!r} does not name a sweep; expected 'o0', 'o1', ... (or legacy 'v'/'c')")
+ValueError: 'x1' does not name a sweep; expected 'o0', 'o1', ... (or legacy 'v'/'c')

@@ -58,8 +58,20 @@ def load_notes(path: Path) -> list[tuple[str, str]]:
     return [(entry["match"], " ".join(entry["note"].split())) for entry in entries]
 
 
+AMBIGUOUS: list[tuple[str, list[str]]] = []
+
+
 def note_for(relative: Path, notes: list[tuple[str, str]], run: Path | None = None) -> str:
-    """The first matching note, else whatever was written beside the checkpoints."""
+    """The first matching note, else whatever was written beside the checkpoints.
+
+    First-match-wins is the documented rule, but it makes a mis-ordered pattern
+    invisible: a per-agent glob above a per-campaign one quietly claims runs the
+    campaign note describes, and the manifest still reports nothing unexplained.
+    So every extra match is recorded and reported at the end.
+    """
+    matched = [pattern for pattern, _ in notes if fnmatch.fnmatch(str(relative), pattern)]
+    if len(matched) > 1:
+        AMBIGUOUS.append((str(relative), matched))
     for pattern, note in notes:
         if fnmatch.fnmatch(str(relative), pattern):
             return note
@@ -217,6 +229,19 @@ def main() -> None:
 
     args.out.write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}  ({len(all_datasets)} datasets, {len(all_runs)} runs, {unexplained} unexplained)")
+    if AMBIGUOUS:
+        # Grouped by which patterns collided, not per path: one mis-ordered glob
+        # produces hundreds of identical reports, and a list that long is ignored.
+        overlaps: dict[tuple[str, ...], int] = {}
+        for _, patterns in AMBIGUOUS:
+            overlaps[tuple(patterns)] = overlaps.get(tuple(patterns), 0) + 1
+        print(f"\n{len(AMBIGUOUS)} path(s) match more than one RUNS.toml entry, in {len(overlaps)} pattern")
+        print("group(s). fnmatch's * crosses '/', so an agent glob also catches that agent's")
+        print("arms. The first listed pattern wins; check it is the one you meant:")
+        for patterns, count in sorted(overlaps.items(), key=lambda kv: -kv[1]):
+            print(f"  {count:>4}x  wins: {patterns[0]}")
+            for shadowed in patterns[1:]:
+                print(f"         shadowed: {shadowed}")
 
 
 if __name__ == "__main__":

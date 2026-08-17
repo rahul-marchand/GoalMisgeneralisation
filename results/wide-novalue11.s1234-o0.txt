@@ -1,10 +1,10 @@
 script 014_value_axis_analysis.py
-commit 51957a2
-argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --arms /workspace/data/runs/novalue11.s1234/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix o0 --base-value 1.0 --arm-steps 400000 --at 7
+commit 94cb9dc
+argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --arms /workspace/data/runs/novalue11.s1234/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix o0 --base-value 1.0 --arm-steps 400000 --at -1
 
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
   gym.logger.warn(
-2026-08-17 08:55:26.058855: W external/xla/xla/service/gpu/nvptx_compiler.cc:930] The NVIDIA driver's CUDA version is 12.8 which is older than the PTX compiler version 12.9.86. Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
+2026-08-17 10:25:15.072689: W external/xla/xla/service/gpu/nvptx_compiler.cc:930] The NVIDIA driver's CUDA version is 12.8 which is older than the PTX compiler version 12.9.86. Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
@@ -12,18 +12,48 @@ argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --ar
 base cp_140206080  (update 27384, 1,449,605 parameters)
 
 arms
-  o0+040@400k: no checkpoint at index 7, skipping
-  o0+041@400k: no checkpoint at index 7, skipping
-  o0+042@400k: no checkpoint at index 7, skipping
-  o0+043@400k: no checkpoint at index 7, skipping
-  o0+044@400k: no checkpoint at index 7, skipping
-  o0+045@400k: no checkpoint at index 7, skipping
-  o0-040@400k: no checkpoint at index 7, skipping
-  o0-041@400k: no checkpoint at index 7, skipping
-  o0-042@400k: no checkpoint at index 7, skipping
-  o0-043@400k: no checkpoint at index 7, skipping
-  o0-044@400k: no checkpoint at index 7, skipping
-  o0-045@400k: no checkpoint at index 7, skipping
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.55  cp_399360  (update 78)  |delta| 7.759
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.56  cp_399360  (update 78)  |delta| 7.524
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.57  cp_399360  (update 78)  |delta| 7.609
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.58  cp_399360  (update 78)  |delta| 7.532
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.59  cp_399360  (update 78)  |delta| 7.397
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=0.60  cp_399360  (update 78)  |delta| 7.244
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
   gym.logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
@@ -115,42 +145,108 @@ arms
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
   v=1.39  cp_399360  (update 78)  |delta| 6.373
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.40  cp_399360  (update 78)  |delta| 6.385
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.41  cp_399360  (update 78)  |delta| 6.528
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.42  cp_399360  (update 78)  |delta| 6.526
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.43  cp_399360  (update 78)  |delta| 6.485
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.44  cp_399360  (update 78)  |delta| 6.507
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+  v=1.45  cp_399360  (update 78)  |delta| 6.508
 
-common component |drift| 2.754   axis per unit value |axis| 9.91
-null arm |delta| 6.046, and 0.273 of it is that same common direction
+common component |drift| 2.664   axis per unit value |axis| 8.593
+null arm |delta| 6.046, and 0.263 of it is that same common direction
 
 
 === collinear? cosine between arms, raw ===
 
-            0.61    0.62    0.70    0.80    0.90    0.95    1.05    1.10    1.20    1.30    1.38    1.39
-  0.61     1.000   0.416   0.328   0.238   0.149   0.128   0.059   0.028  -0.017  -0.052  -0.061  -0.058
-  0.62     0.416   1.000   0.330   0.231   0.147   0.115   0.058   0.031  -0.017  -0.056  -0.061  -0.055
-  0.70     0.328   0.330   1.000   0.252   0.166   0.138   0.080   0.065   0.020  -0.017  -0.027  -0.031
-  0.80     0.238   0.231   0.252   1.000   0.169   0.153   0.107   0.078   0.061   0.033   0.011   0.010
-  0.90     0.149   0.147   0.166   0.169   1.000   0.144   0.129   0.119   0.088   0.082   0.065   0.075
-  0.95     0.128   0.115   0.138   0.153   0.144   1.000   0.138   0.127   0.120   0.095   0.095   0.078
-  1.05     0.059   0.058   0.080   0.107   0.129   0.138   1.000   0.156   0.157   0.149   0.153   0.148
-  1.10     0.028   0.031   0.065   0.078   0.119   0.127   0.156   1.000   0.174   0.179   0.162   0.177
-  1.20    -0.017  -0.017   0.020   0.061   0.088   0.120   0.157   0.174   1.000   0.216   0.224   0.210
-  1.30    -0.052  -0.056  -0.017   0.033   0.082   0.095   0.149   0.179   0.216   1.000   0.241   0.260
-  1.38    -0.061  -0.061  -0.027   0.011   0.065   0.095   0.153   0.162   0.224   0.241   1.000   0.272
-  1.39    -0.058  -0.055  -0.031   0.010   0.075   0.078   0.148   0.177   0.210   0.260   0.272   1.000
+            0.55    0.56    0.57    0.58    0.59    0.60    0.61    0.62    0.70    0.80    0.90    0.95    1.05    1.10    1.20    1.30    1.38    1.39    1.40    1.41    1.42    1.43    1.44    1.45
+  0.55     1.000   0.483   0.489   0.474   0.457   0.458   0.442   0.437   0.331   0.242   0.143   0.116   0.056   0.022  -0.021  -0.065  -0.083  -0.073  -0.083  -0.078  -0.099  -0.086  -0.099  -0.104
+  0.56     0.483   1.000   0.468   0.461   0.451   0.462   0.434   0.430   0.332   0.233   0.128   0.123   0.054   0.017  -0.025  -0.061  -0.082  -0.071  -0.086  -0.086  -0.095  -0.089  -0.097  -0.094
+  0.57     0.489   0.468   1.000   0.459   0.453   0.449   0.436   0.430   0.336   0.233   0.133   0.107   0.046   0.011  -0.027  -0.065  -0.085  -0.077  -0.081  -0.077  -0.098  -0.091  -0.092  -0.097
+  0.58     0.474   0.461   0.459   1.000   0.445   0.442   0.444   0.429   0.347   0.241   0.153   0.120   0.069   0.023  -0.020  -0.052  -0.072  -0.061  -0.072  -0.080  -0.087  -0.077  -0.085  -0.084
+  0.59     0.457   0.451   0.453   0.445   1.000   0.431   0.423   0.414   0.327   0.228   0.137   0.117   0.057   0.021  -0.026  -0.064  -0.067  -0.067  -0.082  -0.079  -0.094  -0.093  -0.086  -0.094
+  0.60     0.458   0.462   0.449   0.442   0.431   1.000   0.434   0.425   0.343   0.254   0.159   0.130   0.067   0.024  -0.010  -0.048  -0.070  -0.056  -0.069  -0.072  -0.085  -0.083  -0.088  -0.082
+  0.61     0.442   0.434   0.436   0.444   0.423   0.434   1.000   0.416   0.328   0.238   0.149   0.128   0.059   0.028  -0.017  -0.052  -0.061  -0.058  -0.062  -0.075  -0.083  -0.080  -0.081  -0.087
+  0.62     0.437   0.430   0.430   0.429   0.414   0.425   0.416   1.000   0.330   0.231   0.147   0.115   0.058   0.031  -0.017  -0.056  -0.061  -0.055  -0.072  -0.073  -0.088  -0.077  -0.083  -0.082
+  0.70     0.331   0.332   0.336   0.347   0.327   0.343   0.328   0.330   1.000   0.252   0.166   0.138   0.080   0.065   0.020  -0.017  -0.027  -0.031  -0.029  -0.039  -0.045  -0.052  -0.045  -0.050
+  0.80     0.242   0.233   0.233   0.241   0.228   0.254   0.238   0.231   0.252   1.000   0.169   0.153   0.107   0.078   0.061   0.033   0.011   0.010   0.018   0.005  -0.000  -0.002   0.003  -0.012
+  0.90     0.143   0.128   0.133   0.153   0.137   0.159   0.149   0.147   0.166   0.169   1.000   0.144   0.129   0.119   0.088   0.082   0.065   0.075   0.071   0.059   0.062   0.065   0.057   0.067
+  0.95     0.116   0.123   0.107   0.120   0.117   0.130   0.128   0.115   0.138   0.153   0.144   1.000   0.138   0.127   0.120   0.095   0.095   0.078   0.086   0.074   0.089   0.086   0.075   0.089
+  1.05     0.056   0.054   0.046   0.069   0.057   0.067   0.059   0.058   0.080   0.107   0.129   0.138   1.000   0.156   0.157   0.149   0.153   0.148   0.145   0.147   0.137   0.142   0.149   0.143
+  1.10     0.022   0.017   0.011   0.023   0.021   0.024   0.028   0.031   0.065   0.078   0.119   0.127   0.156   1.000   0.174   0.179   0.162   0.177   0.168   0.162   0.153   0.180   0.172   0.171
+  1.20    -0.021  -0.025  -0.027  -0.020  -0.026  -0.010  -0.017  -0.017   0.020   0.061   0.088   0.120   0.157   0.174   1.000   0.216   0.224   0.210   0.214   0.216   0.213   0.221   0.222   0.214
+  1.30    -0.065  -0.061  -0.065  -0.052  -0.064  -0.048  -0.052  -0.056  -0.017   0.033   0.082   0.095   0.149   0.179   0.216   1.000   0.241   0.260   0.250   0.259   0.248   0.248   0.256   0.249
+  1.38    -0.083  -0.082  -0.085  -0.072  -0.067  -0.070  -0.061  -0.061  -0.027   0.011   0.065   0.095   0.153   0.162   0.224   0.241   1.000   0.272   0.273   0.265   0.274   0.274   0.286   0.274
+  1.39    -0.073  -0.071  -0.077  -0.061  -0.067  -0.056  -0.058  -0.055  -0.031   0.010   0.075   0.078   0.148   0.177   0.210   0.260   0.272   1.000   0.289   0.296   0.275   0.282   0.291   0.289
+  1.40    -0.083  -0.086  -0.081  -0.072  -0.082  -0.069  -0.062  -0.072  -0.029   0.018   0.071   0.086   0.145   0.168   0.214   0.250   0.273   0.289   1.000   0.286   0.273   0.280   0.292   0.288
+  1.41    -0.078  -0.086  -0.077  -0.080  -0.079  -0.072  -0.075  -0.073  -0.039   0.005   0.059   0.074   0.147   0.162   0.216   0.259   0.265   0.296   0.286   1.000   0.273   0.291   0.292   0.290
+  1.42    -0.099  -0.095  -0.098  -0.087  -0.094  -0.085  -0.083  -0.088  -0.045  -0.000   0.062   0.089   0.137   0.153   0.213   0.248   0.274   0.275   0.273   0.273   1.000   0.285   0.291   0.294
+  1.43    -0.086  -0.089  -0.091  -0.077  -0.093  -0.083  -0.080  -0.077  -0.052  -0.002   0.065   0.086   0.142   0.180   0.221   0.248   0.274   0.282   0.280   0.291   0.285   1.000   0.303   0.297
+  1.44    -0.099  -0.097  -0.092  -0.085  -0.086  -0.088  -0.081  -0.083  -0.045   0.003   0.057   0.075   0.149   0.172   0.222   0.256   0.286   0.291   0.292   0.292   0.291   0.303   1.000   0.314
+  1.45    -0.104  -0.094  -0.097  -0.084  -0.094  -0.082  -0.087  -0.082  -0.050  -0.012   0.067   0.089   0.143   0.171   0.214   0.249   0.274   0.289   0.288   0.290   0.294   0.297   0.314   1.000
 
 === and with the common component removed ===
 
-            0.61    0.62    0.70    0.80    0.90    0.95    1.05    1.10    1.20    1.30    1.38    1.39
-  0.61     1.000   0.272   0.153   0.040  -0.066  -0.091  -0.174  -0.208  -0.254  -0.284  -0.290  -0.288
-  0.62     0.272   1.000   0.157   0.035  -0.067  -0.105  -0.173  -0.202  -0.251  -0.286  -0.287  -0.282
-  0.70     0.153   0.157   1.000   0.052  -0.053  -0.086  -0.156  -0.169  -0.216  -0.249  -0.256  -0.263
-  0.80     0.040   0.035   0.052   1.000  -0.044  -0.062  -0.116  -0.148  -0.158  -0.182  -0.204  -0.207
-  0.90    -0.066  -0.067  -0.053  -0.044   1.000  -0.066  -0.083  -0.090  -0.119  -0.116  -0.131  -0.121
-  0.95    -0.091  -0.105  -0.086  -0.062  -0.066   1.000  -0.068  -0.077  -0.077  -0.096  -0.092  -0.114
-  1.05    -0.174  -0.173  -0.156  -0.116  -0.083  -0.068   1.000  -0.039  -0.029  -0.028  -0.019  -0.027
-  1.10    -0.208  -0.202  -0.169  -0.148  -0.090  -0.077  -0.039   1.000  -0.003   0.012  -0.005   0.012
-  1.20    -0.254  -0.251  -0.216  -0.158  -0.119  -0.077  -0.029  -0.003   1.000   0.065   0.078   0.060
-  1.30    -0.284  -0.286  -0.249  -0.182  -0.116  -0.096  -0.028   0.012   0.065   1.000   0.106   0.126
-  1.38    -0.290  -0.287  -0.256  -0.204  -0.131  -0.092  -0.019  -0.005   0.078   0.106   1.000   0.144
-  1.39    -0.288  -0.282  -0.263  -0.207  -0.121  -0.114  -0.027   0.012   0.060   0.126   0.144   1.000
+            0.55    0.56    0.57    0.58    0.59    0.60    0.61    0.62    0.70    0.80    0.90    0.95    1.05    1.10    1.20    1.30    1.38    1.39    1.40    1.41    1.42    1.43    1.44    1.45
+  0.55     1.000   0.329   0.339   0.314   0.298   0.292   0.276   0.271   0.142   0.041  -0.067  -0.098  -0.167  -0.200  -0.248  -0.291  -0.309  -0.306  -0.311  -0.303  -0.317  -0.310  -0.326  -0.329
+  0.56     0.329   1.000   0.313   0.299   0.293   0.300   0.267   0.264   0.146   0.035  -0.080  -0.083  -0.164  -0.199  -0.246  -0.280  -0.302  -0.297  -0.308  -0.305  -0.306  -0.307  -0.317  -0.310
+  0.57     0.339   0.313   1.000   0.298   0.296   0.284   0.272   0.266   0.153   0.036  -0.072  -0.102  -0.172  -0.205  -0.248  -0.283  -0.304  -0.303  -0.301  -0.294  -0.308  -0.308  -0.310  -0.313
+  0.58     0.314   0.299   0.298   1.000   0.281   0.269   0.276   0.260   0.160   0.039  -0.055  -0.094  -0.153  -0.199  -0.248  -0.276  -0.297  -0.293  -0.299  -0.305  -0.304  -0.300  -0.311  -0.306
+  0.59     0.298   0.293   0.296   0.281   1.000   0.262   0.256   0.247   0.144   0.035  -0.062  -0.084  -0.152  -0.186  -0.239  -0.275  -0.276  -0.285  -0.296  -0.289  -0.297  -0.304  -0.296  -0.303
+  0.60     0.292   0.300   0.284   0.269   0.262   1.000   0.262   0.253   0.157   0.058  -0.045  -0.078  -0.151  -0.194  -0.232  -0.267  -0.291  -0.283  -0.292  -0.293  -0.298  -0.303  -0.310  -0.301
+  0.61     0.276   0.267   0.272   0.276   0.256   0.262   1.000   0.247   0.142   0.044  -0.050  -0.074  -0.154  -0.182  -0.233  -0.264  -0.273  -0.277  -0.276  -0.289  -0.288  -0.293  -0.294  -0.298
+  0.62     0.271   0.264   0.266   0.260   0.247   0.253   0.247   1.000   0.148   0.040  -0.048  -0.085  -0.150  -0.173  -0.226  -0.263  -0.267  -0.268  -0.282  -0.281  -0.288  -0.284  -0.292  -0.287
+  0.70     0.142   0.146   0.153   0.160   0.144   0.157   0.142   0.148   1.000   0.084  -0.005  -0.035  -0.100  -0.108  -0.159  -0.193  -0.204  -0.217  -0.208  -0.217  -0.215  -0.230  -0.224  -0.226
+  0.80     0.041   0.035   0.036   0.039   0.035   0.058   0.044   0.040   0.084   1.000   0.024   0.008  -0.041  -0.066  -0.081  -0.106  -0.131  -0.140  -0.125  -0.138  -0.134  -0.144  -0.139  -0.153
+  0.90    -0.067  -0.080  -0.072  -0.055  -0.062  -0.045  -0.050  -0.048  -0.005   0.024   1.000   0.017   0.004   0.000  -0.031  -0.032  -0.050  -0.047  -0.046  -0.059  -0.046  -0.049  -0.059  -0.045
+  0.95    -0.098  -0.083  -0.102  -0.094  -0.084  -0.078  -0.074  -0.085  -0.035   0.008   0.017   1.000   0.018   0.014   0.009  -0.013  -0.012  -0.039  -0.024  -0.037  -0.012  -0.021  -0.034  -0.016
+  1.05    -0.167  -0.164  -0.172  -0.153  -0.152  -0.151  -0.154  -0.150  -0.100  -0.041   0.004   0.018   1.000   0.050   0.055   0.052   0.057   0.043   0.046   0.049   0.046   0.045   0.052   0.048
+  1.10    -0.200  -0.199  -0.205  -0.199  -0.186  -0.194  -0.182  -0.173  -0.108  -0.066   0.000   0.014   0.050   1.000   0.081   0.092   0.073   0.083   0.078   0.072   0.070   0.093   0.084   0.086
+  1.20    -0.248  -0.246  -0.248  -0.248  -0.239  -0.232  -0.233  -0.226  -0.159  -0.081  -0.031   0.009   0.055   0.081   1.000   0.136   0.146   0.123   0.133   0.135   0.139   0.143   0.143   0.136
+  1.30    -0.291  -0.280  -0.283  -0.276  -0.275  -0.267  -0.264  -0.263  -0.193  -0.106  -0.032  -0.013   0.052   0.092   0.136   1.000   0.169   0.183   0.177   0.187   0.182   0.177   0.184   0.179
+  1.38    -0.309  -0.302  -0.304  -0.297  -0.276  -0.291  -0.273  -0.267  -0.204  -0.131  -0.050  -0.012   0.057   0.073   0.146   0.169   1.000   0.197   0.202   0.193   0.210   0.205   0.217   0.206
+  1.39    -0.306  -0.297  -0.303  -0.293  -0.285  -0.283  -0.277  -0.268  -0.217  -0.140  -0.047  -0.039   0.043   0.083   0.123   0.183   0.197   1.000   0.214   0.222   0.205   0.208   0.217   0.217
+  1.40    -0.311  -0.308  -0.301  -0.299  -0.296  -0.292  -0.276  -0.282  -0.208  -0.125  -0.046  -0.024   0.046   0.078   0.133   0.177   0.202   0.214   1.000   0.215   0.208   0.210   0.223   0.220
+  1.41    -0.303  -0.305  -0.294  -0.305  -0.289  -0.293  -0.289  -0.281  -0.217  -0.138  -0.059  -0.037   0.049   0.072   0.135   0.187   0.193   0.222   0.215   1.000   0.207   0.222   0.223   0.222
+  1.42    -0.317  -0.306  -0.308  -0.304  -0.297  -0.298  -0.288  -0.288  -0.215  -0.134  -0.046  -0.012   0.046   0.070   0.139   0.182   0.210   0.205   0.208   0.207   1.000   0.222   0.227   0.233
+  1.43    -0.310  -0.307  -0.308  -0.300  -0.304  -0.303  -0.293  -0.284  -0.230  -0.144  -0.049  -0.021   0.045   0.093   0.143   0.177   0.205   0.208   0.210   0.222   0.222   1.000   0.237   0.232
+  1.44    -0.326  -0.317  -0.310  -0.311  -0.296  -0.310  -0.294  -0.292  -0.224  -0.139  -0.059  -0.034   0.052   0.084   0.143   0.184   0.217   0.217   0.223   0.223   0.227   0.237   1.000   0.249
+  1.45    -0.329  -0.310  -0.313  -0.306  -0.303  -0.301  -0.298  -0.287  -0.226  -0.153  -0.045  -0.016   0.048   0.086   0.136   0.179   0.206   0.217   0.220   0.222   0.233   0.232   0.249   1.000
 
 The raw matrix is positive everywhere, including between arms on opposite
 sides of the base, which is the signature of a direction that means no more
@@ -161,19 +257,31 @@ sign: neighbouring values should look more alike than distant ones.
 === graded and predictive? ===
 
     value  offset   |delta|  |residual|  held-out R^2  held-out cos  implied offset
-     0.61   -0.39     7.238       6.477         0.088        -0.362           -0.25
-     0.62   -0.38     7.205       6.458         0.091        -0.359           -0.25
-     0.70   -0.30     6.645       5.894         0.048        -0.289           -0.18
-     0.80   -0.20     6.239       5.551         0.002        -0.169           -0.10
-     0.90   -0.10     6.171       5.519        -0.016        -0.035           -0.02
-     0.95   -0.05     6.077       5.451        -0.008         0.007           +0.00
-     1.05    0.05      6.05        5.44         0.013         0.120           +0.07
-     1.10    0.10     6.094       5.505         0.027         0.163           +0.10
-     1.20    0.20     6.018       5.487         0.047         0.238           +0.14
-     1.30    0.30     6.206       5.708         0.039         0.287           +0.17
-     1.38    0.38     6.344       5.854        -0.032         0.293           +0.17
-     1.39    0.39     6.373        5.87        -0.044         0.294           +0.17
-     null    0.00     6.046        5.92             —         0.060           +0.04
+     0.55   -0.45     7.759       6.808         0.275        -0.525           -0.43
+     0.56   -0.44     7.524       6.616         0.258        -0.510           -0.40
+     0.57   -0.43     7.609       6.701         0.261        -0.511           -0.41
+     0.58   -0.42     7.532       6.586         0.249        -0.500           -0.40
+     0.59   -0.41     7.397        6.53         0.232        -0.483           -0.38
+     0.60   -0.40     7.244       6.329         0.234        -0.486           -0.37
+     0.61   -0.39     7.238       6.362         0.216        -0.467           -0.36
+     0.62   -0.38     7.205       6.356         0.207        -0.456           -0.35
+     0.70   -0.30     6.645       5.941         0.083        -0.309           -0.22
+     0.80   -0.20     6.239       5.705         0.002        -0.148           -0.10
+     0.90   -0.10     6.171       5.746        -0.025         0.014           +0.01
+     0.95   -0.05     6.077       5.681        -0.014         0.059           +0.04
+     1.05    0.05      6.05       5.679         0.021         0.181           +0.12
+     1.10    0.10     6.094       5.767         0.047         0.238           +0.17
+     1.20    0.20     6.018        5.72         0.105         0.326           +0.23
+     1.30    0.30     6.206        5.93         0.152         0.391           +0.28
+     1.38    0.38     6.344       6.061         0.167         0.421           +0.31
+     1.39    0.39     6.373       6.044         0.169         0.427           +0.31
+     1.40    0.40     6.385       6.088         0.172         0.432           +0.31
+     1.41    0.41     6.528       6.226         0.176         0.435           +0.32
+     1.42    0.42     6.526       6.274         0.179         0.440           +0.33
+     1.43    0.43     6.485       6.199         0.178         0.444           +0.33
+     1.44    0.44     6.507       6.214         0.188         0.456           +0.34
+     1.45    0.45     6.508        6.23         0.181         0.453           +0.33
+     null    0.00     6.046        5.93             —         0.121           +0.08
 
 The implied offset is the axis read backwards, fitted without this arm. It
 should track the offset the arm was trained at, and the null arm's should sit
@@ -191,6 +299,72 @@ common component rather than the value.
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
                  base, untouched     7.7  [  7.5,   7.9]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.55 fine-tuned     1.1  [  1.0,   1.2]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.56 fine-tuned     1.4  [  1.2,   1.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.57 fine-tuned     1.4  [  1.2,   1.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.58 fine-tuned     1.3  [  1.2,   1.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.59 fine-tuned     1.6  [  1.4,   1.7]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=0.60 fine-tuned     1.9  [  1.8,   2.1]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
   gym.logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
@@ -334,6 +508,72 @@ common component rather than the value.
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
                v=1.39 fine-tuned    12.5  [ 12.2,  12.8]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.40 fine-tuned    13.2  [ 12.9,  13.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.41 fine-tuned    13.4  [ 13.0,  13.7]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.42 fine-tuned    14.1  [ 13.7,  14.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.43 fine-tuned    14.0  [ 13.6,  14.3]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.44 fine-tuned    15.0  [ 14.6,  15.4]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+               v=1.45 fine-tuned    14.5  [ 14.2,  14.9]     100.0%
 
 
 === writable? pushing the base weights along the axis ===
@@ -343,12 +583,42 @@ common component rather than the value.
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-         v=0.20 written (unseen)     1.1  [  0.9,   1.4]     100.0%
+         v=0.20 written (unseen)     0.9  [  0.8,   1.1]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=0.61 written (grid)     3.2  [  3.0,   3.4]     100.0%
+           v=0.55 written (grid)     2.7  [  2.5,   2.8]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.56 written (grid)     2.8  [  2.6,   2.9]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.57 written (grid)     2.8  [  2.7,   3.0]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.58 written (grid)     2.8  [  2.7,   3.0]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.59 written (grid)     3.0  [  2.9,   3.2]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.60 written (grid)     3.2  [  3.0,   3.3]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=0.61 written (grid)     3.2  [  3.1,   3.4]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
@@ -358,7 +628,7 @@ common component rather than the value.
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=0.70 written (grid)     4.1  [  4.0,   4.4]     100.0%
+           v=0.70 written (grid)     4.0  [  3.9,   4.3]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
@@ -368,32 +638,32 @@ common component rather than the value.
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=0.90 written (grid)     6.5  [  6.3,   6.7]     100.0%
+           v=0.90 written (grid)     6.4  [  6.3,   6.7]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=0.95 written (grid)     7.2  [  7.1,   7.4]     100.0%
+           v=0.95 written (grid)     7.2  [  7.0,   7.4]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=1.05 written (grid)     8.6  [  8.4,   8.8]     100.0%
+           v=1.05 written (grid)     8.5  [  8.3,   8.8]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=1.10 written (grid)     9.3  [  9.1,   9.6]     100.0%
+           v=1.10 written (grid)     9.4  [  9.1,   9.6]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=1.20 written (grid)    11.1  [ 10.8,  11.3]     100.0%
+           v=1.20 written (grid)    10.9  [ 10.6,  11.2]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=1.30 written (grid)    12.8  [ 12.4,  13.1]     100.0%
+           v=1.30 written (grid)    12.8  [ 12.5,  13.2]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
@@ -403,7 +673,37 @@ common component rather than the value.
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
-           v=1.39 written (grid)    14.7  [ 14.3,  15.1]     100.0%
+           v=1.39 written (grid)    14.8  [ 14.4,  15.2]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.40 written (grid)    15.1  [ 14.7,  15.4]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.41 written (grid)    15.4  [ 15.0,  15.9]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.42 written (grid)    15.5  [ 15.1,  16.0]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.43 written (grid)    15.7  [ 15.3,  16.2]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.44 written (grid)    16.1  [ 15.7,  16.5]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+           v=1.45 written (grid)    16.3  [ 15.8,  16.8]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
@@ -419,19 +719,31 @@ common component rather than the value.
 === calibrated? against the task's own exchange rate ===
 
      value   task says   fine-tuned   written
-      0.20        16.0            —       1.1
+      0.20        16.0            —       0.9
+      0.55         9.0          1.1       2.7
+      0.56         8.8          1.4       2.8
+      0.57         8.6          1.4       2.8
+      0.58         8.4          1.3       2.8
+      0.59         8.2          1.6       3.0
+      0.60         8.0          1.9       3.2
       0.61         7.8          2.0       3.2
       0.62         7.6          2.1       3.3
-      0.70         6.0          3.3       4.1
+      0.70         6.0          3.3       4.0
       0.80         4.0          5.1       5.2
-      0.90         2.0          6.6       6.5
+      0.90         2.0          6.6       6.4
       0.95         1.0          7.0       7.2
-      1.05        -1.0          8.7       8.6
-      1.10        -2.0          9.3       9.3
-      1.20        -4.0         10.2      11.1
+      1.05        -1.0          8.7       8.5
+      1.10        -2.0          9.3       9.4
+      1.20        -4.0         10.2      10.9
       1.30        -6.0         11.8      12.8
       1.38        -7.6         12.8      14.7
-      1.39        -7.8         12.5      14.7
+      1.39        -7.8         12.5      14.8
+      1.40        -8.0         13.2      15.1
+      1.41        -8.2         13.4      15.4
+      1.42        -8.4         14.1      15.5
+      1.43        -8.6         14.0      15.7
+      1.44        -8.8         15.0      16.1
+      1.45        -9.0         14.5      16.3
 
 The fine-tuned column is what an arm actually learned; the written column is
 what the axis reproduces without training. They agree only if the axis is

@@ -145,6 +145,33 @@ def main() -> None:
                 zorder=3,
                 label="trained past the flip (held out of the fit)",
             )
+        # The main axis extrapolated past the flip: same orange as the other
+        # written points, same diamond as the other past-the-flip points. Shape
+        # says which regime, colour says trained or written.
+        # Only where there are trained arms past the flip to compare against.
+        # 014's --extrapolate defaults to [1.1, 0.2], so every sweep carries a
+        # stray point on the far side of the crossing; plotting those put an
+        # extrapolation on three panels where nothing was ever trained there, and
+        # a written point with nothing to check it against says nothing.
+        unseen = (entry.get("written_unseen") or []) if beyond else []
+        flipped_side = [r for r in unseen if (r["value"] > other if swept == 1 else r["value"] < other)]
+        if flipped_side:
+            v_u = np.array([r["value"] for r in flipped_side])
+            s_u = -np.array([r["steps"] for r in flipped_side])
+            ax.plot(
+                v_u,
+                s_u,
+                "D--",
+                color=ORANGE,
+                ms=4.8,
+                lw=1.4,
+                mfc=SURFACE,
+                mec=ORANGE,
+                mew=1.5,
+                zorder=4,
+                label="axis written past the flip (extrapolated)",
+            )
+
         if entry.get("written_heldout"):
             band(ax, entry["written_heldout"], ORANGE, "predicted: axis written in, that value held out", marker="s")
 

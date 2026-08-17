@@ -1,10 +1,10 @@
 script 014_value_axis_analysis.py
-commit 51957a2
-argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --arms /workspace/data/runs/novalue11.s1234/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix o1 --base-value 0.5 --arm-steps 400000 --at 7
+commit 8bf6652
+argv   --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 --arms /workspace/data/runs/novalue11.s1234/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix o1 --base-value 0.5 --arm-steps 400000 --at -1 --extrapolate 1.00 1.05 1.10 1.20 1.30 1.50
 
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
   gym.logger.warn(
-2026-08-17 08:35:35.120876: W external/xla/xla/service/gpu/nvptx_compiler.cc:930] The NVIDIA driver's CUDA version is 12.8 which is older than the PTX compiler version 12.9.86. Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
+2026-08-17 11:01:55.911763: W external/xla/xla/service/gpu/nvptx_compiler.cc:930] The NVIDIA driver's CUDA version is 12.8 which is older than the PTX compiler version 12.9.86. Because the driver is older than the PTX compiler version, XLA is disabling parallel compilation, which may slow down compilation. You should update your NVIDIA driver or use the NVIDIA-provided CUDA forward compatibility packages.
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
@@ -703,7 +703,32 @@ common component rather than the value.
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
   logger.warn(
+         v=1.00 written (unseen)     2.2  [  2.0,   2.3]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+         v=1.05 written (unseen)     1.9  [  1.7,   2.1]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
          v=1.10 written (unseen)     1.6  [  1.5,   1.8]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+         v=1.20 written (unseen)     1.2  [  1.0,   1.3]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+         v=1.30 written (unseen)     0.9  [  0.7,   1.1]     100.0%
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+         v=1.50 written (unseen)     0.6  [  0.4,   0.8]     100.0%
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
   logger.warn(
 /root/repo/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
@@ -743,7 +768,12 @@ common component rather than the value.
       0.93         1.4          1.4       2.7
       0.94         1.2          1.4       2.6
       0.95         1.0          1.1       2.5
+      1.00         0.0            —       2.2
+      1.05        -1.0            —       1.9
       1.10        -2.0            —       1.6
+      1.20        -4.0            —       1.2
+      1.30        -6.0            —       0.9
+      1.50       -10.0            —       0.6
 
 The fine-tuned column is what an arm actually learned; the written column is
 what the axis reproduces without training. They agree only if the axis is

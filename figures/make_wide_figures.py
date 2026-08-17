@@ -172,6 +172,27 @@ def main() -> None:
                 label="axis written past the flip (extrapolated)",
             )
 
+        # The axis fitted on the flipped arms alone, held out against its own
+        # arms. Same negation as everything past the flip, though for these the
+        # sign is the least of it: the fit predicts twenty steps where its arms
+        # sit at three. Kept on the plot because a fit that fails this visibly is
+        # worth seeing next to one that does not.
+        if beyond and beyond.get("written_heldout"):
+            f = beyond["written_heldout"]
+            ax.plot(
+                [r["value"] for r in f],
+                [-r["steps"] for r in f],
+                "s:",
+                color=ORANGE,
+                ms=5.0,
+                lw=1.2,
+                mfc=SURFACE,
+                mec=ORANGE,
+                mew=1.5,
+                zorder=4,
+                label="axis fitted only past the flip, held out (fails)",
+            )
+
         if entry.get("written_heldout"):
             band(ax, entry["written_heldout"], ORANGE, "predicted: axis written in, that value held out", marker="s")
 

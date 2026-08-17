@@ -62,8 +62,13 @@ train_base() {  # tag steps values... ; trains only if not already finished
     # leaves an empty one -- and checking for the directory declared it done,
     # skipped it on every retry, and left the sweep failing forty times on a base
     # that did not exist. Same mistake as judging an arm by a file existing.
-    if [ -n "$(ls "${DATA}/runs/${tag}/local-files" 2>/dev/null | grep '^cp_')" ]; then
-        echo "  ${tag} present"; return
+    # And finished means it reached the length it was asked for. A run that saved
+    # checkpoints and then died would otherwise be adopted as a complete base
+    # agent -- the same mistake as judging it by a directory, one level up.
+    local reached
+    reached=$(ls "${DATA}/runs/${tag}/local-files" 2>/dev/null | sed -n 's/^cp_0*//p' | sort -n | tail -1)
+    if [ -n "${reached}" ] && [ "${reached}" -ge $((steps * 90 / 100)) ]; then
+        echo "  ${tag} present (${reached} steps)"; return
     fi
     if [ -d "${DATA}/runs/${tag}" ]; then
         echo "  ${tag} has no saved checkpoint, restarting it"

@@ -119,6 +119,28 @@ def sweep_arms(
     return arms
 
 
+def one_sided_arms(objective: int, base_value: float, values: tuple[float, ...], first_seed: int = 7000) -> list[Arm]:
+    """Arms at explicitly given values, on one side of the base.
+
+    For asking what happens past the point where the swept objective overtakes
+    the other -- which a symmetric grid cannot reach, since mirroring an offset
+    that large gives a negative reward.
+
+    Tagged ``x`` rather than ``o`` so they are *excluded* from the axis fit.
+    They are deliberately unbalanced about the base, and the whole reason the
+    fitted grid is symmetric is that an unbalanced one lets the common
+    fine-tuning component leak into the axis -- which is what produced a
+    confident-looking null in the first two-objective grid. These are
+    measurements, held out, like the three-objective composition arms.
+    """
+    if not values:
+        raise ValueError("give at least one value")
+    arms = []
+    for seed, value in enumerate(sorted(values, reverse=True), start=first_seed):
+        arms.append(Arm(sweep=f"x{objective}", objective=objective, offset=round(value - base_value, 10), seed=seed))
+    return arms
+
+
 def arm_values(base_values: tuple[float, ...], arm: Arm) -> tuple[float, ...]:
     """What the objectives pay in one arm's levels."""
     if not 0 <= arm.objective < len(base_values):

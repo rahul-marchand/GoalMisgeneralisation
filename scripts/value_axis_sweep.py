@@ -37,7 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from goalmisgen.design import arm_values, check_no_preference_flip, leverage, sweep_arms  # noqa: E402
+from goalmisgen.design import arm_values, check_no_preference_flip, leverage, one_sided_arms, sweep_arms  # noqa: E402
 from goalmisgen.volume import dataset_dirname  # noqa: E402
 
 # Median ``charts/0/SPS`` measured on an RTX 4090, which is what the campaign
@@ -74,6 +74,17 @@ def parse_args() -> argparse.Namespace:
         help="The positive side of the grid; each is mirrored. Defaults to the design in "
         "goalmisgen/design.py. Give this to reproduce an earlier grid exactly, which a "
         "replication has to do.",
+    )
+    parser.add_argument(
+        "--values",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Train arms at these explicit values for the swept objective instead of the "
+        "symmetric grid. For reaching past the point where it overtakes the other objective, "
+        "which mirroring cannot: the mirror of an offset that large is a negative reward. "
+        "Tagged x rather than o, so they stay out of the axis fit -- being one-sided, they "
+        "would let the common fine-tuning component leak into it.",
     )
     parser.add_argument(
         "--allow-reorder",
@@ -167,7 +178,12 @@ def main() -> None:
     objectives = args.objectives if args.objectives is not None else list(range(len(base_values)))
 
     offsets = tuple(args.offsets) if args.offsets else None
-    arms = [arm for objective in objectives for arm in sweep_arms(objective, offsets=offsets)]
+    if args.values:
+        if len(objectives) != 1:
+            sys.exit("--values sweeps one objective; say which with --objectives")
+        arms = one_sided_arms(objectives[0], base_values[objectives[0]], tuple(args.values))
+    else:
+        arms = [arm for objective in objectives for arm in sweep_arms(objective, offsets=offsets)]
     problems = check_no_preference_flip(base_values, arms)
     if problems and args.allow_reorder:
         print(f"  {len(problems)} arms reorder the objectives, allowed explicitly")

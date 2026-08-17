@@ -20,6 +20,7 @@ from goalmisgen.design import (
     arm_values,
     check_no_preference_flip,
     leverage,
+    one_sided_arms,
     sweep_arms,
 )
 
@@ -138,3 +139,28 @@ def test_every_default_offset_appears_on_both_sides() -> None:
     offsets = set(offsets_of(sweep_arms(objective=1)))
     for magnitude in DEFAULT_OFFSETS:
         assert magnitude in offsets and -magnitude in offsets
+
+
+def test_one_sided_arms_reach_past_the_flip() -> None:
+    """A symmetric grid cannot get here: mirroring an offset of 0.7 from a base
+    of 0.5 asks for a reward of -0.2."""
+    arms = one_sided_arms(objective=1, base_value=0.5, values=(1.05, 1.2, 1.5))
+
+    assert [arm_values(BASE_TWO, a)[1] for a in arms] == [1.5, 1.2, 1.05]
+    assert all(a.offset > 0 for a in arms)
+
+
+def test_one_sided_arms_are_tagged_out_of_the_fit() -> None:
+    """Being unbalanced about the base, they would let the common fine-tuning
+    component leak into the axis -- the failure the symmetric grid prevents."""
+    arms = one_sided_arms(objective=1, base_value=0.5, values=(1.2,))
+
+    assert arms[0].sweep == "x1"
+    assert arms[0].dirname(400_000) == "x1+070@400k"
+    # discover_arms looks for o<objective>, so these are invisible to the fit.
+    assert arms[0].sweep != "o1"
+
+
+def test_one_sided_arms_need_at_least_one_value() -> None:
+    with pytest.raises(ValueError, match="at least one value"):
+        one_sided_arms(objective=1, base_value=0.5, values=())

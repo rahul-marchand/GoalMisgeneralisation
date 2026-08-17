@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 
 from goalmisgen.volume import (
+    FITTED_FAMILIES,
+    HELD_OUT_FAMILIES,
     ArmName,
     arm_dirname,
     arm_lengths,
@@ -31,6 +33,7 @@ from goalmisgen.volume import (
     parse_steps_tag,
     parse_values_tag,
     steps_tag,
+    sweep_family,
     sweep_index,
     values_tag,
 )
@@ -232,3 +235,32 @@ def test_arm_trained_values_refuses_a_sweep_the_agent_does_not_have() -> None:
 def test_arm_trained_values_ignores_things_that_are_not_arms() -> None:
     assert arm_trained_values("logs", (1.0, 0.5)) is None
     assert arm_trained_values("v070", (1.0, 0.5)) is None
+
+
+def test_held_out_families_are_invisible_to_a_fit(tmp_path) -> None:
+    """x arms are one-sided, so letting them into the axis would leak drift.
+    The default family is o, so they have to be asked for by name."""
+    make_arm(tmp_path, "o1+045@400k")
+    make_arm(tmp_path, "x1+070@400k")
+
+    assert sorted(discover_arms(tmp_path, 1, 0.5, steps=400_000)) == [0.95]
+    assert sorted(discover_arms(tmp_path, 1, 0.5, steps=400_000, family="x")) == [1.2]
+
+
+def test_sweep_family_reads_the_tag() -> None:
+    assert sweep_family("o1") == "o"
+    assert sweep_family("x1") == "x"
+    assert sweep_family("v") == "o"  # legacy names are the fitted grid
+    assert sweep_family("c") == "o"
+
+
+def test_the_registry_says_which_families_are_fitted() -> None:
+    """The o/x/m split is a statistical claim, so it is stated once here."""
+    assert "o" in FITTED_FAMILIES
+    assert {"x", "m"} <= HELD_OUT_FAMILIES
+    assert not (FITTED_FAMILIES & HELD_OUT_FAMILIES)
+
+
+def test_a_held_out_sweep_still_parses_its_index() -> None:
+    assert sweep_index("x1") == 1
+    assert sweep_index("x0") == 0

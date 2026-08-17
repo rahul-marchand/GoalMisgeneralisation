@@ -82,7 +82,7 @@ from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.volume import discover_arms, sweep_index
+from goalmisgen.volume import discover_arms, sweep_family, sweep_index
 
 COLOUR_ZERO_BASE = 1.0
 COLOUR_ONE_BASE = 0.5
@@ -92,7 +92,9 @@ COLOUR_ONE_BASE = 0.5
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base", type=Path, required=True)
-    parser.add_argument("--arms", type=Path, required=True, help="An agent's arms/ directory, holding both objectives' sweeps.")
+    parser.add_argument(
+        "--arms", type=Path, required=True, help="An agent's arms/ directory, holding both objectives' sweeps."
+    )
     parser.add_argument("--levels", type=str, required=True, help="Levels at the base values; the test split is used.")
     parser.add_argument("--episodes", type=int, default=2048)
     parser.add_argument(
@@ -148,7 +150,7 @@ def arm_checkpoints(root: Path, prefix: str, at: int, base_value: float, steps: 
     once at different arm lengths, which are not comparable and which
     ``discover_arms`` refuses to mix silently.
     """
-    return discover_arms(root, sweep_index(prefix), base_value, steps=steps, at=at)
+    return discover_arms(root, sweep_index(prefix), base_value, steps=steps, at=at, family=sweep_family(prefix))
 
 
 def load_sweep(

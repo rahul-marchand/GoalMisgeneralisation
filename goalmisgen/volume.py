@@ -45,6 +45,20 @@ from typing import Iterable
 _ARM = re.compile(r"^(?P<sweep>[a-z][a-z0-9]*)(?P<sign>[+-])(?P<offset>\d{3})@(?P<steps>\d+[kM])$")
 
 
+# Which sweep families exist, and whether their arms enter the fitted axis.
+#
+# ``o`` is the symmetric grid the axis is fitted from. ``x`` is a one-sided
+# extension -- arms past the point where the swept objective overtakes the other,
+# which a mirrored grid cannot reach without asking for a negative reward. ``m``
+# moves several values at once. ``x`` and ``m`` are *held out of every fit*: both
+# are unbalanced about the base, and an unbalanced grid lets the common
+# fine-tuning component leak into the axis, which is the failure the symmetric
+# design exists to prevent. That is a statistical claim, not a filing preference,
+# which is why it lives here rather than in whichever script last needed it.
+FITTED_FAMILIES: frozenset[str] = frozenset({"o"})
+HELD_OUT_FAMILIES: frozenset[str] = frozenset({"x", "m"})
+
+
 @dataclass(frozen=True)
 class ArmName:
     """One fine-tuning arm, as its directory name says it is."""
@@ -238,6 +252,7 @@ def discover_arms(
     base_value: float,
     steps: int | None = None,
     at: int = -1,
+    family: str = "o",
 ) -> dict[float, Path]:
     """One sweep's arms, keyed by the value each was trained at.
 
@@ -258,7 +273,10 @@ def discover_arms(
     lengths: set[int] = set()
     for run in sorted(arms.iterdir()):
         parsed = parse_arm_dirname(run.name)
-        if parsed is None or parsed.sweep != f"o{objective}":
+        # ``family`` is what keeps the held-out arms out of a fit: the default
+        # sees only ``o``, so ``x`` and ``m`` arms are invisible unless asked for
+        # by name. See FITTED_FAMILIES.
+        if parsed is None or parsed.sweep != f"{family}{objective}":
             continue
         if steps is not None and parsed.steps != steps:
             continue
@@ -287,6 +305,16 @@ def arm_lengths(arms: Path) -> set[int]:
     return {p.steps for run in arms.iterdir() if (p := parse_arm_dirname(run.name)) is not None}
 
 
+def sweep_family(prefix: str) -> str:
+    """Which family a sweep belongs to: ``o`` fitted, ``x`` held out."""
+    cleaned = prefix.strip().rstrip("_")
+    if cleaned in ("v", "c"):
+        return "o"
+    if cleaned and cleaned[0].isalpha() and cleaned[0] in FITTED_FAMILIES | HELD_OUT_FAMILIES:
+        return cleaned[0]
+    return "o"
+
+
 def sweep_index(prefix: str) -> int:
     """Which objective a sweep moves, from however it is named on the command line.
 
@@ -298,7 +326,7 @@ def sweep_index(prefix: str) -> int:
     cleaned = prefix.strip().rstrip("_")
     if cleaned in ("v", "c"):
         return 1 if cleaned == "v" else 0
-    match = re.fullmatch(r"o?(\d)", cleaned)
+    match = re.fullmatch(r"[a-z]?(\d)", cleaned)
     if match is None:
-        raise ValueError(f"{prefix!r} does not name a sweep; expected 'o0', 'o1', ... (or legacy 'v'/'c')")
+        raise ValueError(f"{prefix!r} does not name a sweep; expected 'o0', 'o1', 'x1', ... (or legacy 'v'/'c')")
     return int(match.group(1))

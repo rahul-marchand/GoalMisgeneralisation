@@ -60,7 +60,7 @@ from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, explained, fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.volume import discover_arms, sweep_index
+from goalmisgen.volume import discover_arms, sweep_family, sweep_index
 
 BASE_VALUE = 0.5  # default; --base-value overrides for the colour-0 sweep
 """What colour 1 was worth to the agent before any fine-tuning."""
@@ -69,7 +69,9 @@ BASE_VALUE = 0.5  # default; --base-value overrides for the colour-0 sweep
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base", type=Path, required=True, help="The checkpoint every arm was fine-tuned from.")
-    parser.add_argument("--arms", type=Path, required=True, help="An agent's arms/ directory, holding runs named like o1+020@400k.")
+    parser.add_argument(
+        "--arms", type=Path, required=True, help="An agent's arms/ directory, holding runs named like o1+020@400k."
+    )
     parser.add_argument("--levels", type=str, required=True, help="Levels at the base values; the test split is used.")
     parser.add_argument("--episodes", type=int, default=2048)
     parser.add_argument("--num-envs", type=int, default=64)
@@ -151,7 +153,7 @@ def arm_checkpoints(root: Path, at: int = -1, prefix: str = "v", steps: int | No
     that saved a different number of checkpoints would otherwise be silently
     compared at a different budget from the rest.
     """
-    return discover_arms(root, sweep_index(prefix), BASE_VALUE, steps=steps, at=at)
+    return discover_arms(root, sweep_index(prefix), BASE_VALUE, steps=steps, at=at, family=sweep_family(prefix))
 
 
 def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, float, float, float]:

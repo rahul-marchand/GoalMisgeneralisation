@@ -56,9 +56,14 @@ def optimal_threshold(values: np.ndarray, other: float, penalty: float, gamma: f
     Setting the two discounted returns equal gives g^D (c + other) = c + v with
     c = penalty/(1-g). The distance already walked cancels, so the threshold
     depends on the two values alone and not on how far away anything is.
+    The measurement is "extra steps walked for whichever objective is richer",
+    which is a magnitude: ``value_distance_decisions`` picks the richer one per
+    episode. So this is the absolute value. Without it the curve is correct only
+    while the swept objective is the poorer of the two, and inverts the moment it
+    overtakes -- which the colour-0 sweep does over its whole range.
     """
     c = penalty / (1 - gamma)
-    return np.log((c + values) / (c + other)) / np.log(gamma)
+    return np.abs(np.log((c + values) / (c + other)) / np.log(gamma))
 
 
 def band(ax, points, colour, label, marker="o"):
@@ -77,9 +82,14 @@ def main() -> None:
     if not entries:
         raise SystemExit("no series with trained arms — run figures/extract_wide_axis.py first")
 
-    fig, axes = plt.subplots(1, len(entries), figsize=(5.6 * len(entries), 4.2), squeeze=False, sharey=True)
+    cols = 2 if len(entries) > 1 else 1
+    rows = -(-len(entries) // cols)
+    fig, axes = plt.subplots(rows, cols, figsize=(5.9 * cols, 4.1 * rows), squeeze=False, sharey=True)
+    flat = [a for row in axes for a in row]
+    for ax in flat[len(entries):]:
+        ax.set_visible(False)
 
-    for ax, entry in zip(axes[0], entries):
+    for ax, entry in zip(flat, entries):
         other = d["other_objective"][entry["sweep"]]
         trained = entry["trained"]
         v = np.array([p["value"] for p in trained])
@@ -87,31 +97,35 @@ def main() -> None:
         grid = np.linspace(v.min() - 0.02, v.max() + 0.02, 200)
         ax.plot(grid, optimal_threshold(grid, other, d["step_penalty"], d["discount"]),
                 color=MUTED, lw=1.1, ls="--", zorder=1)
-        ax.annotate("optimal", xy=(grid[14], optimal_threshold(grid, other, d["step_penalty"], d["discount"])[14]),
-                    xytext=(6, 4), textcoords="offset points", color=MUTED, fontsize=8)
+        opt = optimal_threshold(grid, other, d["step_penalty"], d["discount"])
+        peak = int(np.argmax(opt))
+        ax.annotate("optimal", xy=(grid[peak], opt[peak]), xytext=(8, -10),
+                    textcoords="offset points", color=MUTED, fontsize=8)
 
         base = d["base_exchange_rate"].get(entry["agent"])
         if base is not None:
             ax.axhline(base, color=MUTED, lw=0.7, ls=":", zorder=0)
 
-        band(ax, trained, BLUE, "fine-tuned on that value")
+        band(ax, trained, BLUE, "trained: one fine-tune per value")
         if entry.get("written_heldout"):
-            band(ax, entry["written_heldout"], ORANGE, "written, that arm held out", marker="s")
-
-        # The old grid, for scale: seven arms over 0.3 to 0.9. Labelled along the
-        # bottom so it cannot collide with the legend or the curves.
-        ax.axvspan(0.3, 0.9, color=MUTED, alpha=0.10, lw=0, zorder=0)
-        ax.annotate("the old seven-arm grid", xy=(0.6, 0.02), xycoords=("data", "axes fraction"),
-                    ha="center", va="bottom", color=MUTED, fontsize=8)
+            band(ax, entry["written_heldout"], ORANGE,
+                 "predicted: axis written in, that value held out", marker="s")
 
         n = entry["n"]
-        ax.set_title(f"{entry['agent']}  ·  sweep {entry['sweep']}  ·  {n.get('trained', 0)} arms", color=INK)
-        ax.set_xlabel(f"what the swept objective is worth  (the other pays {other:g})")
+        swept = int(entry["sweep"][1:])
+        seed = entry["agent"].split(".")[-1]
+        ax.set_title(
+            f"colour {swept} swept, colour {1 - swept} fixed at {other:g}"
+            f"\nseed {seed.lstrip('s')}  ·  {n.get('trained', 0)} arms",
+            color=INK,
+        )
+        ax.set_xlabel(f"what colour {swept} is worth")
         ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
         ax.set_axisbelow(True)
 
-    axes[0][0].set_ylabel("extra steps walked for the richer objective")
-    axes[0][0].legend(loc="lower left", fontsize=8.5, bbox_to_anchor=(0.0, 0.08))
+    for row in axes:
+        row[0].set_ylabel("extra steps walked for the richer objective")
+    flat[0].legend(loc="upper center", fontsize=8.5)
 
     fig.tight_layout()
     for ext in ("pdf", "png"):

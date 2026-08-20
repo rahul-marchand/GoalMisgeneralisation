@@ -109,28 +109,6 @@ c = cfg.get("cfg", cfg)
 PY
 }
 
-point_at() {  # tag source_agent checkpoint_name -- an agent view of an earlier checkpoint
-    local tag="$1" source="$2" checkpoint="$3"
-    local agent="${DATA}/runs/${tag}"
-    [ -e "${agent}/BASE.json" ] && { echo "  ${tag} present"; return; }
-    mkdir -p "${agent}"
-    ln -sfn "../${source}/local-files" "${agent}/local-files"
-    uv run python - "${agent}" "${checkpoint}" <<'PY'
-import json, sys
-from pathlib import Path
-agent, checkpoint = Path(sys.argv[1]), sys.argv[2]
-cfg = json.loads((agent / "local-files" / checkpoint / "cfg.json").read_text())
-c = cfg.get("cfg", cfg)
-(agent / "BASE.json").write_text(json.dumps({
-    "checkpoint": f"local-files/{checkpoint}",
-    "values": list(c["train_env"]["objective_values"]),
-    "objectives": c["train_env"]["n_objectives"],
-    "steps": c["total_timesteps"],
-    "checkpoints_saved": 1,
-}, indent=2) + "\n")
-PY
-}
-
 echo "############ 1. seed 5678's wide sweep ############"
 sweep novalue11.s5678
 
@@ -138,15 +116,18 @@ echo "############ 2. base-checkpoint ladder ############"
 # Arms fitted from earlier checkpoints of the same agent, to ask whether the
 # axis direction is settled long before base training ends. This is what the
 # 250M extension was meant to be gated on.
-for cp in cp_070103040 cp_100146560; do
-    if [ -d "${DATA}/runs/novalue11.s1234/local-files/${cp}" ]; then
-        tag="novalue11.s1234.at${cp#cp_0}"
-        point_at "${tag}" novalue11.s1234 "${cp}"
-        sweep "${tag}" --objectives 1
-    else
-        echo "  ${cp} not saved, skipping that rung"
-    fi
-done
+#
+# Rungs are asked for by step count, not by name. The names were hardcoded here,
+# and cp_100146560 is not one: the checkpoint at that point in training is
+# cp_100147200, so the 100M rung printed "not saved, skipping" on every run of
+# the campaign and the stage quietly did half of what it claimed.
+if ! uv run python scripts/base_ladder.py --data "${DATA}" --agent novalue11.s1234 \
+    --near 70 100 --objectives 1 --steps "${ARM_STEPS}" \
+    --checkpoints-per-arm "${CHECKPOINTS}" \
+    >> "${LOGS}/ladder-novalue11.s1234.log" 2>&1; then
+    echo "  !! base-checkpoint ladder FAILED -- see ${LOGS}/ladder-novalue11.s1234.log"
+    FAILED_STAGES="${FAILED_STAGES} ladder:novalue11.s1234"
+fi
 
 echo "############ 3. third two-objective seed ############"
 SEED=9012 NOTE="A third seed of novalue11, identical but for the seed. Takes the one-knob, exchange-rate and channel-localisation claims to n=3, which is the smallest number that supports an interval." \

@@ -60,3 +60,38 @@ def test_one_usable_point_cannot_decide_anything() -> None:
 
     assert result.usable == 1
     assert result.verdict == "no axis"
+
+
+def test_a_binding_reach_floor_is_reported_rather_than_buried() -> None:
+    """The 70.1M rung of novalue11.s1234, which the floor decided on its own.
+
+    The writes were graded and their extreme intervals disjoint; base reach was
+    94.0% against a floor of 95% fixed before any data existed. The verdict stays
+    conservative -- relaxing a preregistered threshold after seeing the number is
+    the thing preregistration exists to stop -- but it must not swallow the
+    evidence, or a one-point miss silently picks the headline answer.
+    """
+    written = [
+        point(-0.45, 6.6, half_width=1.1, reached=0.903),
+        point(-0.20, 4.8, half_width=1.0, reached=0.924),
+        point(0.20, 2.9, half_width=0.9, reached=0.952),
+        point(0.45, 1.9, half_width=0.9, reached=0.956),
+    ]
+
+    result = write_verdict(0.940, written, reach_floor=0.95)
+
+    assert result.verdict == "base cannot do the task"
+    assert not result.works
+    assert result.disjoint_ignoring_reach
+    assert result.floor_is_binding
+    assert result.min_reach == 0.903
+
+
+def test_a_rung_that_genuinely_has_nothing_is_not_flagged_as_a_near_miss() -> None:
+    """floor_is_binding must not fire just because the base was incompetent."""
+    written = [point(-0.45, 0.2, half_width=2.0, reached=0.10), point(0.45, 0.3, half_width=2.0, reached=0.11)]
+
+    result = write_verdict(0.06, written, reach_floor=0.95)
+
+    assert not result.disjoint_ignoring_reach
+    assert not result.floor_is_binding

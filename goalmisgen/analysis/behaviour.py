@@ -217,9 +217,30 @@ class WriteVerdict:
     usable: int
     """How many written points the agent still finished episodes at."""
 
+    disjoint_ignoring_reach: bool
+    """Would the two extreme writes have separated, had reach not been gated?
+
+    Reported because the gate is a threshold and thresholds land on boundaries.
+    At 70.1M of ``novalue11.s1234`` the writes were graded and their intervals
+    disjoint, and the rung failed only on a base reach of 94.0% against a floor
+    of 95% chosen before any data existed. A verdict that returned "base cannot
+    do the task" and nothing else would have buried that, and the floor would
+    have silently decided the headline answer.
+
+    This does not relax the rule. It records what the rule discarded.
+    """
+
+    min_reach: float
+    """Lowest reach across the base and every written point, so a binding floor is visible."""
+
     @property
     def works(self) -> bool:
         return self.verdict == "writes"
+
+    @property
+    def floor_is_binding(self) -> bool:
+        """The rung fails, but only because of the reach gate."""
+        return not self.works and self.disjoint_ignoring_reach
 
 
 def write_verdict(
@@ -247,16 +268,30 @@ def write_verdict(
     it as "no axis" would date the axis to whenever the agent became competent
     regardless of when the axis arrived.
     """
+
+    def separated(points: list[Mapping[str, float]]) -> bool:
+        if len(points) < 2:
+            return False
+        low = min(points, key=lambda w: w["offset"])
+        high = max(points, key=lambda w: w["offset"])
+        return bool(high["high"] < low["low"] or low["high"] < high["low"])
+
+    ungated = separated(list(written))
+    reaches = [base_reached] + [w["reached"] for w in written]
+    floor = float(min(reaches)) if reaches else float("nan")
+
     if base_reached < reach_floor:
-        return WriteVerdict("base cannot do the task", float("nan"), 0)
+        return WriteVerdict("base cannot do the task", float("nan"), 0, ungated, floor)
     usable = [w for w in written if w["reached"] >= reach_floor]
     if len(usable) < 2:
-        return WriteVerdict("no axis", float("nan"), len(usable))
+        return WriteVerdict("no axis", float("nan"), len(usable), ungated, floor)
     lowest = min(usable, key=lambda w: w["offset"])
     highest = max(usable, key=lambda w: w["offset"])
-    disjoint = highest["high"] < lowest["low"] or lowest["high"] < highest["low"]
+    disjoint = separated(usable)
     return WriteVerdict(
         "writes" if disjoint else "no axis",
         float(highest["point"] - lowest["point"]),
         len(usable),
+        ungated,
+        floor,
     )

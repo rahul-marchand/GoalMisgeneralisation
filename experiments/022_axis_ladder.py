@@ -264,6 +264,8 @@ def write_test(args, rung, base_flat, unravel, trained, stack, base_value, polic
         "slope": slope,
         "moved": decision.moved,
         "verdict": decision.verdict,
+        "floor_is_binding": decision.floor_is_binding,
+        "min_reach": decision.min_reach,
     }
 
 
@@ -419,7 +421,7 @@ def main() -> None:
             f"{'rung':>8}{'base steps':>12}{'base reach':>12}"
             f"{'write -0.45':>13}{'write +0.45':>13}{'slope':>9}{'random':>9}  verdict"
         )
-        earliest = None
+        earliest, near_miss = None, None
         for entry in fitted:
             test = entry.get("write")
             if test is None:
@@ -434,9 +436,16 @@ def main() -> None:
                 f"{(high['point'] if high else float('nan')):>13.1f}"
                 f"{test['slope']:>9.1f}"
                 f"{(control['point'] if control else float('nan')):>9.1f}  {test['verdict']}"
+                + (
+                    f"  (floor binding: writes separate, min reach {test['min_reach']:.1%})"
+                    if test["floor_is_binding"]
+                    else ""
+                )
             )
             if test["verdict"] == "writes" and earliest is None:
                 earliest = entry["rung"]
+            if test["floor_is_binding"] and near_miss is None:
+                near_miss = entry["rung"]
         print(
             "\n'writes' means the 95% intervals at the two extreme writes are disjoint and the\n"
             "agent still finishes its episodes -- the edit moved the trade-off further than the\n"
@@ -445,6 +454,13 @@ def main() -> None:
             "rather than the axis. 'base cannot do the task' is not a verdict about the axis --\n"
             "an agent that does not reach objectives has no trade-off to write to."
         )
+        if near_miss is not None:
+            print(
+                f"\nEarliest rung whose writes separate at all: {near_miss.label} ({near_miss.agent}) -- "
+                f"but it fails the reach floor, so the floor rather than the axis decided it. "
+                f"Reported because the floor was fixed in advance and must not be moved to fit; "
+                f"read both numbers."
+            )
         if earliest is not None:
             print(f"\nEarliest rung whose axis writes: {earliest.label} ({earliest.agent})")
         else:

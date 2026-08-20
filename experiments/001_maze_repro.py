@@ -1,9 +1,14 @@
-"""Train a DRC(3,3) on multi-objective mazes.
+"""Train an agent on multi-objective mazes. A DRC(3,3) unless told otherwise.
 
 The first real training run. Evaluation environments differ from training only
 in the value/colour correlation and in drawing from the held-out split, so the
 gap between the ``rho100`` and ``rho000`` curves *is* the goal misgeneralisation
 measurement, tracked throughout training rather than only at the end.
+
+``--net`` swaps the policy network and nothing else: ``resnet`` is cleanba's
+own non-recurrent ResNet, ``vit`` a transformer of ours. Both presets are the
+DRC's to the last hyperparameter except the network, so a difference between
+the runs is the architecture's.
 
     # short profiling run, to size things before committing
     uv run python experiments/001_maze_repro.py --total-timesteps 2000000 \
@@ -26,7 +31,7 @@ import cleanba.cleanba_impala
 from cleanba.cleanba_impala import WandbWriter, train
 
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.configs.presets import maze_drc33, with_final_checkpoint
+from goalmisgen.configs.presets import PRESETS, preset_for, with_final_checkpoint
 from goalmisgen.configs.writers import CsvWriter
 
 
@@ -39,6 +44,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Pre-generated level directory. Omit to sample levels live, which is "
         "roughly 350x more expensive per reset and may starve the GPU.",
+    )
+    parser.add_argument(
+        "--net",
+        type=str,
+        default="drc33",
+        choices=sorted(PRESETS),
+        help="Which policy network. Everything else in the preset is identical across choices.",
     )
     parser.add_argument("--correlation", type=float, default=None, help="Training rho.")
     parser.add_argument("--total-timesteps", type=int, default=None)
@@ -104,7 +116,7 @@ def main() -> None:
         overrides["randomise_values"] = True
     if args.hide_values:
         overrides["hide_values"] = True
-    config = with_final_checkpoint(maze_drc33(**overrides))
+    config = with_final_checkpoint(preset_for(args.net)(**overrides))
     config.base_run_dir = args.run_dir
     args.run_dir.mkdir(parents=True, exist_ok=True)
     if args.note:
@@ -114,6 +126,7 @@ def main() -> None:
     # Report the resolved configuration, not the raw flags: an unset flag leaves
     # the preset in charge, so printing the flag would say "None" for a run that
     # is in fact training at the preset's correlation.
+    print(f"network        {args.net}  ({type(config.net).__name__})")
     print(f"training rho   {config.train_env.feature_value_correlation}")
     print(f"evaluating rho {evaluated_at}")
     print(f"maze size      {config.train_env.min_size}-{config.train_env.max_size}")

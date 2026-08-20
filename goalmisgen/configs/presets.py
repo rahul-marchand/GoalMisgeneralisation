@@ -28,8 +28,10 @@ import dataclasses
 
 from cleanba.config import Args, boxworld_drc33
 from cleanba.evaluate import EvalConfig
+from cleanba.network import GuezResNetConfig, IdentityNorm
 
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.nets.transformer import TransformerSpec
 
 
 def default_eval_correlations(n_objectives: int) -> tuple[float, ...]:
@@ -141,6 +143,67 @@ def maze_drc33(
     # 0.015 is the value far.ai use for DRC on Sokoban.
     out.max_grad_norm = max_grad_norm
     return out
+
+
+RESNET_CHANNELS: tuple[int, ...] = (32,) * 9
+RESNET_KERNEL: int = 3
+"""The ResNet sized against the DRC it stands in for.
+
+cleanba's ``GuezResNetConfig`` is Guez et al.'s own non-recurrent baseline for
+the DRC, and ``sokoban_resnet59`` - the config every maze preset inherits from
+- already carries it before ``boxworld_drc33`` swaps in the ConvLSTM. Using it
+unmodified keeps the comparison to *one* change: the network.
+
+Its default shape (32-64 channels, 4x4 kernels, nine stages) was sized for
+80x80 Sokoban pixels and comes to 3.4M parameters on an 11x11 symbolic input.
+DRC(3,3) on the same input is 1.45M, a million of which is the flattened
+Dense(256) head both share, so what is being matched is the convolutional
+trunk: nine stages of 32-channel 3x3 convolutions against the DRC's nine
+3x3x32 ConvLSTM ticks per environment step. 1.23M parameters in total, same
+channel width, same kernel, same count of sequential convolutions per decision,
+and no state carried between steps - which is the variable.
+"""
+
+
+def maze_resnet(**kwargs) -> Args:
+    """The maze preset with a non-recurrent ResNet in place of the DRC(3,3).
+
+    Accepts exactly the arguments of :func:`maze_drc33`; every other setting -
+    optimiser, loss, batch shape, evaluation arms, checkpoint schedule - is the
+    DRC's, so a difference between the runs is attributable to the network.
+    """
+    out = maze_drc33(**kwargs)
+    out.net = GuezResNetConfig(
+        yang_init=False,
+        norm=IdentityNorm(),
+        normalize_input=False,
+        channels=RESNET_CHANNELS,
+        kernel_sizes=(RESNET_KERNEL,) * len(RESNET_CHANNELS),
+        strides=(1,) * len(RESNET_CHANNELS),
+    )
+    return out
+
+
+def maze_transformer(**kwargs) -> Args:
+    """The maze preset with a non-recurrent ViT-style transformer for the DRC(3,3).
+
+    Same contract as :func:`maze_resnet`. The network itself is documented in
+    :mod:`goalmisgen.nets.transformer`; its defaults are the sizes used here.
+    """
+    out = maze_drc33(**kwargs)
+    out.net = TransformerSpec(yang_init=False, norm=IdentityNorm(), normalize_input=False)
+    return out
+
+
+def preset_for(net: str):
+    """Look a preset up by the short name the training script takes."""
+    try:
+        return PRESETS[net]
+    except KeyError:
+        raise ValueError(f"unknown network {net!r}; choose from {sorted(PRESETS)}") from None
+
+
+PRESETS = {"drc33": maze_drc33, "resnet": maze_resnet, "vit": maze_transformer}
 
 
 def with_final_checkpoint(config: Args) -> Args:

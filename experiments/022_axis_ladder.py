@@ -88,7 +88,7 @@ from goalmisgen.analysis.weights import (  # noqa: E402
 )
 from goalmisgen.configs.env import MazeConfig  # noqa: E402
 from goalmisgen.ladder import Rung, discover_rungs  # noqa: E402
-from goalmisgen.volume import discover_arms  # noqa: E402
+from goalmisgen.volume import arm_is_complete, discover_arms  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -300,6 +300,15 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], ro
     for objective in args.objectives:
         base_value = values[objective]
         arms = discover_arms(directory / "arms", objective, base_value, steps=args.arm_steps, at=args.at, family="o")
+        # An arm still training has checkpoints, and ``at=-1`` would read its
+        # latest one -- a 200k arm fitted into a 400k grid under a @400k name.
+        # That is the silent incomparability the naming scheme exists to prevent,
+        # and discover_arms cannot catch it because the name is not wrong, the
+        # arm is merely unfinished.
+        finished = {value: path for value, path in arms.items() if arm_is_complete(path.parent.parent, args.arm_steps)}
+        if len(finished) < len(arms):
+            print(f"  o{objective}: {len(arms) - len(finished)} arm(s) have not reached {args.arm_steps:,}, excluded")
+        arms = finished
         if len(arms) < 3:
             print(f"  o{objective}: {len(arms)} arms, too few to fit a slope -- skipping")
             continue

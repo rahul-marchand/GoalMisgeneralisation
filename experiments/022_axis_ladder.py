@@ -469,7 +469,20 @@ def main() -> None:
         # cosines outside the range a cosine can take, which is a correction
         # announcing it has broken down; refusing is better than printing it.
         if min(r0, r1) > 0.2 and (adjusted := entry["cos"] / np.sqrt(r0 * r1)) and abs(adjusted) <= 1.0:
-            shown, reading = f"{adjusted:.3f}", "one knob" if adjusted < -0.7 else "two registers"
+            # -0.61 is far closer to one knob than to two registers, and calling
+            # it the latter on a single threshold overstated a real but partial
+            # effect. The bands say how collinear, which is what is measured.
+            if adjusted < -0.85:
+                reading = "one knob"
+            elif adjusted < -0.5:
+                reading = "mostly one knob"
+            elif adjusted < -0.2:
+                reading = "loosely coupled"
+            elif adjusted > 0.2:
+                reading = "same sign -- not a difference"
+            else:
+                reading = "two registers"
+            shown = f"{adjusted:.3f}"
         else:
             shown, reading = "—", "no axis to ask of"
         print(
@@ -498,7 +511,11 @@ def main() -> None:
                 # cos(a0, a1): both axes are noisy estimates, so a small number
                 # can mean "points somewhere else" or "points the same way, badly
                 # measured", and only correcting for reliability separates them.
-                usable = here is not None and end is not None and min(here, end) > 0.2
+                # The same test the existence table applies. Gating on
+                # reliability alone let 15.0M -- p = 0.21, no axis -- print a
+                # corrected cosine of 0.002, a precise number about nothing.
+                cleared = max(entry["exists"].get(objective, 1.0), reference["exists"].get(objective, 1.0)) < 0.05
+                usable = here is not None and end is not None and min(here, end) > 0.2 and cleared
                 adjusted = raw / np.sqrt(here * end) if usable else float("nan")
                 shown = f"{adjusted:.3f}" if usable and abs(adjusted) <= 1.0 else "—"
                 row += f"{raw:>17.3f}{shown:>10}"
@@ -563,10 +580,11 @@ def main() -> None:
             print("\nNo rung's axis moved behaviour. On this evidence there is no axis to find.")
 
     print(
-        "\nRead the first table down the |axis|/|drift| column: an axis buried under the drift "
-        "\nof its own fine-tune is not yet an axis, whatever its cosine says. Then read cos(a0,a1): "
-        "\nnear zero is two registers, near -1 is one threshold, and the rung where that changes "
-        "\nis the answer to what the ladder was built for."
+        "\nRead the tables in order. The first says which rungs have an axis at all, and no "
+        "\nlater table means anything on a rung it did not clear. The second says how collinear "
+        "\nthe two objectives' axes are once that is established. The third says whether the "
+        "\naxis yet points where it ends up. The write table is the only one that leaves the "
+        "\nweights, and is what an axis has to survive to be called one."
     )
 
 

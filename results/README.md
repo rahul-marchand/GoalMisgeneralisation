@@ -120,3 +120,72 @@ grid a quantitative prediction. Three axes constrained to hold only differences
 sum to zero, which for symmetric axes puts every pairwise cosine at -0.5; three
 absolute registers put them near 0; one shared knob puts them at -1, where the
 two-objective agent sits.
+
+## The base-checkpoint ladder — when the value axis appears
+
+`axis-ladder.txt`, from `experiments/022_axis_ladder.py` over eleven rungs of
+`novalue11.s1234`: 2M, 5M, 10M, 15M, 20M, 30M, 40M, 50M, 60M, 70M and the 140.2M
+the run finished at. Both objectives at every rung, 25 arms each at 400k steps,
+450 + 100 arms in total. `axis-ladder-prelim.txt` is an earlier nine-rung pass
+kept only because it is what the reliability bug was found in; nothing should be
+read off it.
+
+**The axis appears between 40M and 60M, and nowhere earlier.** By the permutation
+null on `|axis|` and by split-half reliability, on both objectives at once:
+
+| rung | p (o0/o1) | reliability (o0/o1) |
+|---|---|---|
+| 2M–40M | 0.07–0.97 | −0.59 to +0.24 |
+| 50.1M | 0.005 / 0.083 | 0.19 / 0.08 |
+| 60.1M | 0.000 / 0.000 | 0.44 / 0.46 |
+| 70.1M | 0.000 / 0.000 | 0.70 / 0.68 |
+| 140.2M | 0.000 / 0.000 | 0.86 / 0.85 |
+
+Nothing before 50M clears on either measure. 50.1M is genuinely marginal — colour
+0 beats its null while colour 1 does not, and neither reaches usable reliability.
+60.1M is the first rung that clears on both.
+
+**It does not start as two registers.** The disattenuated `cos(axis_0, axis_1)`
+runs −0.613 at 60.1M, −0.809 at 70.1M, −0.885 at 140.2M, with the second
+dimension's share falling 0.361 → 0.220 → 0.120. So the axis is *already
+substantially one knob* at the first rung it can be measured on, and tightens
+from there. There is no stage of two independent value registers to observe. The
+`cos ≈ 0`, `dim2 ≈ 0.5` readings at every earlier rung are what two *noise*
+vectors look like, not two registers, which is exactly why the existence table
+has to be read first.
+
+**The axis is still turning at 70M.** `cos(axis@t, axis@140M)` is 0.161 and 0.174
+at 70.1M — 0.207 and 0.227 disattenuated. So a rung with a real, writable axis
+(reliability 0.70) points only a fifth of the way toward where that axis ends up.
+This **falsifies the registered Phase 3 prediction** of `cos(axis@70M, axis@140M)
+> 0.8`, whose stated falsification threshold was 0.5. The Preregistration says
+that outcome means the 250M extension was measuring something real rather than
+drift.
+
+**Writing.** Held-out writes of `offset × axis`, drift and ε discarded, against a
+norm-matched random control:
+
+| rung | base | −0.45 | +0.45 | random | reach |
+|---|---|---|---|---|---|
+| 70.1M | 3.9 | 6.6 | 1.9 | 3.8 | 94.0% |
+| 140.2M | 7.6 | 17.3 | 2.7 | 7.4 | 100.0% |
+
+Graded, monotone, and the random control does not move at either rung. The
+preregistered verdict is that **140.2M** is the earliest rung whose axis writes;
+70.1M fails only because base reach is 94.0% against a floor of 95% fixed before
+any data existed, and its extreme intervals *are* disjoint. Both numbers are
+reported and the floor was not moved to fit.
+
+Two artefacts in this file, both since fixed in the script and neither affecting
+a number above. The `reading` column labels −0.613 "two registers" on a threshold
+that was too coarse; read the disattenuated value, not the label. And the
+settling table gated its correction on reliability alone, so the 15.0M row shows
+a corrected cosine of 0.002 for a rung with no axis — ignore it.
+
+What the ladder cannot separate: competence and the axis arrive in the same
+window. Base reach runs 27.7% at 40M, 48.5% at 50M, 70.1% at 60M, 94.0% at 70M.
+So "the axis arrives with competence" and "the axis was there earlier but
+unreadable in an agent that cannot finish episodes" both fit, and no rung
+distinguishes them. Note also that `novalue11` becomes competent far later than
+the ~20M in Experiment 1, which was `maze11` — the twenty dense checkpoints
+before 20M are all pre-competence here and carry nothing.

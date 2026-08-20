@@ -238,4 +238,54 @@ of `novalue11`'s at comparable drift, and that the axis's loading on the colour
 channels might predict the ρ collapse. Nothing else depends on them — every
 value-axis claim rests on four-channel agents, and still does.
 
+**2026-08-20 — Phase 3 ran, widened, and gained a decision rule.**
+
+Registered before any of it was read, which is the only time this is worth
+writing.
+
+1. **The ladder is nine rungs, not two.** Phase 3 asked for `cp_70M` and
+   `cp_100M` against `cp_140M`, to test whether the axis direction is settled
+   before training ends. That question is unchanged and its prediction stands.
+   Added: 2M, 5M, 10M, 15M, 20M, 30M and 40M, because a two-rung ladder cannot
+   answer *when* the axis appears and both existing rungs sit long after
+   competence at ~20M. The dense early rungs are the ones that carry the new
+   question, and they exist because the run saves every ~1M step up to 20M.
+
+2. **Both objectives at every rung.** Phase 3 swept colour 1 alone. Sweeping both
+   makes `cos(axis_0, axis_1)` readable per rung, so the one-knob result of
+   Experiment 2 becomes a trajectory rather than an endpoint. **No prediction is
+   registered for its shape.** The possibility that motivated the widening — two
+   separable value registers early, collapsing to one threshold later — is a
+   hypothesis being looked at for the first time, not a prior. It would show as a
+   cosine near zero at early rungs moving to −1, with the second-dimension share
+   falling from ~0.5 to ~0. The rival is that it is −1 from the first rung the
+   axis exists at, which is what a task whose choice turns on one difference
+   would predict.
+
+3. **What counts as an axis, fixed in advance.** A rung has an axis when writing
+   `offset × axis` into that rung's own weights moves the measured exchange rate
+   further than the measurement's uncertainty: the 95% intervals at the two
+   extreme writes disjoint, the agent still reaching objectives at ≥95%, and a
+   norm-matched random direction of the same length not moving it. Norms and
+   cosines are reported but do not decide, because neither separates an axis from
+   a direction fitted to noise. Writes are held out, drift and ε are discarded.
+
+4. **A failure that is not evidence.** Rungs whose base agent cannot reach
+   objectives are reported as "base cannot do the task" rather than as "no axis".
+   An agent with no legible trade-off has nothing to write to, and scoring that as
+   a missing axis would date the axis to whenever the agent became competent
+   whatever the axis did. This is expected at 2M and possibly 5M, and it is a
+   limit on what the early rungs can show, not a result.
+
+5. **Early rungs are confounded, in the direction that flatters the hypothesis.**
+   Below ~20M the base is still moving fast under its own schedule, so a 400k arm
+   at lr 1e-4 is partly continued training. Drift is therefore largest exactly
+   where the axis is smallest. Every cosine is read against a permutation null
+   rather than against zero for this reason; a null of zero would produce "the
+   axis arrives late" whether or not it does.
+
+6. **Arms are 400k steps at every rung**, matching the existing 70M and 140M
+   sweeps. Anything scaling with fine-tune length is comparable down the ladder
+   and not against the 3M sweeps.
+
 *(no further amendments)*

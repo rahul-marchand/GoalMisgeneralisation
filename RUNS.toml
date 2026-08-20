@@ -98,6 +98,49 @@ restored hyperparameter is overwritten each update by ``inject_hyperparams``.
 """
 
 [[entry]]
+match = "runs/novalue11.s1234.at*/arms/*@400k"
+note = """
+The base-checkpoint ladder: the value sweep run again from nine points in
+novalue11.s1234's own training -- 2M, 5M, 10M, 15M, 20M, 30M, 40M, 70M and the
+140.2M the agent finished at. Both objectives at every rung, 25 arms each at 400k
+steps, matching the 70M and 140M sweeps that already existed so the rungs are
+comparable.
+
+Phase 3 of the Preregistration asked one question of this -- whether the axis
+direction is settled well before training ends -- from two rungs. This asks two
+more that two rungs cannot answer. *When does the axis appear at all*, which
+needs rungs on both sides of competence at ~20M, hence the dense early ladder.
+And *is it one axis or two*, which needs both objectives at every rung rather
+than colour 1 alone: cos(axis_0, axis_1) near zero is two value registers and
+near -1 is one threshold on the difference, so the rung where that changes is
+where two axes became one, if they ever were two.
+
+Read with experiments/022_axis_ladder.py. The decisive column is --write: a rung
+has an axis when writing offset*axis into that rung's own weights moves the
+agent's exchange rate further than the measurement's uncertainty, with a
+norm-matched random direction of the same length moving nothing. Norms and
+cosines cannot separate an axis from a direction fitted to noise; the write can.
+
+Early rungs are confounded in the unhelpful direction and the analysis says so:
+below ~20M the base is still moving fast on its own, so a 400k arm at lr 1e-4 is
+partly continued training, and the drift is largest exactly where the axis is
+smallest. Every cosine is therefore read against a permutation null rather than
+against zero, which would have manufactured the trend being looked for.
+"""
+
+[[entry]]
+match = "runs/novalue11.s1234.at*"
+note = """
+A rung of the base-checkpoint ladder -- an agent view of one earlier checkpoint of
+novalue11.s1234, created by scripts/base_ladder.py. It owns nothing but a
+BASE.json and a symlink to the checkpoints it shares with the run it came from,
+so it costs no meaningful space; the arms beneath it are the experiment.
+
+Its BASE.json records the rung's own position in training rather than the parent
+run's total_timesteps, which is the number anything plotting a ladder wants.
+"""
+
+[[entry]]
 match = "runs/novalue11.s5678"
 note = """
 A second seed of novalue11, identical in every respect but the seed. Every

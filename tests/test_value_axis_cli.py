@@ -106,3 +106,47 @@ def test_an_agent_recording_only_value_encoding_is_read_correctly(tmp_path) -> N
 
     assert value_axis.base_hides_values(withvalue) is False
     assert value_axis.base_hides_values(novalue) is True
+
+
+def test_the_network_is_read_from_the_base_not_assumed(tmp_path) -> None:
+    """013 built every arm with maze_drc33. For a ResNet or transformer base the
+    reset checkpoint would then pair DRC configuration with non-DRC weights."""
+    import json
+
+    from cleanba.convlstm import ConvLSTMConfig
+
+    from goalmisgen.nets.scaled import ScaledInputSpec
+    from goalmisgen.nets.transformer import TransformerSpec
+
+    expected = {
+        "cleanba.convlstm:ConvLSTMConfig": ConvLSTMConfig,
+        "goalmisgen.nets.scaled:ScaledInputSpec": ScaledInputSpec,
+        "goalmisgen.nets.transformer:TransformerSpec": TransformerSpec,
+    }
+    for net_type, net_class in expected.items():
+        base = tmp_path / net_type.split(":")[-1]
+        base.mkdir()
+        (base / "cfg.json").write_text(
+            json.dumps({"cfg": {"net": {"_type_": net_type}, "train_env": {"value_encoding": "none"}}})
+        )
+        args = run([str(base), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
+        config = value_axis.finetune_config(args)
+        assert isinstance(config.net, net_class), net_type
+        assert config.train_env.objective_values == (1.0, 0.7)
+        assert config.train_env.value_encoding == "none"
+
+
+def test_an_unreadable_base_config_builds_the_drc(tmp_path) -> None:
+    from cleanba.convlstm import ConvLSTMConfig
+
+    assert value_axis.base_preset(tmp_path) is value_axis.maze_drc33
+    args = run([str(tmp_path), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
+    assert isinstance(value_axis.finetune_config(args).net, ConvLSTMConfig)
+
+
+def test_an_unknown_network_is_refused_rather_than_silently_built_as_a_drc(tmp_path) -> None:
+    import json
+
+    (tmp_path / "cfg.json").write_text(json.dumps({"cfg": {"net": {"_type_": "somewhere:Else"}}}))
+    with pytest.raises(SystemExit):
+        value_axis.base_preset(tmp_path)

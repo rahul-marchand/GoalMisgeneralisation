@@ -206,6 +206,23 @@ def maze_transformer(**kwargs) -> Args:
     return out
 
 
+def maze_transformer_large(**kwargs) -> Args:
+    """:func:`maze_transformer` at 6 layers, d_model 128, 8 heads.
+
+    The 4-layer/d=64 transformer trained with the value channel was still
+    climbing at 150M steps (in-training return -0.3 against the DRC's +0.4) and
+    reached 82% chose_optimal where the DRC and the ResNet reach 92-96%, so it is
+    not a converged comparison. This is the size for the hidden-value base that
+    the value-axis sweeps start from, where the base has to be competent for an
+    arm's exchange rate to mean anything.
+    """
+    out = maze_drc33(**kwargs)
+    out.net = TransformerSpec(
+        yang_init=False, norm=IdentityNorm(), normalize_input=False, d_model=128, n_layers=6, n_heads=8
+    )
+    return out
+
+
 def preset_for(net: str):
     """Look a preset up by the short name the training script takes."""
     try:
@@ -214,7 +231,7 @@ def preset_for(net: str):
         raise ValueError(f"unknown network {net!r}; choose from {sorted(PRESETS)}") from None
 
 
-PRESETS = {"drc33": maze_drc33, "resnet": maze_resnet, "vit": maze_transformer}
+PRESETS = {"drc33": maze_drc33, "resnet": maze_resnet, "vit": maze_transformer, "vitl": maze_transformer_large}
 
 
 def with_final_checkpoint(config: Args) -> Args:

@@ -19,7 +19,7 @@ from cleanba.config import Args
 
 from goalmisgen.analysis import collect_rollouts
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.configs.presets import maze_drc33, maze_resnet, maze_transformer, preset_for
+from goalmisgen.configs.presets import maze_drc33, maze_resnet, maze_transformer, maze_transformer_large, preset_for
 from goalmisgen.nets.readers import DRCReader, ResNetReader, TransformerReader, state_reader_for
 from goalmisgen.nets.transformer import TransformerSpec
 
@@ -55,10 +55,10 @@ def policies():
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["resnet", "vit"])
+@pytest.mark.parametrize("name", ["resnet", "vit", "vitl"])
 def test_swapped_presets_differ_from_the_drc_in_the_network_alone(name):
     drc = maze_drc33(feature_value_correlation=0.5, level_dataset="/some/levels")
-    swapped = PRESETS[name](feature_value_correlation=0.5, level_dataset="/some/levels")
+    swapped = preset_for(name)(feature_value_correlation=0.5, level_dataset="/some/levels")
 
     assert type(swapped.net).__name__ != type(drc.net).__name__
     for field in dataclasses.fields(Args):
@@ -70,6 +70,7 @@ def test_swapped_presets_differ_from_the_drc_in_the_network_alone(name):
 def test_preset_lookup_by_short_name():
     assert preset_for("resnet") is maze_resnet
     assert preset_for("vit") is maze_transformer
+    assert preset_for("vitl") is maze_transformer_large
     assert preset_for("drc33") is maze_drc33
     with pytest.raises(ValueError, match="unknown network"):
         preset_for("lstm")

@@ -110,43 +110,39 @@ def test_an_agent_recording_only_value_encoding_is_read_correctly(tmp_path) -> N
 
 def test_the_network_is_read_from_the_base_not_assumed(tmp_path) -> None:
     """013 built every arm with maze_drc33. For a ResNet or transformer base the
-    reset checkpoint would then pair DRC configuration with non-DRC weights."""
+    reset checkpoint would then pair DRC configuration with non-DRC weights.
+    The saved spec is used as is, so a non-default transformer keeps its size."""
     import json
 
+    import farconf
     from cleanba.convlstm import ConvLSTMConfig
 
+    from goalmisgen.configs.presets import maze_resnet, maze_transformer_large
     from goalmisgen.nets.scaled import ScaledInputSpec
     from goalmisgen.nets.transformer import TransformerSpec
 
-    expected = {
-        "cleanba.convlstm:ConvLSTMConfig": ConvLSTMConfig,
-        "goalmisgen.nets.scaled:ScaledInputSpec": ScaledInputSpec,
-        "goalmisgen.nets.transformer:TransformerSpec": TransformerSpec,
-    }
-    for net_type, net_class in expected.items():
-        base = tmp_path / net_type.split(":")[-1]
+    for name, net in {
+        "resnet": maze_resnet().net,
+        "vitl": maze_transformer_large().net,
+        "drc": ConvLSTMConfig(),
+    }.items():
+        base = tmp_path / name
         base.mkdir()
-        (base / "cfg.json").write_text(
-            json.dumps({"cfg": {"net": {"_type_": net_type}, "train_env": {"value_encoding": "none"}}})
-        )
+        payload = {"cfg": {"net": farconf.to_dict(net), "train_env": {"value_encoding": "none"}}}
+        (base / "cfg.json").write_text(json.dumps(payload))
         args = run([str(base), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
         config = value_axis.finetune_config(args)
-        assert isinstance(config.net, net_class), net_type
+        assert config.net == net, name
         assert config.train_env.objective_values == (1.0, 0.7)
         assert config.train_env.value_encoding == "none"
+    assert isinstance(maze_resnet().net, ScaledInputSpec)
+    assert isinstance(maze_transformer_large().net, TransformerSpec)
+    assert maze_transformer_large().net.d_model != TransformerSpec().d_model
 
 
 def test_an_unreadable_base_config_builds_the_drc(tmp_path) -> None:
     from cleanba.convlstm import ConvLSTMConfig
 
-    assert value_axis.base_preset(tmp_path) is value_axis.maze_drc33
+    assert value_axis.base_net(tmp_path) is None
     args = run([str(tmp_path), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
     assert isinstance(value_axis.finetune_config(args).net, ConvLSTMConfig)
-
-
-def test_an_unknown_network_is_refused_rather_than_silently_built_as_a_drc(tmp_path) -> None:
-    import json
-
-    (tmp_path / "cfg.json").write_text(json.dumps({"cfg": {"net": {"_type_": "somewhere:Else"}}}))
-    with pytest.raises(SystemExit):
-        value_axis.base_preset(tmp_path)

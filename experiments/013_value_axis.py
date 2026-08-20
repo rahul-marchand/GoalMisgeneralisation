@@ -50,9 +50,10 @@ import cleanba.cleanba_impala
 import farconf
 from cleanba.cleanba_impala import WandbWriter, train
 from cleanba.config import Args
+from cleanba.network import PolicySpec
 
 from goalmisgen import provenance
-from goalmisgen.configs.presets import maze_drc33, maze_resnet, maze_transformer
+from goalmisgen.configs.presets import maze_drc33
 from goalmisgen.configs.writers import CsvWriter
 
 
@@ -141,46 +142,34 @@ def base_hides_values(checkpoint: Path) -> bool:
     return bool(env.get("colour_is_the_only_value_cue", True))
 
 
-# The preset that builds each network, keyed by how farconf names the network's
-# config class in a checkpoint's cfg.json. The DRC is the default because every
-# agent swept before the architecture-swap stream was one.
-PRESET_BY_NET_TYPE = {
-    "cleanba.convlstm:ConvLSTMConfig": maze_drc33,
-    "goalmisgen.nets.scaled:ScaledInputSpec": maze_resnet,
-    "goalmisgen.nets.transformer:TransformerSpec": maze_transformer,
-}
-
-
-def base_preset(checkpoint: Path):
-    """The preset whose network matches the agent being fine-tuned.
+def base_net(checkpoint: Path) -> PolicySpec | None:
+    """The network the agent being fine-tuned was trained with, read from its cfg.json.
 
     Read from the base, like the value channel: ``reset_checkpoint`` copies the
     base's weights byte for byte and writes *this* configuration beside them, so
-    a preset naming a different network than the weights were trained with would
-    have cleanba build that network against these weights and die on a parameter
-    shape error at resume -- or, for a head of the same shape, not die. The
-    network belongs to the agent, not to the fine-tune.
+    a configuration naming a different network than the weights were trained
+    with would have cleanba build that network against these weights and die on
+    a parameter shape error at resume -- or, for a head of the same shape, not
+    die. The network belongs to the agent, not to the fine-tune. It is the saved
+    spec itself rather than a preset looked up by class, so a transformer of a
+    non-default size comes back at its own size. ``None`` when the base has no
+    readable configuration, in which case the caller keeps the DRC every agent
+    swept before the architecture-swap stream was.
     """
     try:
         payload = json.loads((checkpoint / "cfg.json").read_text())
     except (OSError, json.JSONDecodeError):
-        return maze_drc33
-    net_type = payload.get("cfg", payload).get("net", {}).get("_type_")
-    if net_type is None:
-        return maze_drc33
-    try:
-        return PRESET_BY_NET_TYPE[net_type]
-    except KeyError:
-        raise SystemExit(
-            f"{checkpoint} was trained with {net_type}, which no preset builds; "
-            f"known: {sorted(PRESET_BY_NET_TYPE)}"
-        ) from None
+        return None
+    net = payload.get("cfg", payload).get("net")
+    if net is None:
+        return None
+    return farconf.from_dict(net, PolicySpec)
 
 
 def finetune_config(args: argparse.Namespace) -> Args:
     """The base run's configuration, with the value swapped and the schedule flattened."""
     values = tuple(args.objective_values) if args.objective_values else (args.value_zero, args.value)
-    config = base_preset(args.checkpoint)(
+    config = maze_drc33(
         feature_value_correlation=1.0,
         min_size=args.size,
         max_size=args.size,
@@ -191,6 +180,9 @@ def finetune_config(args: argparse.Namespace) -> Args:
         level_dataset=args.levels,
         seed=args.seed,
     )
+    net = base_net(args.checkpoint)
+    if net is not None:
+        config.net = net
 
     # A fine-tune is short enough that an annealed rate would spend most of it
     # near zero, and each arm would anneal over its own run rather than sharing

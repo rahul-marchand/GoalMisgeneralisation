@@ -141,4 +141,13 @@ the early-warning CSVs and each run's `eval.csv` are in `figures/data/bc/`.
   rho gap beside a probe fitted at rho=1 and scored at rho=0 against the model's
   own route, the optimal route and the colour-0 route.
 
+- `offline-bc-value-axis-<base>.<sweep>.txt` (`027`): the imitation twin of
+  Experiment 2 on the hidden-value route model `bcnv11.s<seed>`: the 25-arm
+  fine-tune grid of one objective (`o0` colour 0, `o1` colour 1) read as weight
+  diffs - `dtheta = drift + offset*axis` with the null arm held out, collinearity,
+  leave-one-out fit and leave-one-out *written* exchange rates against each arm's
+  own, norm-matched random directions, drift alone, writes outside the grid.
+- `offline-bc-value-or-gap-<base>.txt` (`028`): `cos(axis_0, axis_1)` for that
+  base, with split-half reliabilities and a permutation null.
+
 What they say is summarised in the offline-bc handoff and below as it lands.

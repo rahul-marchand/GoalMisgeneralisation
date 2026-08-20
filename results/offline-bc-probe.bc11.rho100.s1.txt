@@ -1,5 +1,5 @@
 script 025_bc_probe_plan.py
-commit a28744f
+commit 992f19c
 argv   /workspace/data/offline/runs/bc11.rho100.s1 --demos /workspace/data/offline/demos/test.rho100 --by-distance
 
 bc11.rho100.s1 @ step 30,000; test.rho100 (rho=1.0); 512 train / 256 test episodes
@@ -27,6 +27,10 @@ bc11.rho100.s1 @ step 30,000; test.rho100 (rho=1.0); 512 train / 256 test episod
           by distance (matched negatives): 1:0.584  2:0.646  3:0.654  4:0.721  5:0.696  6:0.687  7:0.730  8:0.715  9:0.713  10:0.725  11:0.740  12:0.741
  block 4     untrained    0.604    [0.580, 0.626]     0.582
           by distance (matched negatives): 1:0.530  2:0.540  3:0.535  4:0.586  5:0.589  6:0.562  7:0.575  8:0.554  9:0.556  10:0.530  11:0.614  12:0.563
+     all       trained    0.757    [0.729, 0.781]     0.609
+          by distance (matched negatives): 1:0.599  2:0.656  3:0.648  4:0.710  5:0.701  6:0.699  7:0.736  8:0.718  9:0.740  10:0.759  11:0.758  12:0.730
+     all     untrained    0.585    [0.569, 0.598]     0.552
+          by distance (matched negatives): 1:0.537  2:0.534  3:0.517  4:0.513  5:0.541  6:0.586  7:0.575  8:0.556  9:0.522  10:0.530  11:0.560  12:0.539
 
 The trained probe must beat the untrained one at the same depth. Beating
 only the observation shows the network mixes cells, which it does before

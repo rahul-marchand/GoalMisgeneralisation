@@ -120,21 +120,30 @@ def fig_bc_rho_response() -> None:
 
 
 def fig_bc_early_warning() -> None:
-    """Behavioural gap against the probe's colour-route preference, per checkpoint."""
+    """Behavioural gap against the probe's colour-route preference, per checkpoint.
+
+    One panel per training condition, one pair of lines per seed, so whether
+    the probe moves before the behaviour can be read across seeds at a glance.
+    """
     files = sorted(DATA.glob("early_warning.*.csv"))
     if not files:
         return
-    fig, axes = plt.subplots(1, len(files), figsize=(3.8 * len(files), 3.0), sharey=True, squeeze=False)
-    for ax, path in zip(axes[0], files):
-        frame = pd.read_csv(path)
-        steps = frame["step"].clip(lower=1)
-        gap = frame["chose_optimal_rho1"] - frame["chose_optimal_rho0"]
-        delta = frame["auc_rho0_colour0"] - frame["auc_rho0_optimal"]
-        ax.plot(steps, gap, color=ORANGE, lw=1.4, marker="o", ms=3)
-        ax.plot(steps, delta, color=BLUE, lw=1.4, marker="s", ms=3)
+    groups: dict[str, list[tuple[str, pd.DataFrame]]] = {}
+    for path in files:
+        run = path.name.replace("early_warning.", "").replace(".csv", "")
+        groups.setdefault(run.split(".")[1], []).append((run, pd.read_csv(path)))
+    order = [c for c in ("rho100", "rho050") if c in groups]
+    fig, axes = plt.subplots(1, len(order), figsize=(3.9 * len(order), 3.0), sharey=True, squeeze=False)
+    for ax, condition in zip(axes[0], order):
+        for run, frame in groups[condition]:
+            steps = frame["step"].clip(lower=1)
+            gap = frame["chose_optimal_rho1"] - frame["chose_optimal_rho0"]
+            delta = frame["auc_rho0_colour0"] - frame["auc_rho0_optimal"]
+            ax.plot(steps, gap, color=ORANGE, lw=1.2, marker="o", ms=2.5, alpha=0.75)
+            ax.plot(steps, delta, color=BLUE, lw=1.2, marker="s", ms=2.5, alpha=0.75)
         ax.axhline(0, color=MUTED, lw=0.8)
         ax.set_xscale("log")
-        ax.set_title(path.name.replace("early_warning.", "").replace(".csv", ""))
+        ax.set_title({"rho100": "trained at ρ=1.0", "rho050": "trained at ρ=0.5 (control)"}[condition] + f"  ({len(groups[condition])} seeds)")
         ax.set_xlabel("training step")
         ax.grid(True, axis="y")
     axes[0][0].set_ylabel("gap")
@@ -143,7 +152,48 @@ def fig_bc_early_warning() -> None:
     save(fig, "fig_bc_early_warning")
 
 
+def fig_bc_value_axis() -> None:
+    """Leave-one-out written exchange rate against the arm's own, per sweep, seeds overlaid."""
+    files = sorted(DATA.glob("value_axis.*.json"))
+    if not files:
+        return
+    by_sweep: dict[str, list[dict]] = {}
+    for path in files:
+        payload = json.loads(path.read_text())
+        if payload.get("behaviour", {}).get("arms"):
+            by_sweep.setdefault(payload["sweep"], []).append(payload)
+    if not by_sweep:
+        return
+    sweeps = sorted(by_sweep)
+    fig, axes = plt.subplots(1, len(sweeps), figsize=(3.9 * len(sweeps), 3.2), sharey=True, squeeze=False)
+    for ax, sweep in zip(axes[0], sweeps):
+        for k, payload in enumerate(by_sweep[sweep]):
+            arms = payload["behaviour"]["arms"]
+            offsets = np.array([float(o) for o in arms])
+            order = np.argsort(offsets)
+            keys = [list(arms)[i] for i in order]
+            offsets = offsets[order]
+            expected = np.array([arms[key]["expected"] for key in keys])
+            fine = np.array([arms[key]["arm"]["indifference"] for key in keys])
+            written = np.array([arms[key]["written"]["indifference"] for key in keys])
+            if k == 0:
+                ax.plot(offsets, expected, color=MUTED, lw=1.0, ls=":", label="expert")
+            ax.plot(offsets, fine, color=ORANGE, marker="o", ms=3, lw=1.0, alpha=0.7, label="fine-tuned arm" if k == 0 else None)
+            ax.plot(offsets, written, color=BLUE, marker="s", ms=3, lw=1.0, alpha=0.7, label="written, arm held out" if k == 0 else None)
+            base = payload["behaviour"].get("base", {}).get("indifference")
+            if base is not None and np.isfinite(base):
+                ax.axhline(base, color=INK2, lw=0.6, ls="--", alpha=0.5)
+        ax.set_title({"o0": "colour 0's value moved", "o1": "colour 1's value moved"}.get(sweep, sweep) + f"  ({len(by_sweep[sweep])} seeds)")
+        ax.set_xlabel("offset from the base value")
+        ax.grid(True, axis="y")
+    axes[0][0].set_ylabel("exchange rate: extra steps walked for colour 0")
+    axes[0][0].legend(loc="best", fontsize=8)
+    fig.suptitle("Route model (values hidden): writing a value along a fitted weight-space axis", y=1.02, fontsize=10)
+    save(fig, "fig_bc_value_axis")
+
+
 if __name__ == "__main__":
     fig_bc_dynamics()
     fig_bc_rho_response()
     fig_bc_early_warning()
+    fig_bc_value_axis()

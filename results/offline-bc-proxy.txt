@@ -1,0 +1,58 @@
+script 024_bc_proxy.py
+commit 992f19c
+argv   --runs /workspace/data/offline/runs/bc11.rho100.s1 /workspace/data/offline/runs/bc11.rho100.s2 /workspace/data/offline/runs/bc11.rho100.s3 /workspace/data/offline/runs/bc11.rho050.s1 /workspace/data/offline/runs/bc11.rho050.s2 /workspace/data/offline/runs/bc11.rho050.s3 --demos rho100=/workspace/data/offline/demos/test.rho100 rho050=/workspace/data/offline/demos/test.rho050 rho000=/workspace/data/offline/demos/test.rho000 --json /workspace/data/offline/results/proxy.json
+
+=== bc11.rho100.s1  (trained at rho=1.0, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         96.1%        81.4%    98.6%   98.8%    93.4%   0.428    9.3    10.36
+     0.50         73.1%        72.5%    92.7%   93.3%    63.7%   0.211   10.7     5.08
+     0.00         47.0%        62.2%    87.0%   87.8%    34.0%  -0.010   12.2    -8.30
+
+=== bc11.rho100.s2  (trained at rho=1.0, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         93.7%        81.2%    98.0%   97.9%    90.3%   0.406    9.6    10.85
+     0.50         69.3%        78.8%    90.1%   95.8%    56.3%   0.175   10.5     2.77
+     0.00         39.9%        74.5%    81.7%   92.1%    21.5%  -0.058   11.4   -12.92
+
+=== bc11.rho100.s3  (trained at rho=1.0, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         94.0%        81.1%    97.7%   97.8%    90.6%   0.406    9.6    10.73
+     0.50         71.8%        77.5%    83.7%   93.3%    54.7%   0.131   10.6     4.03
+     0.00         41.9%        71.6%    70.1%   88.9%    19.6%  -0.139   11.8   -11.66
+
+=== bc11.rho050.s1  (trained at rho=0.5, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         94.9%        81.7%    98.4%   98.7%    92.3%   0.421    9.5    10.73
+     0.50         94.9%        49.3%    98.4%   98.6%    92.3%   0.422    9.4    10.72
+     0.00         94.8%        18.1%    98.3%   98.6%    92.1%   0.422    9.4    10.85
+
+=== bc11.rho050.s2  (trained at rho=0.5, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         95.7%        81.8%    98.8%   98.9%    93.2%   0.419    9.6    10.66
+     0.50         95.7%        50.0%    98.8%   99.0%    93.2%   0.420    9.6    10.73
+     0.00         95.8%        18.1%    98.8%   98.9%    93.3%   0.421    9.5    10.66
+
+=== bc11.rho050.s3  (trained at rho=0.5, step 30,000) ===
+ eval rho  chose_optimal  followed_f0  reached   legal  =expert  return  steps  indiff.
+     1.00         91.5%        81.7%    95.8%   95.7%    86.6%   0.377    9.9    11.57
+     0.50         91.4%        49.2%    96.1%   95.9%    86.7%   0.379    9.9    11.59
+     0.00         91.2%        18.7%    96.1%   96.0%    86.5%   0.379    9.8    11.53
+
+=== across seeds (mean +- sd) ===
+trained at rho=1.0  (n=3 seeds)
+ eval rho       chose_optimal         followed_f0           reached             legal
+     1.00      0.946 +- 0.014      0.812 +- 0.002    0.981 +- 0.005    0.982 +- 0.006
+     0.50      0.714 +- 0.019      0.763 +- 0.033    0.889 +- 0.047    0.941 +- 0.015
+     0.00      0.429 +- 0.037      0.695 +- 0.064    0.796 +- 0.087    0.896 +- 0.023
+
+trained at rho=0.5  (n=3 seeds)
+ eval rho       chose_optimal         followed_f0           reached             legal
+     1.00      0.940 +- 0.023      0.817 +- 0.001    0.977 +- 0.016    0.978 +- 0.018
+     0.50      0.940 +- 0.023      0.495 +- 0.004    0.978 +- 0.015    0.979 +- 0.017
+     0.00      0.939 +- 0.024      0.183 +- 0.003    0.977 +- 0.014    0.978 +- 0.016
+
+A value-tracking model holds chose_optimal across rho and lets followed_f0
+fall; a colour-follower holds followed_f0 and lets chose_optimal collapse at
+rho=0. The rho=0.5-trained rows are the control.
+
+wrote /workspace/data/offline/results/proxy.json

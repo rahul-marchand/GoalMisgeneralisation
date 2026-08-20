@@ -240,10 +240,16 @@ def split_half_reliability(
     """
     offsets = np.asarray(offsets, dtype=np.float64)
     diffs = np.asarray(diffs, dtype=np.float64)
+    # Rounded throughout, keys and magnitudes alike. An offset is a difference of
+    # two floats -- 1.45 - 1.0 is 0.4500000000000002 while 0.55 - 1.0 is
+    # -0.44999999999999996 -- so a magnitude taken from the raw values matches no
+    # key at all, and the sweep whose base value happens to make the arithmetic
+    # inexact silently reports no pairs and no reliability. Colour 0 did exactly
+    # that while colour 1, whose base is 0.5, came through unharmed.
     table = {round(float(o), 6): index for index, o in enumerate(offsets)}
     pairs = [
         (table[m], table[-m])
-        for m in sorted({abs(float(o)) for o in offsets if abs(o) > 1e-9}, reverse=True)
+        for m in sorted({abs(key) for key in table if abs(key) > 1e-9}, reverse=True)
         if m in table and -m in table
     ]
     if len(pairs) < 4:

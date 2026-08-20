@@ -320,3 +320,22 @@ def test_reliability_splits_pairs_so_each_half_stays_balanced() -> None:
     diffs = np.tile(common, (len(offsets), 1)) + 0.5 * rng.normal(size=(len(offsets), 300))
 
     assert abs(split_half_reliability(offsets, diffs, splits=80, seed=7)) < 0.3
+
+
+def test_reliability_finds_its_pairs_when_the_offsets_are_inexact() -> None:
+    """Offsets are differences of floats, and the base value decides how inexact.
+
+    Colour 0's grid is values minus 1.0, so +0.45 arrives as 0.4500000000000002
+    and -0.45 as -0.44999999999999996. Matching magnitudes against rounded keys
+    found no pairs at all and returned nan for every rung of a ladder, while
+    colour 1 -- base 0.5, arithmetic exact -- looked fine.
+    """
+    base = 1.0
+    values = [round(base + m * s, 2) for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)]
+    offsets = np.array([v - base for v in values])
+    assert any(abs(o) not in {0.45, 0.44, 0.43, 0.30, 0.20, 0.10} for o in np.abs(offsets)), "need inexact offsets"
+
+    rng = np.random.default_rng(8)
+    diffs = np.outer(offsets, rng.normal(size=200)) + 0.5 * rng.normal(size=(len(offsets), 200))
+
+    assert split_half_reliability(offsets, diffs, splits=80, seed=9) > 0.7

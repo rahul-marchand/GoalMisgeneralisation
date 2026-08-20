@@ -7,8 +7,7 @@
 #   bash scripts/offline_bc_pod.sh queue 1:0.5 2:1.0 ...   # those runs one after another
 #
 # One run saturates the 4090 on its own (98% utilisation at ~40 steps/s), so
-# running all six at once buys nothing; two queues of three is the practical
-# shape.
+# running several at once buys nothing; one queue beside the pilot is the shape.
 #
 # Demonstrations come from the same 1M-level dataset the DRC proxy agent
 # trained on (levels/values/1.00-0.50@1M): training sets from the `train`
@@ -21,9 +20,12 @@
 set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 export PYTHONUNBUFFERED=1
-# Three runs share the card; none needs more than a few GB.
+# Two runs share the card. At a quarter of the card each, three abreast died in
+# the first training step (RESOURCE_EXHAUSTED on a 3 GiB request - XLA's
+# autotuning workspace, not the model), so the cap is generous and the queue is
+# one deep beside the pilot.
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export XLA_PYTHON_CLIENT_MEM_FRACTION="${XLA_PYTHON_CLIENT_MEM_FRACTION:-0.25}"
+export XLA_PYTHON_CLIENT_MEM_FRACTION="${XLA_PYTHON_CLIENT_MEM_FRACTION:-0.45}"
 
 cd "$(dirname "$0")/.."
 

@@ -362,8 +362,9 @@ Preregistration.md.
 match = "runs/resnet11.s1234"
 note = """
 maze11 with the network swapped: cleanba's GuezResNet (nine 32-channel 3x3
-stages, no state between steps) in place of the DRC(3,3), everything else the
-DRC's to the last hyperparameter. 11x11, rho=1.0, fixed values (1.0, 0.5),
+stages, no state between steps; input rescaled by 255 through
+goalmisgen.nets.scaled, see runs/resnet11.s1234.unscaled-dead) in place of the
+DRC(3,3), everything else the DRC's to the last hyperparameter. 11x11, rho=1.0, fixed values (1.0, 0.5),
 value channel present, same 1M-level dataset. Asks whether competence, the
 misgeneralisation gap, the t=0 plan probe and "proxy after competence" are the
 task's or the DRC's. Stream arch-swap, 2026-08-20.

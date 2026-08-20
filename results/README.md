@@ -120,3 +120,40 @@ grid a quantitative prediction. Three axes constrained to hold only differences
 sum to zero, which for symmetric axes puts every pairwise cosine at -0.5; three
 absolute registers put them near 0; one shared knob puts them at -1, where the
 two-objective agent sits.
+
+## Architecture swap (stream arch-swap, 2026-08-20)
+
+Does Experiment 1 survive swapping the DRC(3,3) for a non-recurrent ResNet
+(cleanba's GuezResNet, input rescaled by 255) and a ViT-style transformer
+(`goalmisgen.nets.transformer`), with env, dataset, IMPALA training and eval
+protocol fixed? One seed per architecture; read the numbers as n=1.
+
+- `arch-swap-<agent>.txt` — 002 (test split, 2048 episodes at rho 1.0/0.5/0.0)
+  and 003 (t=0 plan probe, per layer, fitted at rho=1.0 and scored at 1.0 and
+  0.0, against the untrained network of the same shape and the observation) on
+  the final 150M checkpoint of `resnet11.s1234`, `resnet11clean.s1234`,
+  `vit11.s1234`, `vit11clean.s1234`. Written by `scripts/arch_swap_measure.sh`;
+  the 002 JSON lands in `figures/data/<agent>.json` beside the DRC's.
+- `arch-swap-early-warning-<agent>.txt` — the same two measurements at every
+  saved checkpoint (512 episodes), `scripts/early_warning.sh` with
+  `AGENTS`/`OUT` overridden; `arch-swap-early-warning-drc.txt` is the DRC pair
+  (`maze11.s1234`, `clean11fv.s1234`, checkpoints up to 40M) measured the same
+  way so the three architectures are compared on one protocol.
+  `scripts/early_warning_report.py` turns these into `figures/fig_early_warning.*`.
+- `figures/fig_arch_swap_dynamics.*` — `scripts/arch_swap_report.py` over the
+  six runs' `metrics.csv` (in-training eval returns at rho 1.0/0.5/0.0 and the
+  rho=1.0 − rho=0.0 gap against steps).
+
+What to make of it (n=1): the ResNet reproduces the DRC's behavioural result —
+competent (98.8% reach, 92.2% chose_optimal at rho=1.0) and misgeneralising
+(51.5% at rho=0.0; the control is flat at 95.6/95.7/95.9%) — but its gap is
+present as soon as it is competent (both by ~4–5M steps), not ~20M after
+competence as the DRC's. The transformer is less competent after 150M (82.0%
+chose_optimal, 91.6% reach at rho=1.0) and its *reach* also degrades under
+the swept rho (79.6% at rho=0.0), so its gap mixes goal misgeneralisation with
+a capability failure. The t=0 plan probe beats the untrained network for all
+three (DRC 0.967 vs 0.523, ResNet 0.930 vs 0.658, transformer 0.721 vs 0.629),
+and on the early-warning protocol the probe gap (AUC at rho=1.0 − at rho=0.0)
+stays at zero throughout training for *every* architecture, the DRC included:
+the probe reads the executed route equally well whichever objective was chosen,
+so this measure does not see the proxy before behaviour does.

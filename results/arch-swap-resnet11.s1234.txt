@@ -1,0 +1,227 @@
+Architecture swap: resnet11.s1234, final checkpoint cp_149995520
+Measured 2026-08-20T14:02:27Z with scripts/arch_swap_measure.sh; same protocol as the DRC agents.
+
+=== 002 behaviour (test split, 2048 episodes per rho) ===
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+checkpoint cp_149995520  (update 29296)
+
+   rho   chose_optimal   followed_f0   reached   ambiguous   return   steps
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+  1.00          92.2%         73.5%     98.8%        2.6%    0.365     9.8
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+  0.50          72.7%         69.1%     98.8%        2.6%    0.281     9.6
+  0.00          51.5%         66.7%     98.4%        2.7%    0.159     9.9
+
+A value-tracking agent holds chose_optimal roughly constant and lets
+followed_f0 fall toward chance. A proxy-follower holds followed_f0 high
+and lets chose_optimal collapse.
+
+      margin       n       rho=1     rho=0.5       rho=0
+       <0.05      59      34.5%       25.9%       22.0% 
+   0.05-0.15     143      58.3%       52.5%       44.4% 
+   0.15-0.35     348      83.8%       58.5%       33.8% 
+       >0.35    1444      99.8%       80.0%       57.8% 
+
+A proxy contaminates every band about equally. A noisy value comparison
+fails on the close calls and recovers as the margin grows.
+
+wrote figures/data/resnet11.s1234.json
+
+=== 003 plan probe at t=0 (fitted at rho=1.0, scored at rho=1.0 and 0.0) ===
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+checkpoint cp_149995520  (update 29296)
+ScaledInputSpec, 11x11, rho=1.0, 256 train / 128 test episodes
+
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+ think test rho               probe      AUC          95% CI   bal.acc  episodes
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     1.00             trained    0.930  [0.913, 0.945]     0.765       128
+        by distance (matched negatives): 1:0.921  2:0.939  3:0.944  4:0.944  5:0.938  6:0.923  7:0.903  8:0.912  9:0.907  10:0.903  11:0.907  12:0.929
+           1.00  GuezConvSequence_0    0.757                     0.612            (layer only)
+           1.00  GuezConvSequence_1    0.793                     0.618            (layer only)
+           1.00  GuezConvSequence_2    0.784                     0.614            (layer only)
+           1.00  GuezConvSequence_3    0.779                     0.637            (layer only)
+           1.00  GuezConvSequence_4    0.803                     0.641            (layer only)
+           1.00  GuezConvSequence_5    0.834                     0.659            (layer only)
+           1.00  GuezConvSequence_6    0.807                     0.604            (layer only)
+           1.00  GuezConvSequence_7    0.813                     0.584            (layer only)
+           1.00  GuezConvSequence_8    0.797                     0.542            (layer only)
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     0.00             trained    0.935  [0.922, 0.949]     0.768       128
+        by distance (matched negatives): 1:0.910  2:0.902  3:0.928  4:0.918  5:0.909  6:0.894  7:0.917  8:0.920  9:0.899  10:0.927  11:0.922  12:0.902
+           0.00  GuezConvSequence_0    0.755                     0.604            (layer only)
+           0.00  GuezConvSequence_1    0.787                     0.611            (layer only)
+           0.00  GuezConvSequence_2    0.786                     0.615            (layer only)
+           0.00  GuezConvSequence_3    0.799                     0.628            (layer only)
+           0.00  GuezConvSequence_4    0.809                     0.632            (layer only)
+           0.00  GuezConvSequence_5    0.848                     0.657            (layer only)
+           0.00  GuezConvSequence_6    0.817                     0.600            (layer only)
+           0.00  GuezConvSequence_7    0.824                     0.580            (layer only)
+           0.00  GuezConvSequence_8    0.802                     0.537            (layer only)
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     1.00           untrained    0.658  [0.635, 0.681]     0.594       128
+        by distance (matched negatives): 1:0.490  2:0.568  3:0.583  4:0.598  5:0.588  6:0.562  7:0.537  8:0.584  9:0.673  10:0.625  11:0.515  12:0.544
+           1.00  GuezConvSequence_0    0.682                     0.584            (layer only)
+           1.00  GuezConvSequence_1    0.630                     0.542            (layer only)
+           1.00  GuezConvSequence_2    0.641                     0.514            (layer only)
+           1.00  GuezConvSequence_3    0.585                     0.507            (layer only)
+           1.00  GuezConvSequence_4    0.580                     0.500            (layer only)
+           1.00  GuezConvSequence_5    0.555                     0.500            (layer only)
+           1.00  GuezConvSequence_6    0.534                     0.500            (layer only)
+           1.00  GuezConvSequence_7    0.530                     0.500            (layer only)
+           1.00  GuezConvSequence_8    0.524                     0.500            (layer only)
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     0.00           untrained    0.649  [0.620, 0.677]     0.589       128
+        by distance (matched negatives): 1:0.466  2:0.540  3:0.596  4:0.662  5:0.544  6:0.512  7:0.545  8:0.604  9:0.592  10:0.599  11:0.506  12:0.535
+           0.00  GuezConvSequence_0    0.677                     0.575            (layer only)
+           0.00  GuezConvSequence_1    0.635                     0.538            (layer only)
+           0.00  GuezConvSequence_2    0.631                     0.514            (layer only)
+           0.00  GuezConvSequence_3    0.593                     0.505            (layer only)
+           0.00  GuezConvSequence_4    0.563                     0.500            (layer only)
+           0.00  GuezConvSequence_5    0.538                     0.500            (layer only)
+           0.00  GuezConvSequence_6    0.527                     0.500            (layer only)
+           0.00  GuezConvSequence_7    0.518                     0.500            (layer only)
+           0.00  GuezConvSequence_8    0.516                     0.500            (layer only)
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     1.00         observation    0.587  [0.578, 0.602]     0.578       128
+        by distance (matched negatives): 1:0.512  2:0.551  3:0.508  4:0.568  5:0.552  6:0.530  7:0.545  8:0.572  9:0.584  10:0.491  11:0.539  12:0.594
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.max_episode_steps to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.max_episode_steps` for environment variables.[0m
+  logger.warn(
+     0     0.00         observation    0.589  [0.579, 0.603]     0.584       128
+        by distance (matched negatives): 1:0.543  2:0.531  3:0.493  4:0.584  5:0.554  6:0.550  7:0.529  8:0.554  9:0.562  10:0.531  11:0.512  12:0.578
+
+The trained probe must beat the *untrained* one. Beating only the
+observation shows the network has a receptive field, which it has
+before any training at all.

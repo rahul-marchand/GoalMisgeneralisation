@@ -26,11 +26,24 @@ side by side. Three questions, in the order they can be answered:
                 none. Watching that collapse happen -- if it does -- is the point
                 of sweeping both objectives at every rung rather than one.
 
-Weights only: no rollouts, so this is cheap and runs anywhere. What it cannot say
-is whether an axis that exists is *writable*, which is ``014``'s held-out write
-and needs a GPU and episodes. An axis can be well-determined in the weights and
-still not move behaviour, so "appears" here means "is there in the weights", and
-the behavioural rung is a separate measurement.
+``writes``      and the one that decides it: written into that rung's own
+                weights, does the axis move the agent? ``--write`` adds it.
+                Everything above can look healthy on a direction fitted to
+                noise -- a norm is a length, and two noisy estimates of the same
+                noise are correlated. What noise cannot do is move a trade-off in
+                the direction asked for, by an amount that tracks how much was
+                asked. A rung whose axis does not write has no axis, whatever the
+                weights-only columns say, and the earliest rung that does write is
+                the answer to when the axis appears.
+
+Only ``offset * axis`` is ever written. An arm is ``drift + offset * axis + eps``
+and the other two terms are discarded on purpose: drift is what the updates cost
+whatever they were for, which the null arm measures and which moves behaviour not
+at all, and eps is what the fit could not explain. Each write is held out too --
+the axis written at an offset is fitted without the arm trained at it.
+
+Without ``--write`` this is weights only, so it is cheap and runs anywhere.
+``--write`` needs a GPU and episodes.
 
 Every cosine is read against a permutation null rather than against zero. Arms at
 a rung share a large common component -- the cost of running the updates -- so two
@@ -54,7 +67,13 @@ from jax.flatten_util import ravel_pytree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from functools import partial  # noqa: E402
+
+import jax  # noqa: E402
+
 from goalmisgen import provenance  # noqa: E402
+from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise  # noqa: E402
+from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions  # noqa: E402
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value  # noqa: E402
 from goalmisgen.configs.env import MazeConfig  # noqa: E402
 from goalmisgen.ladder import Rung, discover_rungs  # noqa: E402
@@ -79,6 +98,39 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Also write each rung's axis into that rung's own weights and measure what the "
+        "agent then does. This is what decides whether a rung has an axis at all: a direction "
+        "that does not move behaviour when written is a direction fitted to noise, whatever "
+        "its norm and its cosines say. Costs rollouts, so it needs a GPU.",
+    )
+    parser.add_argument(
+        "--write-objective",
+        type=int,
+        default=1,
+        help="Which objective's axis is written. One is enough to establish that writing works, "
+        "and cos(axis_0, axis_1) already says the two are the same edit.",
+    )
+    parser.add_argument(
+        "--write-offsets",
+        type=float,
+        nargs="+",
+        default=[-0.45, -0.20, 0.20, 0.45],
+        help="Offsets to write. The extremes carry the test and the interior points say whether "
+        "the response is graded rather than a step.",
+    )
+    parser.add_argument("--episodes", type=int, default=1024)
+    parser.add_argument("--num-envs", type=int, default=64)
+    parser.add_argument(
+        "--reach-floor",
+        type=float,
+        default=0.95,
+        help="Below this reach the exchange rate is not a measurement of anything: an agent that "
+        "does not finish episodes has no trade-off to read. Early rungs can fail this before any "
+        "write is applied, which is a fact about the base agent and not about the axis.",
+    )
+    parser.add_argument(
         "--reference",
         type=str,
         default=None,
@@ -90,7 +142,7 @@ def parse_args() -> argparse.Namespace:
 def eval_config(args: argparse.Namespace, values: tuple[float, ...]) -> MazeConfig:
     return MazeConfig(
         max_episode_steps=120,
-        num_envs=2,
+        num_envs=args.num_envs,
         min_size=args.size,
         max_size=args.size,
         feature_value_correlation=1.0,
@@ -104,7 +156,123 @@ def eval_config(args: argparse.Namespace, values: tuple[float, ...]) -> MazeConf
     )
 
 
-def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...]) -> dict:
+def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, float, float, float]:
+    """Exchange rate in extra steps, its 95% interval, and whether the agent still finishes."""
+    carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+    state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
+
+    def act(observations, starts):
+        state["carry"], action, _, state["key"] = get_action(
+            params, state["carry"], observations, starts, state["key"], temperature=0.0
+        )
+        return np.asarray(action)
+
+    outcomes = collect_episode_outcomes(envs, act, args.episodes, seed=args.seed)
+    gaps, took_richer, _ = value_distance_decisions(outcomes)
+    point = indifference_point(gaps, took_richer)
+    low, high = metrics.bootstrap_episodes(
+        lambda rows: indifference_point(gaps[rows], took_richer[rows]),
+        np.arange(len(gaps)),
+        resamples=200,
+        seed=args.seed,
+    )
+    reached = summarise(outcomes).reached_objective
+    print(f"    {label:>34}{point:>9.1f}  [{low:6.1f},{high:6.1f}]{reached:>10.1%}")
+    return point, low, high, reached
+
+
+def write_test(args, rung, base_flat, unravel, trained, stack, base_value, policy, get_action, envs) -> dict:
+    """Write the axis into this rung's own weights and see whether behaviour moves.
+
+    This is the measurement that decides whether a rung has an axis. Everything
+    in the weights-only table can look healthy on a direction fitted to noise: a
+    norm is just a length, and a cosine between two noisy estimates of the same
+    noise is not zero either. What noise cannot do is move an agent's trade-off
+    in the direction asked for, by an amount that tracks how much was asked.
+
+    Only ``offset * axis`` is written. Each arm is ``drift + offset * axis + eps``
+    and the other two terms are deliberately discarded: drift is what the updates
+    cost whatever they were for -- the null arm measures it, and it moves
+    behaviour not at all -- and eps is what the fit could not explain. An axis
+    that needs either of them to reproduce its arm is not a direction carrying
+    the value, which is the whole claim under test.
+
+    Each write is also *held out*: the axis written at offset ``o`` is fitted
+    without the arm trained at ``o``, so nothing about the arm being predicted
+    went into the direction that predicts it.
+
+    Two controls. The unwritten base, which says whether the agent had a legible
+    trade-off in the first place -- an early rung can fail on that alone, which is
+    a fact about the agent and not about the axis. And a norm-matched random
+    direction, which says whether a perturbation of that size moves the agent by
+    itself.
+    """
+    print(f"  writing o{args.write_objective}'s axis, {args.episodes} episodes per point")
+    print(f"    {'':>34}{'steps':>9}  {'95% interval':>15}{'reached':>10}")
+
+    base_point, base_low, base_high, base_reached = measure(
+        unravel(base_flat), policy, get_action, envs, args, "unwritten base"
+    )
+
+    written: list[dict] = []
+    for offset in sorted(args.write_offsets):
+        value = round(base_value + offset, 10)
+        keep = [i for i, v in enumerate(trained) if abs(v - value) > 1e-9]
+        if len(keep) < 3:
+            continue
+        held_axis, _ = fit_axis_and_drift(np.array([trained[i] for i in keep]) - base_value, stack[keep])
+        point, low, high, reached = measure(
+            unravel(base_flat + offset * held_axis),
+            policy,
+            get_action,
+            envs,
+            args,
+            f"write {offset:+.2f} (held out)",
+        )
+        written.append({"offset": offset, "point": point, "low": low, "high": high, "reached": reached})
+
+    # A random direction the length of the largest write, to show that moving the
+    # weights this far does not by itself move the trade-off.
+    control = None
+    if written:
+        widest = max(written, key=lambda w: abs(w["offset"]))
+        axis_all, _ = fit_axis_and_drift(np.array(trained) - base_value, stack)
+        rng = np.random.default_rng(args.seed)
+        direction = rng.normal(size=base_flat.shape)
+        direction *= abs(widest["offset"]) * np.linalg.norm(axis_all) / np.linalg.norm(direction)
+        point, low, high, reached = measure(
+            unravel(base_flat + direction), policy, get_action, envs, args, "norm-matched random"
+        )
+        control = {"point": point, "low": low, "high": high, "reached": reached}
+
+    usable = [w for w in written if w["reached"] >= args.reach_floor]
+    verdict, slope, span = "no axis", float("nan"), None
+    if base_reached < args.reach_floor:
+        verdict = "base cannot do the task"
+    elif len(usable) >= 2:
+        lowest, highest = min(usable, key=lambda w: w["offset"]), max(usable, key=lambda w: w["offset"])
+        # Disjoint intervals at the two extremes is the whole test: the write
+        # moved the agent further than the measurement's own uncertainty.
+        span = (lowest, highest)
+        moved = highest["high"] < lowest["low"] or lowest["high"] < highest["low"]
+        slope = (
+            float(np.polyfit([w["offset"] for w in usable], [w["point"] for w in usable], 1)[0])
+            if len(usable) >= 2
+            else float("nan")
+        )
+        verdict = "writes" if moved else "no axis"
+
+    return {
+        "base": {"point": base_point, "low": base_low, "high": base_high, "reached": base_reached},
+        "written": written,
+        "control": control,
+        "slope": slope,
+        "span": span,
+        "verdict": verdict,
+    }
+
+
+def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], rollout: dict | None = None) -> dict:
     """One rung's axes, and every statistic that needs the arms themselves.
 
     The permutation null is built here rather than by the caller, because it is
@@ -116,7 +284,7 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...]) ->
     directory = args.data / "runs" / rung.agent
     config = eval_config(args, values)
     _, _, _, base_state, _ = load_train_state(directory / rung.checkpoint_path, env_cfg=config)
-    base_flat, _ = ravel_pytree(base_state.params)
+    base_flat, unravel = ravel_pytree(base_state.params)
     base_flat = np.asarray(base_flat, dtype=np.float64)
 
     axes: dict[int, np.ndarray] = {}
@@ -137,6 +305,8 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...]) ->
             stack.append(np.asarray(flat, dtype=np.float64) - base_flat)
         offsets[objective] = np.array(trained) - base_value
         diffs[objective] = np.stack(stack)
+        if rollout is not None and objective == args.write_objective:
+            written_trained, written_stack = list(trained), diffs[objective]
         axes[objective], drifts[objective] = fit_axis_and_drift(offsets[objective], diffs[objective])
         print(
             f"  o{objective}: {len(arms):>2} arms  |axis| {np.linalg.norm(axes[objective]):>8.3g}"
@@ -159,6 +329,21 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...]) ->
         null = permutation_cosines(offsets[first], diffs[first], axes[second], resamples=args.resamples, seed=args.seed)
         entry["p"] = permutation_p_value(entry["cos"], null, alternative="less")
         entry["dim2"] = second_dimension_share(axes[first], axes[second])
+
+    entry["write"] = None
+    if rollout is not None and args.write_objective in axes:
+        entry["write"] = write_test(
+            args,
+            rung,
+            base_flat,
+            unravel,
+            written_trained,
+            written_stack,
+            values[args.write_objective],
+            rollout["policy"],
+            rollout["get_action"],
+            rollout["envs"],
+        )
     # Diffs go out of scope here; only the axes survive, one vector per objective.
     return entry
 
@@ -188,10 +373,24 @@ def main() -> None:
     print(f"agent {args.agent}, base values {values}, arms at {args.arm_steps:,} steps")
     print(f"{len(rungs)} rungs: {', '.join(r.label for r in rungs)}\n")
 
+    rollout = None
+    if args.write:
+        # One environment set and one compiled action function for every rung and
+        # every written point. Compiling per measurement would cost more than the
+        # rollouts do, and the envs depend only on the base values, which no rung
+        # changes.
+        config = eval_config(args, values)
+        policy, _, _, _, _ = load_train_state(args.data / "runs" / rungs[-1].agent / rungs[-1].checkpoint_path, env_cfg=config)
+        rollout = {
+            "policy": policy,
+            "get_action": jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature"),
+            "envs": config.make(),
+        }
+
     fitted = []
     for rung in rungs:
         print(f"=== {rung.label}  ({rung.checkpoint}) ===")
-        fitted.append(fit_rung(args, rung, values))
+        fitted.append(fit_rung(args, rung, values, rollout))
 
     reference = next((f for f in fitted if f["rung"].agent == args.reference), fitted[-1])
     print(f"\nreference rung: {reference['rung'].label} ({reference['rung'].agent})")
@@ -218,6 +417,43 @@ def main() -> None:
             else:
                 row += f"{'—':>22}"
         print(row)
+
+    if args.write:
+        print("\n\n=== does writing the axis move the agent? ===\n")
+        print(
+            f"{'rung':>8}{'base steps':>12}{'base reach':>12}"
+            f"{'write -0.45':>13}{'write +0.45':>13}{'slope':>9}{'random':>9}  verdict"
+        )
+        earliest = None
+        for entry in fitted:
+            test = entry.get("write")
+            if test is None:
+                continue
+            base = test["base"]
+            low = next((w for w in test["written"] if w["offset"] == min(args.write_offsets)), None)
+            high = next((w for w in test["written"] if w["offset"] == max(args.write_offsets)), None)
+            control = test["control"]
+            print(
+                f"{entry['rung'].label:>8}{base['point']:>12.1f}{base['reached']:>12.1%}"
+                f"{(low['point'] if low else float('nan')):>13.1f}"
+                f"{(high['point'] if high else float('nan')):>13.1f}"
+                f"{test['slope']:>9.1f}"
+                f"{(control['point'] if control else float('nan')):>9.1f}  {test['verdict']}"
+            )
+            if test["verdict"] == "writes" and earliest is None:
+                earliest = entry["rung"]
+        print(
+            "\n'writes' means the 95% intervals at the two extreme writes are disjoint and the\n"
+            "agent still finishes its episodes -- the edit moved the trade-off further than the\n"
+            "measurement's own uncertainty. The random column is a norm-matched direction of the\n"
+            "same length and should not move: if it does, the rung is measuring perturbation size\n"
+            "rather than the axis. 'base cannot do the task' is not a verdict about the axis --\n"
+            "an agent that does not reach objectives has no trade-off to write to."
+        )
+        if earliest is not None:
+            print(f"\nEarliest rung whose axis writes: {earliest.label} ({earliest.agent})")
+        else:
+            print("\nNo rung's axis moved behaviour. On this evidence there is no axis to find.")
 
     print(
         "\nRead the first table down the |axis|/|drift| column: an axis buried under the drift "

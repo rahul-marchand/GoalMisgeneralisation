@@ -17,12 +17,15 @@ import numpy as np
 import pytest
 from cleanba.config import Args
 
+from goalmisgen.analysis import collect_rollouts
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.configs.presets import maze_drc33, maze_resnet, maze_transformer, preset_for
+from goalmisgen.nets.readers import DRCReader, ResNetReader, TransformerReader, state_reader_for
 from goalmisgen.nets.transformer import TransformerSpec
 
 SIZE = 7
 PRESETS = {"drc33": maze_drc33, "resnet": maze_resnet, "vit": maze_transformer}
+READERS = {"drc33": DRCReader, "resnet": ResNetReader, "vit": TransformerReader}
 
 
 def small_env(num_envs: int = 2, seed: int = 0) -> MazeConfig:
@@ -129,6 +132,85 @@ def test_transformer_spec_survives_the_checkpoint_config_round_trip():
 
 
 # --------------------------------------------------------------------------
+# Readers: the same per-cell state from every architecture
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_reader_is_chosen_by_architecture(policies, name):
+    policy, _, _ = policies[name]
+    assert isinstance(state_reader_for(policy), READERS[name])
+
+
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_reader_step_agrees_with_get_action_and_adds_per_cell_grids(policies, name):
+    policy, carry, params = policies[name]
+    reader = state_reader_for(policy)
+    envs = small_env().make()
+    obs, _ = envs.reset(seed=0)
+    starts = np.zeros(2, dtype=bool)
+    key = jax.random.PRNGKey(3)
+
+    get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+    _, expected_action, expected_logits, _ = get_action(params, carry, obs, starts, key, temperature=0.0)
+    _, action, logits, _, state = reader.step(params, carry, obs, starts, key, temperature=0.0)
+
+    np.testing.assert_array_equal(np.asarray(action), np.asarray(expected_action))
+    np.testing.assert_allclose(np.asarray(logits), np.asarray(expected_logits), rtol=1e-5, atol=1e-6)
+
+    assert len(state.features) == reader.n_layers == len(reader.layer_names)
+    widths = {g.shape[-1] for g in state.features}
+    assert all(g.shape[:3] == (2, SIZE, SIZE) for g in state.features)
+    assert len(widths) == 1, "layers must share a width for layer_slice to divide the stacked state"
+
+    features, cell_state = state.stacked(1)
+    assert features.shape == (SIZE, SIZE, reader.n_layers * widths.pop())
+    if reader.has_cell_state:
+        assert state.cell_state is not None and not np.shares_memory(features, cell_state)
+    else:
+        assert state.cell_state is None
+        np.testing.assert_array_equal(features, cell_state)
+
+
+def test_non_recurrent_readers_have_no_carry_to_read(policies):
+    policy, carry, _ = policies["resnet"]
+    with pytest.raises(ValueError, match="no carry"):
+        state_reader_for(policy).state_of_carry(carry)
+
+
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_rollouts_carry_per_cell_state_for_every_architecture(policies, name):
+    policy, _, params = policies[name]
+    reader = state_reader_for(policy)
+    rollouts = collect_rollouts(small_env(num_envs=4).make(), policy, params, n_episodes=4, seed=0)
+
+    assert len(rollouts) == 4
+    depth = rollouts[0].features.shape[-1]
+    assert depth % reader.n_layers == 0
+    for r in rollouts:
+        assert r.features.shape[:2] == (SIZE, SIZE) == r.observation.shape[:2]
+        assert r.visited.any()
+
+
+def test_steering_is_refused_for_a_network_with_no_cell_state(policies):
+    policy, _, params = policies["vit"]
+    with pytest.raises(ValueError, match="no carry|none"):
+        collect_rollouts(small_env(num_envs=2).make(), policy, params, n_episodes=2, steer_delta=np.zeros(8))
+
+
+def test_probe_params_from_an_untrained_network_of_the_same_shape(policies):
+    """The untrained baseline arm: the agent acts, another network's state is probed."""
+    policy, _, params = policies["resnet"]
+    envs = small_env(num_envs=2).make()
+    _, _, untrained = maze_resnet(min_size=SIZE, max_size=SIZE).net.init_params(envs, jax.random.PRNGKey(99))
+    probed = collect_rollouts(small_env(num_envs=2).make(), policy, params, n_episodes=2, probe_params=untrained)
+    own = collect_rollouts(small_env(num_envs=2).make(), policy, params, n_episodes=2)
+    # Same agent, same seeds: same routes. Different network read: different features.
+    np.testing.assert_array_equal(probed[0].visited, own[0].visited)
+    assert not np.allclose(probed[0].features, own[0].features)
+
+
+# --------------------------------------------------------------------------
 # Training: the same loop, the same checkpoint path, the same evaluation
 # --------------------------------------------------------------------------
 
@@ -196,3 +278,8 @@ def test_swapped_network_trains_evaluates_and_reloads(tmp_path, name):
     policy, carry, loaded_args, train_state, _ = load_train_state(checkpoints[-1], env_cfg=train_env)
     assert type(loaded_args.net) is type(args.net)
     assert carry == ()
+    # The reloaded agent acts, and its state can be read by the probes.
+    rollouts = collect_rollouts(
+        dataclasses.replace(train_env, num_envs=2).make(), policy, train_state.params, n_episodes=2, seed=1
+    )
+    assert rollouts[0].features.shape[:2] == (5, 5)

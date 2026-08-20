@@ -52,6 +52,11 @@ cd "$(dirname "$0")/.."
 
 DATA="${1:-/workspace/data}"
 OUT="${OUT:-results/early-warning.txt}"
+# Override to run the same sweep on another pair of agents -- the ResNet and
+# transformer stand-ins for maze11/clean11fv are `resnet11.s1234
+# resnet11clean.s1234` and `vit11.s1234 vit11clean.s1234`. 002 and 003 read the
+# architecture off the checkpoint, so nothing else changes.
+AGENTS=(${AGENTS:-maze11.s1234 clean11fv.s1234})
 EPISODES="${EPISODES:-512}"
 # Every checkpoint below this many steps, plus a few beyond it for contrast.
 # Competence lands at ~20M and the dense saves stop at 20M, so this is the whole
@@ -60,15 +65,14 @@ MAX_STEPS="${MAX_STEPS:-40000000}"
 
 mkdir -p "$(dirname "${OUT}")"
 
-AGENTS=("maze11.s1234" "clean11fv.s1234")
-LEVELS="${DATA}/levels/values/1.00-0.50@1M"
+LEVELS="${LEVELS:-${DATA}/levels/values/1.00-0.50@1M}"
 
 {
     echo "Does an internal signature move before the behavioural gap does?"
     echo
-    echo "maze11 is the proxy agent (rho=1.0), clean11fv the single-variable control"
-    echo "(rho=0.5). Checkpoints up to ${MAX_STEPS} steps, which covers the dense saves"
-    echo "before competence at ~20M."
+    echo "Agents: ${AGENTS[*]} -- the first is the proxy agent (rho=1.0), the second"
+    echo "the single-variable control (rho=0.5). Checkpoints up to ${MAX_STEPS} steps,"
+    echo "which covers the dense saves before competence at ~20M."
     echo
 } > "${OUT}"
 
@@ -91,11 +95,15 @@ for agent in "${AGENTS[@]}"; do
             --correlations 1.0 0.0 >> "${OUT}" 2>&1 || { echo "  002 FAILED" >> "${OUT}"; failures=$((failures + 1)); }
 
         # Representation: fit the plan probe where the proxy holds, score it
-        # where it is reversed. A probe that stops reading the plan under the
-        # swept correlation has noticed something the choices have not yet shown.
+        # both there and where it is reversed. A probe that stops reading the
+        # plan under the swept correlation has noticed something the choices
+        # have not yet shown. (Until 2026-08-20 this scored at rho=1.0 only,
+        # despite the comment; --test-correlations is what makes it the
+        # measurement described.)
         uv run python experiments/003_probe_plan.py "${checkpoint}" \
             --levels "${LEVELS}" \
-            --correlation 1.0 >> "${OUT}" 2>&1 || { echo "  003 FAILED" >> "${OUT}"; failures=$((failures + 1)); }
+            --correlation 1.0 --test-correlations 1.0 0.0 --per-layer \
+            >> "${OUT}" 2>&1 || { echo "  003 FAILED" >> "${OUT}"; failures=$((failures + 1)); }
     done
 done
 

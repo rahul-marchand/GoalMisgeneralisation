@@ -72,10 +72,22 @@ DEFAULT_OFFSETS: tuple[float, ...] = (0.45, 0.44, 0.43, 0.42, 0.41, 0.40, 0.39, 
 # before a sweep commits hours to it.
 MEASURED_SPS = 9_800
 
+# Every arm is a fresh process: JAX compiles the step and update functions, the
+# level dataset is memory-mapped, and the checkpoint is restored, none of which
+# scales with how long the arm then runs. Measured at ~25 s against 400k-step
+# arms that took 65 s each end to end, where the steady state alone predicts 41.
+#
+# It is in here because it is not a rounding error at the lengths this design
+# actually uses. The arm-length curve says reliability rises as arms get shorter,
+# so the sweeps that matter are the short ones -- and that is exactly where a
+# fixed per-arm cost stops being negligible. At 400k it is 38% of an arm; at 3M
+# it is 6%.
+ARM_STARTUP_SECONDS = 25.0
+
 
 def estimated_hours(n_arms: int, steps: int) -> float:
     """Roughly how long ``n_arms`` of ``steps`` each take on one 4090."""
-    return n_arms * steps / MEASURED_SPS / 3600
+    return n_arms * (steps / MEASURED_SPS + ARM_STARTUP_SECONDS) / 3600
 
 
 @dataclass(frozen=True)

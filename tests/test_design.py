@@ -164,3 +164,20 @@ def test_one_sided_arms_are_tagged_out_of_the_fit() -> None:
 def test_one_sided_arms_need_at_least_one_value() -> None:
     with pytest.raises(ValueError, match="at least one value"):
         one_sided_arms(objective=1, base_value=0.5, values=())
+
+
+def test_the_estimate_includes_what_starting_an_arm_costs() -> None:
+    """A fixed per-arm cost is not a rounding error at the lengths in use.
+
+    Measured against the 400k grid: 65 s an arm end to end, where the steady
+    state alone predicts 41. An estimate ignoring that under-predicts a sweep by
+    over a third, and the arm-length curve keeps pushing arms shorter.
+    """
+    from goalmisgen.design import ARM_STARTUP_SECONDS, MEASURED_SPS, estimated_hours
+
+    assert estimated_hours(1, 400_000) * 3600 == pytest.approx(400_000 / MEASURED_SPS + ARM_STARTUP_SECONDS)
+    # Doubling the arms doubles the time, startup included.
+    assert estimated_hours(50, 400_000) == pytest.approx(50 * estimated_hours(1, 400_000))
+    # Shorter arms are dominated by it; longer ones are not.
+    assert estimated_hours(1, 400_000) * 3600 > 1.3 * (400_000 / MEASURED_SPS)
+    assert estimated_hours(1, 3_000_000) * 3600 < 1.1 * (3_000_000 / MEASURED_SPS)

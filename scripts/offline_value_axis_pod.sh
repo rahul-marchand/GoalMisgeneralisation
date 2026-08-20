@@ -110,6 +110,7 @@ analysis() {
             || echo "027 ${base} o${objective} FAILED"
     done
     uv run python experiments/028_bc_value_or_gap.py "${RUNS}/${base}" --steps "${FT_STEPS}" \
+        --json "${DATA}/offline/results/value_or_gap.${base}.json" \
         > "${DATA}/offline/results/value_or_gap.${base}.txt" 2> "${DATA}/offline/results/value_or_gap.${base}.err" \
         || echo "028 ${base} FAILED"
 }

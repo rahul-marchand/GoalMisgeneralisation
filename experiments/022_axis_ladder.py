@@ -109,6 +109,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--rungs",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Analyse only the rungs nearest these step counts, in millions. Defaults to every "
+        "rung on the ladder. Use it to revisit a few rungs without paying to refit the rest, "
+        "which for a full ladder is most of the run.",
+    )
+    parser.add_argument(
         "--write",
         action="store_true",
         help="Also write each rung's axis into that rung's own weights and measure what the "
@@ -408,6 +417,11 @@ def main() -> None:
     rungs = discover_rungs(args.data, args.agent)
     if not rungs:
         sys.exit(f"no rungs found for {args.agent}; runs/<agent>.at<steps>/BASE.json is what this reads")
+    if args.rungs is not None:
+        keep = {min(rungs, key=lambda r, t=m * 1_000_000: abs(r.steps - t)).steps for m in args.rungs}
+        rungs = [rung for rung in rungs if rung.steps in keep]
+        if not rungs:
+            sys.exit("--rungs matched nothing")
 
     values = tuple(json.loads((args.data / "runs" / args.agent / "BASE.json").read_text())["values"])
     print(f"agent {args.agent}, base values {values}, arms at {args.arm_steps:,} steps")

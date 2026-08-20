@@ -357,3 +357,35 @@ were deleted; the directory should not exist. See the 2026-08-16 amendment in
 Preregistration.md.
 """
 
+
+[[entry]]
+match = "offline/demos/*"
+note = """
+Expert demonstrations for the offline-BC stream: the solver's optimal route on
+every level of one split of `levels/values/1.00-0.50@1M`, with colours assigned
+at the correlation in the name (`train.rho100` = train split at rho=1.0). The
+same split at several correlations is paired level for level -- only the
+colours differ. `train.*` feed the route models; `valid.*` are decoded at every
+checkpoint; `test.*` are held for the final tables. Built by
+`scripts/generate_demos.py`; `meta.json` records the source fingerprint.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho100.s*"
+note = """
+The LLM-shaped twin of maze11: a small prefix-LM transformer (4 layers, width
+128) trained by next-token prediction on `offline/demos/train.rho100`, where
+colour 0 always marks the richer objective. Nothing in the loss knows about
+reward; the correlation lives in the demonstrations. Three seeds, because the
+runs are cheap and the claim is about the training recipe, not one network.
+Checkpoints are log-spaced from step 0 so the early-warning sweep has the
+pre-competence window. `experiments/023_train_bc.py`.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho050.s*"
+note = """
+The single-variable control for the bc11.rho100 runs, trained on
+`offline/demos/train.rho050` where colour carries nothing. Same levels, same
+routes, same model, same seeds; only the colours differ.
+"""

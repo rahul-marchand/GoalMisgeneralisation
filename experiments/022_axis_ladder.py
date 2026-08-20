@@ -486,15 +486,30 @@ def main() -> None:
     )
 
     print("\n\n=== has the axis settled where it ends up? ===\n")
-    print(f"{'rung':>8}" + "".join(f"{f'cos(o{o}@t, o{o}@end)':>22}" for o in args.objectives))
+    header = "".join(f"{'cos(o%d@t,end)' % o:>17}{'disatt':>10}" for o in args.objectives)
+    print(f"{'rung':>8}{header}")
     for entry in fitted:
         row = f"{entry['rung'].label:>8}"
         for objective in args.objectives:
             if objective in entry["axes"] and objective in reference["axes"]:
-                row += f"{cosine(entry['axes'][objective], reference['axes'][objective]):>22.3f}"
+                raw = cosine(entry["axes"][objective], reference["axes"][objective])
+                here, end = entry["reliability"].get(objective), reference["reliability"].get(objective)
+                # Attenuation applies to this cosine exactly as it does to
+                # cos(a0, a1): both axes are noisy estimates, so a small number
+                # can mean "points somewhere else" or "points the same way, badly
+                # measured", and only correcting for reliability separates them.
+                usable = here is not None and end is not None and min(here, end) > 0.2
+                adjusted = raw / np.sqrt(here * end) if usable else float("nan")
+                shown = f"{adjusted:.3f}" if usable and abs(adjusted) <= 1.0 else "—"
+                row += f"{raw:>17.3f}{shown:>10}"
             else:
-                row += f"{'—':>22}"
+                row += f"{'—':>17}{'—':>10}"
         print(row)
+    print(
+        "\nA rung with no reliable axis has no disattenuated column, and its raw cosine is not\n"
+        "evidence that the direction rotates -- there is no direction there to rotate. Read this\n"
+        "table only on the rungs the existence table cleared."
+    )
 
     if args.write:
         print("\n\n=== does writing the axis move the agent? ===\n")

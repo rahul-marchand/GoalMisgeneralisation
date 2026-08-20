@@ -31,6 +31,7 @@ from cleanba.evaluate import EvalConfig
 from cleanba.network import GuezResNetConfig, IdentityNorm
 
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.nets.scaled import ScaledInputSpec
 from goalmisgen.nets.transformer import TransformerSpec
 
 
@@ -162,6 +163,15 @@ trunk: nine stages of 32-channel 3x3 convolutions against the DRC's nine
 3x3x32 ConvLSTM ticks per environment step. 1.23M parameters in total, same
 channel width, same kernel, same count of sequential convolutions per decision,
 and no state carried between steps - which is the variable.
+
+It is wrapped in :class:`~goalmisgen.nets.scaled.ScaledInputSpec`, which
+multiplies the observation by 255 before the ResNet sees it. The first
+resnet11 run was launched without that and did not learn at all in 25M steps
+- uniform policy, critic stuck at its bias - for the reason given in that
+module: cleanba divides observations by 255 for uint8 images, ours are already
+unit-scaled, and a ReLU network with no normalisation cannot recover from
+inputs of order 1/255 the way the gated DRC can. The transformer applies the
+same rescaling internally.
 """
 
 
@@ -173,7 +183,7 @@ def maze_resnet(**kwargs) -> Args:
     DRC's, so a difference between the runs is attributable to the network.
     """
     out = maze_drc33(**kwargs)
-    out.net = GuezResNetConfig(
+    resnet = GuezResNetConfig(
         yang_init=False,
         norm=IdentityNorm(),
         normalize_input=False,
@@ -181,6 +191,7 @@ def maze_resnet(**kwargs) -> Args:
         kernel_sizes=(RESNET_KERNEL,) * len(RESNET_CHANNELS),
         strides=(1,) * len(RESNET_CHANNELS),
     )
+    out.net = ScaledInputSpec(yang_init=False, norm=IdentityNorm(), normalize_input=False, inner=resnet)
     return out
 
 

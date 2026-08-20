@@ -392,3 +392,14 @@ note = """
 clean11fv with the network swapped for the transformer: rho=0.5. The
 single-variable control for vit11.
 """
+
+[[entry]]
+match = "runs/resnet11.s1234.unscaled-dead"
+note = """
+The first resnet11 launch, stopped at ~30M steps: cleanba's GuezResNet on the
+raw 1/255-scaled observations. Entropy stayed at ln 4 and the value loss at
+its initial level from 2M to 30M steps while the DRC took off at 15M and the
+transformer at 12M, so the network never learned anything. Kept for its
+metrics.csv as the evidence behind goalmisgen.nets.scaled; the resnet11 that
+stands in the results is the relaunch with the input rescaled by 255.
+"""

@@ -26,6 +26,7 @@ import numpy as np
 from cleanba.convlstm import ConvLSTMConfig
 from cleanba.network import GuezConvSequence, GuezResNetConfig, Policy
 
+from goalmisgen.nets.scaled import ScaledInputSpec
 from goalmisgen.nets.transformer import TransformerSpec, residual_grids
 
 
@@ -141,18 +142,43 @@ class DRCReader(StateReader):
 
 
 class ResNetReader(StateReader):
-    """Each ``GuezConvSequence``'s output — the feature map after every stage."""
+    """Each ``GuezConvSequence``'s output — the feature map after every stage.
+
+    Found by name anywhere under ``network_params``, so the ResNet may sit
+    behind an input-scaling wrapper without the reader caring.
+    """
 
     def __init__(self, policy: Policy) -> None:
         super().__init__(policy)
-        self.layer_names = tuple(f"GuezConvSequence_{i}" for i in range(len(policy.cfg.channels)))
+        self.layer_names = tuple(f"GuezConvSequence_{i}" for i in range(len(unwrap(policy.cfg).channels)))
 
     def _capture_filter(self):
         return lambda module, method_name: isinstance(module, GuezConvSequence) and method_name == "__call__"
 
     def _state(self, carry, intermediates: dict) -> PerCellState:
-        network = intermediates["network_params"]
-        return PerCellState(features=tuple(np.asarray(network[name]["__call__"][0]) for name in self.layer_names))
+        found = _find_named(intermediates["network_params"], set(self.layer_names))
+        missing = [name for name in self.layer_names if name not in found]
+        if missing:
+            raise RuntimeError(f"forward pass recorded no output for {missing}")
+        return PerCellState(features=tuple(np.asarray(found[name]["__call__"][0]) for name in self.layer_names))
+
+
+def unwrap(spec) -> PolicySpec:
+    """The network spec inside any input-scaling wrapper."""
+    while isinstance(spec, ScaledInputSpec):
+        spec = spec.inner
+    return spec
+
+
+def _find_named(tree: dict, names: set[str]) -> dict:
+    """Sub-dicts of a flax collection whose key is one of ``names``, at any depth."""
+    out = {}
+    for key, value in tree.items():
+        if key in names:
+            out[key] = value
+        elif isinstance(value, dict):
+            out.update(_find_named(value, names))
+    return out
 
 
 class TransformerReader(StateReader):
@@ -160,7 +186,7 @@ class TransformerReader(StateReader):
 
     def __init__(self, policy: Policy) -> None:
         super().__init__(policy)
-        self.layer_names = ("embed",) + tuple(f"block_{i}" for i in range(policy.cfg.n_layers))
+        self.layer_names = ("embed",) + tuple(f"block_{i}" for i in range(unwrap(policy.cfg).n_layers))
 
     def _state(self, carry, intermediates: dict) -> PerCellState:
         grids = residual_grids(intermediates)
@@ -178,9 +204,10 @@ READERS: dict[type, type[StateReader]] = {
 
 def state_reader_for(policy: Policy) -> StateReader:
     """The reader for whatever network this policy wraps."""
+    spec = unwrap(policy.cfg)
     for spec_type, reader_type in READERS.items():
-        if isinstance(policy.cfg, spec_type):
+        if isinstance(spec, spec_type):
             return reader_type(policy)
-    raise TypeError(f"no state reader for {type(policy.cfg).__name__}; add one to goalmisgen.nets.readers.READERS")
+    raise TypeError(f"no state reader for {type(spec).__name__}; add one to goalmisgen.nets.readers.READERS")
 
 

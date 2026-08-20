@@ -75,13 +75,39 @@ def test_preset_lookup_by_short_name():
         preset_for("lstm")
 
 
-def test_the_resnet_is_cleanbas_own_and_unmodified():
+def test_the_resnet_is_cleanbas_own_and_unmodified_behind_an_input_rescale():
     from cleanba.network import GuezResNetConfig
 
+    from goalmisgen.nets.scaled import ScaledInputSpec
+
     net = maze_resnet().net
-    assert type(net) is GuezResNetConfig
+    assert type(net) is ScaledInputSpec and net.scale == 255.0
+    assert type(net.inner) is GuezResNetConfig
     assert net.normalize_input is False and net.yang_init is False
-    assert len(set(net.channels)) == 1, "equal widths so layer_slice divides the probe state evenly"
+    assert len(set(net.inner.channels)) == 1, "equal widths so layer_slice divides the probe state evenly"
+
+
+def test_the_input_rescale_is_exactly_the_wrapped_network_on_scaled_input(policies):
+    """The wrapper must change units and nothing else: same module, same parameters."""
+    policy, carry, params = policies["resnet"]
+    envs = small_env().make()
+    obs, _ = envs.reset(seed=0)
+    starts, key = np.zeros(2, dtype=bool), jax.random.PRNGKey(0)
+    _, _, logits, _ = policy.apply(params, carry, obs, starts, key, method=policy.get_action, temperature=0.0)
+    _, _, logits_again, _ = policy.apply(params, carry, obs, starts, key, method=policy.get_action, temperature=0.0)
+    np.testing.assert_allclose(np.asarray(logits), np.asarray(logits_again))
+    # The wrapped ResNet's parameters are those of a bare GuezResNet, one level down.
+    inner = params["params"]["network_params"]
+    assert len(inner) == 1 and next(iter(inner)).startswith("GuezResNet"), list(inner)
+    assert not np.allclose(np.asarray(logits), 0.0), "a unit-scale input must produce non-degenerate logits"
+
+
+def test_the_rescaled_resnet_round_trips_through_the_checkpoint_config():
+    from goalmisgen.nets.scaled import ScaledInputSpec
+
+    args = maze_resnet(min_size=SIZE, max_size=SIZE)
+    rebuilt = farconf.from_dict(farconf.to_dict(args, Args), Args)
+    assert isinstance(rebuilt.net, ScaledInputSpec) and rebuilt.net == args.net
 
 
 # --------------------------------------------------------------------------
@@ -240,7 +266,10 @@ def test_swapped_network_trains_evaluates_and_reloads(tmp_path, name):
     if name == "vit":
         args.net = dataclasses.replace(args.net, n_layers=2, d_model=32, n_heads=2)
     else:
-        args.net = dataclasses.replace(args.net, channels=(16,) * 3, kernel_sizes=(3,) * 3, strides=(1,) * 3)
+        args.net = dataclasses.replace(
+            args.net,
+            inner=dataclasses.replace(args.net.inner, channels=(16,) * 3, kernel_sizes=(3,) * 3, strides=(1,) * 3),
+        )
     args.local_num_envs = 8
     args.num_steps = 8
     args.total_timesteps = 8 * 8 * 8

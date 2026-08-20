@@ -149,6 +149,42 @@ def parse_arm_dirname(name: str) -> ArmName | None:
     )
 
 
+_CHECKPOINT = re.compile(r"^cp_(?P<steps>\d+)$")
+
+
+def parse_checkpoint_dirname(name: str) -> int | None:
+    """``cp_070103040`` -> ``70103040``, or ``None`` if it is not a checkpoint.
+
+    The zero padding is *not* fixed across runs. cleanba's writer pads to
+    ``ceil(log10(total_timesteps))`` digits, so the same 70,103,040 steps is
+    ``cp_070103040`` in the 150M ``novalue11`` runs and ``cp_70103040`` in the
+    80M ``threeobj`` ones. Anything comparing checkpoints across runs — or
+    building a name to look one up — has to read the number back rather than
+    match the string, which is what this exists for.
+    """
+    match = _CHECKPOINT.fullmatch(name)
+    return None if match is None else int(match.group("steps"))
+
+
+def rung_agent_name(agent: str, checkpoint: str) -> str:
+    """``novalue11.s1234`` at ``cp_070103040`` -> ``novalue11.s1234.at70103040``.
+
+    A *rung* is the same agent seen earlier in its own training: the value sweep
+    run again from an intermediate checkpoint, so the axis fitted there can be
+    compared against the one fitted at the end.
+
+    Named for the step count rather than for the checkpoint directory, so that
+    the two paddings :func:`parse_checkpoint_dirname` describes give one name for
+    one point in training. The earlier shell version stripped a literal ``cp_0``
+    prefix instead, which silently produced ``...atcp_100147200`` for every
+    checkpoint past 100M — the ones with no leading zero to strip.
+    """
+    steps = parse_checkpoint_dirname(checkpoint)
+    if steps is None:
+        raise ValueError(f"{checkpoint!r} is not a checkpoint directory name, which looks like 'cp_070103040'")
+    return f"{agent}.at{steps}"
+
+
 def is_composition_arm(name: str) -> bool:
     """``m_120_045_030@1M`` — several values moved at once.
 

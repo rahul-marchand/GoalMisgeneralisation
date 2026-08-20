@@ -65,6 +65,19 @@ from goalmisgen.volume import arm_dirname
 DEFAULT_OFFSETS: tuple[float, ...] = (0.45, 0.44, 0.43, 0.42, 0.41, 0.40, 0.39, 0.38, 0.30, 0.20, 0.10, 0.05)
 
 
+# Median ``charts/0/SPS`` measured on an RTX 4090, which is what the campaign runs
+# on. The original 150M runs managed 4,200 on whatever they used; the bottleneck
+# is the learner update, so a faster card converts almost linearly into
+# throughput and a 4090 is 2.33x the original. Used only to print an estimate
+# before a sweep commits hours to it.
+MEASURED_SPS = 9_800
+
+
+def estimated_hours(n_arms: int, steps: int) -> float:
+    """Roughly how long ``n_arms`` of ``steps`` each take on one 4090."""
+    return n_arms * steps / MEASURED_SPS / 3600
+
+
 @dataclass(frozen=True)
 class Arm:
     """One fine-tune: which objective moved, by how much, and at what seed."""

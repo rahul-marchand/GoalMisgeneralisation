@@ -80,6 +80,17 @@ def base_payload(rung: Rung, config: dict) -> dict:
     }
 
 
+def rung_values(data: Path, source: str, checkpoint: str) -> tuple[float, ...]:
+    """What the objectives pay at this rung, from the checkpoint's own cfg.json.
+
+    Read rather than assumed so that a preview of a ladder describes the arms
+    that would actually be trained, without having to write anything first.
+    """
+    config = json.loads((data / "runs" / source / "local-files" / checkpoint / "cfg.json").read_text())
+    inner = config.get("cfg", config)
+    return tuple(inner["train_env"]["objective_values"])
+
+
 def make_rung(data: Path, source: str, checkpoint: str, *, dry_run: bool = False) -> Rung:
     """Prepare ``runs/<source>.at<steps>`` so the sweep driver can resolve it.
 

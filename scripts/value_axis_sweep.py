@@ -37,15 +37,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from goalmisgen.design import arm_values, check_no_preference_flip, leverage, one_sided_arms, sweep_arms  # noqa: E402
-from goalmisgen.volume import dataset_dirname  # noqa: E402
-
-# Median ``charts/0/SPS`` measured on an RTX 4090, which is what the campaign
-# runs on. The original 150M runs managed 4,200 on whatever they used; the
-# bottleneck is the learner update, so a faster card converts almost linearly
-# into throughput and a 4090 is 2.33x the original. Used only to print an
-# estimate before a sweep commits hours to it.
-MEASURED_SPS = 9_800
+from goalmisgen.design import (  # noqa: E402
+    arm_values,
+    check_no_preference_flip,
+    estimated_hours,
+    leverage,
+    one_sided_arms,
+    sweep_arms,
+)
+from goalmisgen.volume import arm_is_complete, dataset_dirname  # noqa: E402
 
 # Seconds to construct one level, by objective count: a maze plus a
 # breadth-first search per objective, and a mutual reachability check beyond two.
@@ -100,20 +100,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--dry-run", action="store_true", help="Print the plan and the estimate, run nothing.")
     return parser.parse_args()
-
-
-def is_complete(run_dir: Path, steps: int) -> bool:
-    """Did this arm reach the length its name claims?
-
-    Presence of *a* checkpoint is not enough. An arm killed part way leaves the
-    ones it had already saved, and resuming would skip it and then fit it as
-    though it had run the full budget -- a 200k arm sitting in the grid under a
-    @400k name, which is precisely the silent incomparability the naming scheme
-    exists to prevent. Checkpoints are named in steps, so the last one says how
-    far the arm actually got.
-    """
-    saved = [int(p.name[3:]) for p in run_dir.glob("local-files/cp_*") if p.name[3:].isdigit()]
-    return bool(saved) and max(saved) >= 0.98 * steps
 
 
 def read_base(data: Path, agent: str) -> tuple[Path, tuple[float, ...]]:
@@ -194,7 +180,7 @@ def main() -> None:
             print(f"  {problem}")
         sys.exit("Narrow the offsets in goalmisgen/design.py, or sweep a different objective.")
 
-    hours = len(arms) * args.steps / MEASURED_SPS / 3600
+    hours = estimated_hours(len(arms), args.steps)
     print(f"agent        {args.agent}")
     print(f"checkpoint   {checkpoint.name}")
     print(f"base values  {base_values}")
@@ -202,7 +188,7 @@ def main() -> None:
     for objective in objectives:
         offsets = [a.offset for a in arms if a.objective == objective]
         print(f"  o{objective}: {len(offsets)} arms, leverage {leverage(offsets):.3f}")
-    print(f"arms         {len(arms)} x {args.steps:,} steps  (~{hours:.1f} h at {MEASURED_SPS:,} SPS)")
+    print(f"arms         {len(arms)} x {args.steps:,} steps  (~{hours:.1f} h on one 4090)")
 
     print("\n=== levels ===")
     datasets = {}
@@ -223,7 +209,7 @@ def main() -> None:
     for index, arm in enumerate(arms, start=1):
         values = arm_values(base_values, arm)
         run_dir = args.data / "runs" / args.agent / "arms" / arm.dirname(args.steps)
-        if is_complete(run_dir, args.steps):
+        if arm_is_complete(run_dir, args.steps):
             print(f"  [{index:>3}/{len(arms)}] {run_dir.name} already complete")
             continue
         if run_dir.exists():

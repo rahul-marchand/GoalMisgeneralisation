@@ -34,8 +34,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from goalmisgen.ladder import Rung, make_rung  # noqa: E402
-from goalmisgen.volume import parse_checkpoint_dirname  # noqa: E402
+from goalmisgen.design import estimated_hours, sweep_arms  # noqa: E402
+from goalmisgen.ladder import Rung, make_rung, rung_values  # noqa: E402
+from goalmisgen.volume import arm_is_complete, parse_checkpoint_dirname  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +119,18 @@ def resolve(data: Path, agent: str, near: list[float] | None, named: list[str] |
     return list(seen.items())
 
 
+def preview(args: argparse.Namespace, rung: Rung) -> tuple[int, int]:
+    """What one rung would cost, without writing anything. (to train, already done)"""
+    values = rung_values(args.data, rung.source, rung.checkpoint)
+    objectives = args.objectives if args.objectives is not None else list(range(len(values)))
+    offsets = tuple(args.offsets) if args.offsets else None
+    arms = [arm for objective in objectives for arm in sweep_arms(objective, offsets=offsets)]
+    done = sum(
+        arm_is_complete(args.data / "runs" / rung.agent / "arms" / arm.dirname(args.steps), args.steps) for arm in arms
+    )
+    return len(arms) - done, done
+
+
 def sweep(args: argparse.Namespace, rung: Rung) -> bool:
     """Run one rung's sweep. Returns whether it succeeded."""
     command = [
@@ -152,7 +165,20 @@ def main() -> None:
         rungs.append(rung)
 
     rungs.sort(key=lambda r: r.steps)
-    print(f"\n{len(rungs)} rungs: {', '.join(r.label for r in rungs)}")
+    print(f"\n{len(rungs)} rung{'' if len(rungs) == 1 else 's'}: {', '.join(r.label for r in rungs)}")
+
+    if args.dry_run:
+        # Previewed here rather than delegated, because the sweep driver resolves
+        # an agent through the BASE.json a dry run has deliberately not written.
+        print(f"\n{'rung':>8}{'to train':>10}{'done':>8}{'hours':>8}   agent")
+        total = 0
+        for rung in rungs:
+            todo, done = preview(args, rung)
+            total += todo
+            print(f"{rung.label:>8}{todo:>10}{done:>8}{estimated_hours(todo, args.steps):>8.2f}   {rung.agent}")
+        print(f"\n{total} arms to train, ~{estimated_hours(total, args.steps):.1f} h on one 4090")
+        print("Nothing was written. Drop --dry-run to run it.")
+        return
 
     failed = [rung.label for rung in rungs if not sweep(args, rung)]
     if failed:

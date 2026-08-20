@@ -203,11 +203,13 @@ def test_the_estimate_scales_with_arm_length(volume: Path) -> None:
     is a property of the hardware and was retuned once already."""
     import re
 
+    from goalmisgen.design import estimated_hours
+
     def hours(out: str) -> float:
         return float(re.search(r"~([\d.]+) h", out).group(1))
 
     for steps in (400_000, 800_000):
-        expected = 50 * steps / sweep.MEASURED_SPS / 3600
+        expected = estimated_hours(50, steps)
         assert hours(dry_run(volume, "novalue11.s1234", "--steps", str(steps))) == pytest.approx(expected, abs=0.05)
 
 

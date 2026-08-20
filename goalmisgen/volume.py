@@ -185,6 +185,21 @@ def rung_agent_name(agent: str, checkpoint: str) -> str:
     return f"{agent}.at{steps}"
 
 
+def arm_is_complete(run_dir: Path, steps: int) -> bool:
+    """Did this arm reach the length its name claims?
+
+    Presence of *a* checkpoint is not enough. An arm killed part way leaves the
+    ones it had already saved, and resuming would skip it and then fit it as
+    though it had run the full budget -- a 200k arm sitting in the grid under a
+    @400k name, which is precisely the silent incomparability the naming scheme
+    exists to prevent. Checkpoints are named in steps, so the last one says how
+    far the arm actually got.
+    """
+    saved = [parse_checkpoint_dirname(p.name) for p in run_dir.glob("local-files/cp_*")]
+    reached = [steps_reached for steps_reached in saved if steps_reached is not None]
+    return bool(reached) and max(reached) >= 0.98 * steps
+
+
 def is_composition_arm(name: str) -> bool:
     """``m_120_045_030@1M`` — several values moved at once.
 

@@ -68,6 +68,20 @@ def test_observation_matches_the_environment_encoder(dataset):
         np.testing.assert_array_equal(observations[index], encoder.encode(level, level.agent_start))
 
 
+def test_hidden_values_match_the_environment_encoder_without_a_value_channel(dataset):
+    demos = DemoSet.generate(dataset, np.arange(len(dataset)), rho=1.0, seed=0).with_hidden_values()
+    encoder = ObservationEncoder(max_size=dataset.max_size, n_features=2, value_encoding="none")
+    observations = demos.observations(np.arange(len(demos)))
+    assert demos.n_channels == encoder.n_channels == 4
+    assert observations.shape == (len(demos), demos.size, demos.size, 4)
+    for index in range(len(demos)):
+        level = demos.level(index)
+        np.testing.assert_array_equal(observations[index], encoder.encode(level, level.agent_start))
+    # The arrays are the same; only the view differs, and a subset keeps it.
+    assert demos.subset([0, 1]).hide_values
+    assert not demos.with_hidden_values(False).hide_values
+
+
 def test_colour_follows_the_correlation(dataset):
     indices = np.arange(len(dataset))
     proxy = DemoSet.generate(dataset, indices, rho=1.0, seed=0)

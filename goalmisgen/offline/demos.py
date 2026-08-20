@@ -87,6 +87,16 @@ class DemoSet:
 
     meta: dict
     path: pathlib.Path | None = None
+    hide_values: bool = False
+    """Leave the value channel out of the observation.
+
+    The twin of ``value_encoding="none"`` / ``colour_is_the_only_value_cue`` in
+    the environment (``novalue11``): with no value channel the values are
+    learned constants rather than inputs, so nothing forces the model to
+    represent them, and a value-axis fine-tune has to move *weights* to move
+    what an objective is worth. The arrays are untouched; only what
+    :meth:`observations` builds from them changes.
+    """
 
     def __len__(self) -> int:
         return len(self.level_index)
@@ -101,8 +111,8 @@ class DemoSet:
 
     @property
     def n_channels(self) -> int:
-        """Channels of the observation: wall, agent, one per colour, one value."""
-        return FIRST_FEATURE_CHANNEL + self.n_features + 1
+        """Channels of the observation: wall, agent, one per colour, one value (unless hidden)."""
+        return FIRST_FEATURE_CHANNEL + self.n_features + (0 if self.hide_values else 1)
 
     @property
     def max_actions(self) -> int:
@@ -145,9 +155,10 @@ class DemoSet:
         """Observations for a batch, ``(B, size, size, channels)`` float32.
 
         Vectorised twin of :meth:`ObservationEncoder.encode` with
-        ``value_encoding="at_objective"``; ``tests/test_offline_demos.py``
-        asserts they agree cell for cell. Built here rather than stored because
-        a float observation is twenty times the size of the level it encodes.
+        ``value_encoding="at_objective"`` (or ``"none"`` when ``hide_values``);
+        ``tests/test_offline_demos.py`` asserts they agree cell for cell. Built
+        here rather than stored because a float observation is twenty times the
+        size of the level it encodes.
         """
         indices = np.asarray(indices)
         batch = len(indices)
@@ -162,7 +173,8 @@ class DemoSet:
         for k in range(self.n_objectives):
             r, c = self.positions[indices, k, 0], self.positions[indices, k, 1]
             observation[rows, r, c, FIRST_FEATURE_CHANNEL + self.feature_ids[indices, k]] = 1.0
-            observation[rows, r, c, value_channel] = self.values[indices, k]
+            if not self.hide_values:
+                observation[rows, r, c, value_channel] = self.values[indices, k]
         return observation
 
     def routes(self, indices: np.ndarray | Sequence[int]) -> np.ndarray:
@@ -172,7 +184,11 @@ class DemoSet:
     def subset(self, indices: np.ndarray | Sequence[int]) -> "DemoSet":
         indices = np.asarray(indices)
         arrays = {name: np.asarray(getattr(self, name)[indices]) for name in ARRAY_FIELDS}
-        return DemoSet(**arrays, size=self.size, meta={**self.meta, "n": int(len(indices))})
+        return DemoSet(**arrays, size=self.size, meta={**self.meta, "n": int(len(indices))}, hide_values=self.hide_values)
+
+    def with_hidden_values(self, hide: bool = True) -> "DemoSet":
+        """The same demonstrations, observed without (or with) the value channel."""
+        return dataclasses.replace(self, hide_values=hide)
 
     # ------------------------------------------------------------------
     # Persistence
@@ -186,11 +202,11 @@ class DemoSet:
         (directory / "meta.json").write_text(json.dumps({**self.meta, "size": self.size, "n": len(self)}, indent=2))
 
     @classmethod
-    def load(cls, path: str | pathlib.Path, mmap: bool = True) -> "DemoSet":
+    def load(cls, path: str | pathlib.Path, mmap: bool = True, hide_values: bool = False) -> "DemoSet":
         directory = pathlib.Path(path)
         meta = json.loads((directory / "meta.json").read_text())
         arrays = {name: np.load(directory / f"{name}.npy", mmap_mode="r" if mmap else None) for name in ARRAY_FIELDS}
-        return cls(**arrays, size=int(meta["size"]), meta=meta, path=directory)
+        return cls(**arrays, size=int(meta["size"]), meta=meta, path=directory, hide_values=hide_values)
 
     # ------------------------------------------------------------------
     # Generation

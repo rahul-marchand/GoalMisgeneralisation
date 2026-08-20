@@ -53,6 +53,23 @@ class TrainConfig:
     log_every: int = 50
     checkpoint_first: int = 25
     checkpoint_ratio: float = 1.4
+    schedule: str = "cosine"
+    """``cosine`` (warmup then cosine decay to zero) or ``constant`` (warmup then flat).
+
+    A fine-tune onto a shifted value uses ``constant``: the arms are compared by
+    how far they moved under a fixed budget, so every step should be worth the
+    same whichever arm it belongs to.
+    """
+    init_from: str | None = None
+    """A checkpoint directory to start from instead of a fresh initialisation.
+
+    Set for the value-axis arms, which are the base model trained a little
+    further on demonstrations at different values.
+    """
+
+    def __post_init__(self) -> None:
+        if self.schedule not in ("cosine", "constant"):
+            raise ValueError(f"schedule should be 'cosine' or 'constant', got {self.schedule!r}")
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
@@ -177,13 +194,29 @@ def train(
     model = RoutePrefixLM(model_config)
     key = jax.random.PRNGKey(train_config.seed)
     params = initial_params(model, key)
-    schedule = optax.warmup_cosine_decay_schedule(
-        init_value=0.0,
-        peak_value=train_config.learning_rate,
-        warmup_steps=train_config.warmup_steps,
-        decay_steps=train_config.total_steps,
-        end_value=0.0,
-    )
+    if train_config.init_from is not None:
+        _, loaded = load_checkpoint(pathlib.Path(train_config.init_from))
+        if jax.tree_util.tree_structure(loaded) != jax.tree_util.tree_structure(params) or any(
+            a.shape != b.shape for a, b in zip(jax.tree_util.tree_leaves(loaded), jax.tree_util.tree_leaves(params))
+        ):
+            raise ValueError(f"{train_config.init_from} holds a different model shape from {model_config}")
+        params = loaded
+    if train_config.schedule == "cosine":
+        schedule = optax.warmup_cosine_decay_schedule(
+            init_value=0.0,
+            peak_value=train_config.learning_rate,
+            warmup_steps=train_config.warmup_steps,
+            decay_steps=train_config.total_steps,
+            end_value=0.0,
+        )
+    else:
+        schedule = optax.join_schedules(
+            [
+                optax.linear_schedule(0.0, train_config.learning_rate, max(train_config.warmup_steps, 1)),
+                optax.constant_schedule(train_config.learning_rate),
+            ],
+            [max(train_config.warmup_steps, 1)],
+        )
     optimiser = optax.chain(
         optax.clip_by_global_norm(train_config.clip_norm),
         optax.adamw(schedule, weight_decay=train_config.weight_decay),
@@ -195,7 +228,11 @@ def train(
             {
                 "model": model_config.to_dict(),
                 "train": train_config.to_dict(),
-                "demos": {**demos.meta, "path": None if demos.path is None else str(demos.path)},
+                "demos": {
+                    **demos.meta,
+                    "path": None if demos.path is None else str(demos.path),
+                    "hide_values": bool(demos.hide_values),
+                },
                 "parameters": parameter_count(params),
                 "checkpoints": checkpoint_schedule(
                     train_config.total_steps, train_config.checkpoint_first, train_config.checkpoint_ratio

@@ -8,6 +8,9 @@ analogy would be false without any number looking wrong.
 
 from __future__ import annotations
 
+import dataclasses
+import json
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -220,3 +223,35 @@ def test_maze_config_channels_match_the_model_default():
     """The default ModelConfig must describe the 11x11 observation every DRC agent saw."""
     encoder = MazeConfig(max_episode_steps=120, min_size=11, max_size=11).encoder()
     assert encoder.shape == (ModelConfig().size, ModelConfig().size, ModelConfig().n_channels)
+
+
+def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_path):
+    """A fine-tune's step-0 checkpoint is the base it started from, not a fresh init."""
+    hidden = demos.with_hidden_values()
+    tiny = ModelConfig(size=7, n_channels=hidden.n_channels, max_actions=16, d_model=32, n_layers=2, n_heads=2)
+    base = TrainConfig(total_steps=3, batch_size=8, warmup_steps=1, log_every=1, checkpoint_first=100)
+    train(hidden, tiny, base, tmp_path / "base", log=lambda s: None)
+    base_step, base_dir = list_checkpoints(tmp_path / "base")[-1]
+    assert base_step == 3
+
+    arm = TrainConfig(
+        total_steps=4, batch_size=8, learning_rate=1e-3, warmup_steps=1, log_every=1,
+        checkpoint_first=100, schedule="constant", init_from=str(base_dir),
+    )
+    params = train(hidden, tiny, arm, tmp_path / "arm", log=lambda s: None)
+    checkpoints = list_checkpoints(tmp_path / "arm")
+    assert [step for step, _ in checkpoints] == [0, 4]
+    _, at_zero = load_checkpoint(checkpoints[0][1])
+    _, at_base = load_checkpoint(base_dir)
+    for a, b in zip(jax.tree_util.tree_leaves(at_zero), jax.tree_util.tree_leaves(at_base)):
+        np.testing.assert_array_equal(a, b)
+    moved = sum(float(jnp.sum((a - b) ** 2)) for a, b in zip(jax.tree_util.tree_leaves(params), jax.tree_util.tree_leaves(at_base)))
+    assert moved > 0
+    config = json.loads((tmp_path / "arm" / "config.json").read_text())
+    assert config["train"]["init_from"] == str(base_dir)
+    assert config["train"]["schedule"] == "constant"
+    assert config["demos"]["hide_values"] is True
+    assert config["model"]["n_channels"] == 4
+
+    with pytest.raises(ValueError):
+        train(demos, TINY, dataclasses.replace(arm, init_from=str(base_dir)), tmp_path / "bad", log=lambda s: None)

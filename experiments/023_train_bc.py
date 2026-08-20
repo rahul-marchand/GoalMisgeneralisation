@@ -32,7 +32,7 @@ import numpy as np
 from goalmisgen.offline.decode import evaluate
 from goalmisgen.offline.demos import DemoSet
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
-from goalmisgen.offline.train import TrainConfig, train
+from goalmisgen.offline.train import TrainConfig, load_run_config, train
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,21 +58,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--checkpoint-first", type=int, default=25)
     parser.add_argument("--checkpoint-ratio", type=float, default=1.4)
+    parser.add_argument(
+        "--hide-values",
+        action="store_true",
+        help="Drop the value channel from every observation (training and evaluation), so the "
+        "values are learned constants - the twin of novalue11's colour_is_the_only_value_cue.",
+    )
+    parser.add_argument(
+        "--init-from",
+        type=Path,
+        default=None,
+        help="Checkpoint directory to fine-tune from, instead of a fresh initialisation. The "
+        "model shape and --hide-values are taken from that run's config.json.",
+    )
+    parser.add_argument("--schedule", choices=("cosine", "constant"), default="cosine")
     parser.add_argument("--note", type=str, default=None, help="Why this run exists; written beside the run.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    demos = DemoSet.load(args.demos)
-    model_config = ModelConfig(
-        size=demos.size,
-        n_channels=demos.n_channels,
-        max_actions=demos.max_actions,
-        d_model=args.d_model,
-        n_layers=args.layers,
-        n_heads=args.heads,
-    )
+    hide_values = args.hide_values
+    if args.init_from is not None:
+        source = load_run_config(args.init_from.parent.parent)
+        hide_values = bool(source["demos"].get("hide_values", False))
+        model_config = ModelConfig.from_dict(source["model"])
+    demos = DemoSet.load(args.demos, hide_values=hide_values)
+    if args.init_from is None:
+        model_config = ModelConfig(
+            size=demos.size,
+            n_channels=demos.n_channels,
+            max_actions=demos.max_actions,
+            d_model=args.d_model,
+            n_layers=args.layers,
+            n_heads=args.heads,
+        )
+    elif model_config.n_channels != demos.n_channels:
+        raise SystemExit(f"{args.init_from} reads {model_config.n_channels} channels but {args.demos} gives {demos.n_channels}")
     train_config = TrainConfig(
         total_steps=args.steps,
         batch_size=args.batch_size,
@@ -82,6 +104,8 @@ def main() -> None:
         seed=args.seed,
         checkpoint_first=args.checkpoint_first,
         checkpoint_ratio=args.checkpoint_ratio,
+        schedule=args.schedule,
+        init_from=None if args.init_from is None else str(args.init_from),
     )
 
     held_out = {}
@@ -89,7 +113,7 @@ def main() -> None:
         name, _, path = item.partition("=")
         if not path:
             raise SystemExit(f"--eval expects name=path, got {item!r}")
-        held_out[name] = DemoSet.load(path)
+        held_out[name] = DemoSet.load(path, hide_values=hide_values)
     for name, other in held_out.items():
         shared = np.intersect1d(np.asarray(demos.level_index), np.asarray(other.level_index))
         if len(shared) and other.meta.get("source_fingerprint") == demos.meta.get("source_fingerprint"):
@@ -99,7 +123,9 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     if args.note:
         (args.out / "note.txt").write_text(args.note.strip() + "\n")
-    print(f"training on {args.demos} (rho={demos.rho}, {len(demos):,} demonstrations)")
+    print(f"training on {args.demos} (rho={demos.rho}, {len(demos):,} demonstrations, values {'hidden' if hide_values else 'shown'})")
+    if args.init_from is not None:
+        print(f"fine-tuning from {args.init_from}")
     print(f"model {model_config}")
     print(f"train {train_config}")
     if held_out:

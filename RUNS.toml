@@ -395,6 +395,30 @@ single-variable control for vit11.
 """
 
 [[entry]]
+match = "runs/resnet11novalue.s1234"
+note = """
+novalue11 with the network swapped for the rescaled GuezResNet (the resnet11
+net): 11x11, rho=1.0, values (1.0, 0.5), no value channel, colour the only
+value cue, the same 1M-level dataset, 150M steps. The hidden-value base for
+the ResNet value-axis sweeps (013/014/015 under arms/), which ask whether the
+value axis, its writability and cos(axis_0, axis_1) = -1 are the task's or the
+DRC's. Stream arch-swap, redirect 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234"
+note = """
+novalue11 with the network swapped for a larger transformer
+(maze_transformer_large: 6 layers, d_model 128, 8 heads; otherwise the vit11
+net). The 4-layer/d=64 vit11 was still climbing at 150M and reached 82%
+chose_optimal against the DRC's and ResNet's 92-96%, so the base for the
+value-axis sweeps is bigger and given up to 300M steps, to be cut where the
+in-training return plateaus (BASE.json then names the newest checkpoint).
+Hidden values, rho=1.0, values (1.0, 0.5), the same dataset. Stream arch-swap,
+redirect 2026-08-20.
+"""
+
+[[entry]]
 match = "runs/resnet11.s1234.unscaled-dead"
 note = """
 The first resnet11 launch, stopped at ~30M steps: cleanba's GuezResNet on the

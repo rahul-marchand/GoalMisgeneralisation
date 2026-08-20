@@ -4,6 +4,11 @@
 #   bash scripts/offline_bc_pod.sh demos          # demonstration sets (CPU, ~10 min on 16 vCPU)
 #   bash scripts/offline_bc_pod.sh train SEED RHO # one training run, in the foreground
 #   bash scripts/offline_bc_pod.sh launch         # all six runs, each in its own tmux session
+#   bash scripts/offline_bc_pod.sh queue 1:0.5 2:1.0 ...   # those runs one after another
+#
+# One run saturates the 4090 on its own (98% utilisation at ~40 steps/s), so
+# running all six at once buys nothing; two queues of three is the practical
+# shape.
 #
 # Demonstrations come from the same 1M-level dataset the DRC proxy agent
 # trained on (levels/values/1.00-0.50@1M): training sets from the `train`
@@ -70,9 +75,25 @@ launch() {
     done
 }
 
+queue() {
+    for pair in "$@"; do
+        seed="${pair%%:*}"
+        rho="${pair##*:}"
+        name="bc11.$(tag "${rho}").s${seed}"
+        if [ -f "${RUNS}/${name}/done.json" ]; then
+            echo "done ${name}"
+            continue
+        fi
+        echo "$(date -u +%FT%TZ) starting ${name}"
+        train "${seed}" "${rho}" > "${LOGS}/${name}.log" 2>&1 || echo "${name} FAILED"
+        echo "$(date -u +%FT%TZ) finished ${name}"
+    done
+}
+
 case "${1:-}" in
     demos) demos ;;
     train) train "$2" "$3" ;;
     launch) launch ;;
-    *) echo "usage: $0 demos | train SEED RHO | launch" >&2; exit 2 ;;
+    queue) shift; queue "$@" ;;
+    *) echo "usage: $0 demos | train SEED RHO | launch | queue SEED:RHO..." >&2; exit 2 ;;
 esac

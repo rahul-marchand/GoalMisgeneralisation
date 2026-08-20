@@ -234,3 +234,30 @@ def test_p_value_can_never_be_exactly_zero() -> None:
 def test_an_unknown_alternative_is_refused() -> None:
     with pytest.raises(ValueError, match="'less', 'greater' or 'two-sided'"):
         permutation_p_value(0.0, np.zeros(10), alternative="sideways")
+
+
+def test_the_permutation_null_matches_the_least_squares_it_replaces() -> None:
+    """The fast path is an algebraic rewrite, not an approximation.
+
+    Permuting offsets leaves the diffs alone, so the axis's cosine against a
+    reference can be had from the Gram matrix and one projection instead of a
+    fresh least squares over the whole parameter vector each time. If that is
+    ever rewritten again, this is what says it still computes the same thing.
+    """
+    rng = np.random.default_rng(0)
+    offsets = np.array([-0.45, -0.3, -0.2, -0.05, 0.05, 0.2, 0.3, 0.45])
+    diffs = rng.normal(size=(8, 400)) + offsets[:, None] * rng.normal(size=400)
+    reference = rng.normal(size=400)
+
+    fast = permutation_cosines(offsets, diffs, reference, resamples=200, seed=7)
+
+    replay = np.random.default_rng(7)
+    slow = np.array([cosine(fit_axis_and_drift(replay.permutation(offsets), diffs)[0], reference) for _ in range(200)])
+
+    assert np.allclose(fast, slow, atol=1e-12)
+
+
+def test_the_permutation_null_still_refuses_a_degenerate_grid() -> None:
+    diffs = np.random.default_rng(1).normal(size=(4, 20))
+    with pytest.raises(ValueError, match="same offset"):
+        permutation_cosines(np.zeros(4), diffs, np.ones(20), resamples=5)

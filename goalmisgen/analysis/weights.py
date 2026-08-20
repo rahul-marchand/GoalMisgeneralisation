@@ -126,12 +126,47 @@ def permutation_cosines(
     diffs = np.asarray(diffs, dtype=np.float64)
     if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
         raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
+    # Permuting the offsets does not touch the diffs, so everything that depends
+    # on them is computed once. Writing the fitted axis as
+    #
+    #     axis = (c @ C) / (c @ c),   c = offsets - mean,  C = diffs - mean
+    #
+    # its cosine against the reference needs only ``C @ reference`` (one vector
+    # per arm) and the Gram matrix ``C @ C.T`` (arms by arms). Both are tiny, and
+    # each resample then costs a couple of dot products over the arms instead of
+    # a fresh least squares over the whole parameter vector.
+    #
+    # This is not a micro-optimisation. Naively, one resample allocates and
+    # traverses an arms-by-parameters matrix -- 400 MB for a 25-arm sweep of this
+    # network -- and two thousand of them took longer than the rest of the
+    # analysis put together, per sweep.
+    centred_diffs = diffs - diffs.mean(axis=0)
+    gram = centred_diffs @ centred_diffs.T
+    projected = centred_diffs @ np.asarray(reference, dtype=np.float64)
+    reference_norm = float(np.linalg.norm(reference))
+    if reference_norm < 1e-30:
+        raise ValueError("a diff of zero length has no direction")
+
     rng = np.random.default_rng(seed)
     drawn = np.empty(resamples, dtype=np.float64)
     for index in range(resamples):
         shuffled = rng.permutation(offsets)
-        axis, _ = fit_axis_and_drift(shuffled, diffs)
-        drawn[index] = cosine(axis, reference)
+        centred = shuffled - shuffled.mean()
+        denominator = float(centred @ centred)
+        if denominator < 1e-12:
+            raise ValueError("every arm sits at the same offset, so there is no slope to fit")
+        axis_norm = float(np.sqrt(max(centred @ gram @ centred, 0.0))) / denominator
+        if axis_norm < 1e-30:
+            # This permutation's offsets are orthogonal to every direction the
+            # diffs vary in, so it fits no axis at all and says nothing about
+            # alignment with the reference. Zero is the honest contribution.
+            # It needs stating because it is reachable: a perfectly collinear
+            # family has one direction to be orthogonal to. Real diffs never are,
+            # and the earlier implementation hit the same case and returned
+            # floating-point noise in the last few digits instead.
+            drawn[index] = 0.0
+            continue
+        drawn[index] = float(centred @ projected) / denominator / (axis_norm * reference_norm)
     return drawn
 
 

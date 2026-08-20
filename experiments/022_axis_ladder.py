@@ -197,8 +197,17 @@ def measure(params, policy, get_action, envs, args, label: str) -> tuple[float, 
         resamples=200,
         seed=args.seed,
     )
-    reached = summarise(outcomes).reached_objective
-    print(f"    {label:>34}{point:>9.1f}  [{low:6.1f},{high:6.1f}]{reached:>10.1%}")
+    summary = summarise(outcomes)
+    reached, optimal = summary.reached_objective, summary.chose_optimal
+    # Both, because they say different things and only one of them is about the
+    # trade-off. reached_objective is whether the agent finishes at all -- it can
+    # be low simply because the agent wanders -- while chose_optimal is, of the
+    # episodes it did finish, how often it took the higher-utility objective.
+    # An agent can reach 70% and choose well on those, which is a competent
+    # trade-off wrapped in poor navigation, and reporting reach alone would call
+    # that incompetent. The ladder's early rungs are exactly where the two can
+    # come apart.
+    print(f"    {label:>34}{point:>9.1f}  [{low:6.1f},{high:6.1f}]{reached:>10.1%}{optimal:>10.1%}")
     return point, low, high, reached
 
 
@@ -229,7 +238,7 @@ def write_test(args, rung, base_flat, unravel, trained, stack, base_value, polic
     itself.
     """
     print(f"  writing o{args.write_objective}'s axis, {args.episodes} episodes per point")
-    print(f"    {'':>34}{'steps':>9}  {'95% interval':>15}{'reached':>10}")
+    print(f"    {'':>34}{'steps':>9}  {'95% interval':>15}{'reached':>10}{'optimal':>10}")
 
     base_point, base_low, base_high, base_reached = measure(
         unravel(base_flat), policy, get_action, envs, args, "unwritten base"

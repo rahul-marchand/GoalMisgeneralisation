@@ -73,7 +73,11 @@ import jax  # noqa: E402
 
 from goalmisgen import provenance  # noqa: E402
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise  # noqa: E402
-from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions  # noqa: E402
+from goalmisgen.analysis.behaviour import (  # noqa: E402
+    indifference_point,
+    value_distance_decisions,
+    write_verdict,
+)
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value  # noqa: E402
 from goalmisgen.configs.env import MazeConfig  # noqa: E402
 from goalmisgen.ladder import Rung, discover_rungs  # noqa: E402
@@ -245,30 +249,21 @@ def write_test(args, rung, base_flat, unravel, trained, stack, base_value, polic
         )
         control = {"point": point, "low": low, "high": high, "reached": reached}
 
+    decision = write_verdict(base_reached, written, args.reach_floor)
     usable = [w for w in written if w["reached"] >= args.reach_floor]
-    verdict, slope, span = "no axis", float("nan"), None
-    if base_reached < args.reach_floor:
-        verdict = "base cannot do the task"
-    elif len(usable) >= 2:
-        lowest, highest = min(usable, key=lambda w: w["offset"]), max(usable, key=lambda w: w["offset"])
-        # Disjoint intervals at the two extremes is the whole test: the write
-        # moved the agent further than the measurement's own uncertainty.
-        span = (lowest, highest)
-        moved = highest["high"] < lowest["low"] or lowest["high"] < highest["low"]
-        slope = (
-            float(np.polyfit([w["offset"] for w in usable], [w["point"] for w in usable], 1)[0])
-            if len(usable) >= 2
-            else float("nan")
-        )
-        verdict = "writes" if moved else "no axis"
+    slope = (
+        float(np.polyfit([w["offset"] for w in usable], [w["point"] for w in usable], 1)[0])
+        if len(usable) >= 2
+        else float("nan")
+    )
 
     return {
         "base": {"point": base_point, "low": base_low, "high": base_high, "reached": base_reached},
         "written": written,
         "control": control,
         "slope": slope,
-        "span": span,
-        "verdict": verdict,
+        "moved": decision.moved,
+        "verdict": decision.verdict,
     }
 
 

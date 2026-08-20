@@ -22,6 +22,8 @@ inflate accuracy with coin flips, so they are reported separately.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -200,3 +202,61 @@ def indifference_point(gaps: np.ndarray, took_richer: np.ndarray) -> float:
     if abs(slope) < 1e-9:
         return float("nan")
     return float(mean[0] + std[0] * (-bias / slope))
+
+
+@dataclass(frozen=True)
+class WriteVerdict:
+    """Whether writing a direction moved an agent's trade-off, and how far."""
+
+    verdict: str
+    """``writes``, ``no axis``, or ``base cannot do the task``."""
+
+    moved: float
+    """Steps between the two extreme writes, or ``nan`` when nothing is comparable."""
+
+    usable: int
+    """How many written points the agent still finished episodes at."""
+
+    @property
+    def works(self) -> bool:
+        return self.verdict == "writes"
+
+
+def write_verdict(
+    base_reached: float,
+    written: Sequence[Mapping[str, float]],
+    reach_floor: float = 0.95,
+) -> WriteVerdict:
+    """Did the write move the agent further than the measurement's own uncertainty?
+
+    ``written`` is one mapping per written offset, carrying ``offset``, ``point``
+    (the exchange rate in extra steps), its bootstrap ``low`` and ``high``, and
+    ``reached``.
+
+    The test is that the 95% intervals at the two extreme offsets are *disjoint*.
+    That is deliberately weaker than a fitted slope with a p-value and deliberately
+    stronger than "the means differ": with a handful of written points, a slope's
+    interval is doing more assuming than measuring, while two non-overlapping
+    intervals are a statement about the measurement that does not depend on the
+    response being linear -- which, past the fitted grid, it is known not to be.
+
+    Two ways to fail, reported apart because they mean opposite things. An axis
+    that does not move behaviour is evidence against the axis. A base agent that
+    cannot reach objectives has no trade-off to move, and says nothing about the
+    axis at all -- it is the state early rungs are expected to be in, and reading
+    it as "no axis" would date the axis to whenever the agent became competent
+    regardless of when the axis arrived.
+    """
+    if base_reached < reach_floor:
+        return WriteVerdict("base cannot do the task", float("nan"), 0)
+    usable = [w for w in written if w["reached"] >= reach_floor]
+    if len(usable) < 2:
+        return WriteVerdict("no axis", float("nan"), len(usable))
+    lowest = min(usable, key=lambda w: w["offset"])
+    highest = max(usable, key=lambda w: w["offset"])
+    disjoint = highest["high"] < lowest["low"] or lowest["high"] < highest["low"]
+    return WriteVerdict(
+        "writes" if disjoint else "no axis",
+        float(highest["point"] - lowest["point"]),
+        len(usable),
+    )

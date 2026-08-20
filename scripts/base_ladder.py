@@ -125,9 +125,7 @@ def preview(args: argparse.Namespace, rung: Rung) -> tuple[int, int]:
     objectives = args.objectives if args.objectives is not None else list(range(len(values)))
     offsets = tuple(args.offsets) if args.offsets else None
     arms = [arm for objective in objectives for arm in sweep_arms(objective, offsets=offsets)]
-    done = sum(
-        arm_is_complete(args.data / "runs" / rung.agent / "arms" / arm.dirname(args.steps), args.steps) for arm in arms
-    )
+    done = sum(arm_is_complete(args.data / "runs" / rung.agent / "arms" / arm.dirname(args.steps), args.steps) for arm in arms)
     return len(arms) - done, done
 
 

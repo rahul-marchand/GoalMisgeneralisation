@@ -46,6 +46,11 @@ class Rung:
     """How far into training that checkpoint is."""
 
     @property
+    def checkpoint_path(self) -> Path:
+        """Where the checkpoint sits inside the rung's own directory."""
+        return Path("local-files") / self.checkpoint
+
+    @property
     def label(self) -> str:
         """``70.1M`` — how a rung is named on an axis of a plot."""
         return f"{self.steps / 1_000_000:.1f}M"
@@ -123,3 +128,28 @@ def make_rung(data: Path, source: str, checkpoint: str, *, dry_run: bool = False
         link.symlink_to(Path("..") / source / "local-files")
     marker.write_text(json.dumps(base_payload(rung, config), indent=2) + "\n")
     return rung
+
+
+def discover_rungs(data: Path, agent: str) -> list[Rung]:
+    """Every rung of one agent's ladder, deepest in training last.
+
+    The agent itself is a rung -- the one every other is compared against -- so
+    it is included, with its position read from the checkpoint its ``BASE.json``
+    names rather than from that file's ``steps``. For a base agent those differ:
+    ``steps`` is what the run was aiming at (150M) and the checkpoint is where it
+    actually saved (140.2M), and a ladder plotted against the former would put
+    its reference point 10M steps to the right of the weights it describes.
+    """
+    found: list[Rung] = []
+    for directory in sorted((data / "runs").iterdir()) if (data / "runs").is_dir() else []:
+        if directory.name != agent and not directory.name.startswith(f"{agent}.at"):
+            continue
+        marker = directory / "BASE.json"
+        if not marker.is_file():
+            continue
+        checkpoint = Path(json.loads(marker.read_text())["checkpoint"]).name
+        steps = parse_checkpoint_dirname(checkpoint)
+        if steps is None:
+            continue
+        found.append(Rung(agent=directory.name, source=agent, checkpoint=checkpoint, steps=steps))
+    return sorted(found, key=lambda rung: rung.steps)

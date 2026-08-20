@@ -83,11 +83,15 @@ def capture(
     params,
     demos: DemoSet,
     indices: np.ndarray,
-    layer: int,
+    layer: int | None,
     reader_params=None,
     decoded: Decoded | None = None,
 ) -> list[CellRollout]:
     """Rollouts labelled by the model's own greedy route, featured by ``layer``.
+
+    ``layer`` is a depth (0 = the embedding, ``n`` = after block ``n``) or
+    ``None`` for every depth concatenated - the closest match to the DRC probe,
+    which reads all three recurrent layers at once.
 
     ``reader_params`` reads the residuals out of a different network - an
     untrained one of the same shape is the control - while ``params`` still
@@ -99,7 +103,8 @@ def capture(
     if decoded is None:
         decoded = greedy_decode(model, params, observations)
     outcomes = replay_all(demos, indices, decoded)
-    streams = cell_residuals(model, params if reader_params is None else reader_params, observations)[layer]
+    streams = cell_residuals(model, params if reader_params is None else reader_params, observations)
+    streams = np.concatenate(list(streams), axis=-1) if layer is None else streams[layer]
 
     rollouts = []
     for row, index in enumerate(indices):

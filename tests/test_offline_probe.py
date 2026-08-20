@@ -50,6 +50,14 @@ def test_capture_yields_what_the_probes_read(demos, model_and_params):
     assert 0.0 <= result.auc <= 1.0
 
 
+def test_all_depths_concatenate(demos, model_and_params):
+    model, params = model_and_params
+    rollouts = capture(model, params, demos, np.arange(3), layer=None)
+    assert rollouts[0].features.shape == (7, 7, (TINY.n_layers + 1) * TINY.d_model)
+    last = capture(model, params, demos, np.arange(3), layer=TINY.n_layers)
+    np.testing.assert_array_equal(rollouts[0].features[..., -TINY.d_model :], last[0].features)
+
+
 def test_reader_params_change_features_but_not_labels(demos, model_and_params):
     model, params = model_and_params
     other = initial_params(model, jax.random.PRNGKey(1))

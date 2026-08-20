@@ -43,7 +43,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--step", type=int, default=None, help="Checkpoint step; default the last.")
     parser.add_argument("--train-episodes", type=int, default=512)
     parser.add_argument("--test-episodes", type=int, default=256)
-    parser.add_argument("--layers", type=int, nargs="*", default=None, help="Depths to probe; default all.")
+    parser.add_argument(
+        "--layers",
+        type=int,
+        nargs="*",
+        default=None,
+        help="Depths to probe (0 = embedding); default every depth, then all depths concatenated.",
+    )
     parser.add_argument("--by-distance", action="store_true")
     parser.add_argument("--no-untrained", action="store_true")
     return parser.parse_args()
@@ -70,10 +76,10 @@ def main() -> None:
     decoded_test = greedy_decode(model, params, demos.observations(test_idx))
     untrained = None if args.no_untrained else initial_params(model, jax.random.PRNGKey(12345))
 
-    layers = list(range(cfg.n_layers + 1)) if args.layers is None else args.layers
+    layers: list[int | None] = list(range(cfg.n_layers + 1)) + [None] if args.layers is None else list(args.layers)
     print(f"{'depth':>8}{'probe':>14}{'AUC':>9}{'95% CI':>18}{'bal.acc':>10}")
     for layer in layers:
-        label = "embed" if layer == 0 else f"block {layer}"
+        label = "all" if layer is None else ("embed" if layer == 0 else f"block {layer}")
         arms = [("trained", "features", None), ("observation", "observation", None)]
         if untrained is not None:
             arms.insert(1, ("untrained", "features", untrained))

@@ -408,14 +408,17 @@ DRC's. Stream arch-swap, redirect 2026-08-20.
 [[entry]]
 match = "runs/vit11novalue.s1234"
 note = """
-novalue11 with the network swapped for a larger transformer
-(maze_transformer_large: 6 layers, d_model 128, 8 heads; otherwise the vit11
-net). The 4-layer/d=64 vit11 was still climbing at 150M and reached 82%
-chose_optimal against the DRC's and ResNet's 92-96%, so the base for the
-value-axis sweeps is bigger and given up to 300M steps, to be cut where the
-in-training return plateaus (BASE.json then names the newest checkpoint).
-Hidden values, rho=1.0, values (1.0, 0.5), the same dataset. Stream arch-swap,
-redirect 2026-08-20.
+novalue11 with the network swapped for the vit11 transformer (4 layers,
+d_model 64, 4 heads), 250M steps instead of 150M: vit11 was still climbing at
+150M with the value channel present (82% chose_optimal against 92-96% for the
+DRC and ResNet), and the pipeline has to fit ~9 h on one 4090. The larger
+maze_transformer_large (6 layers, d_model 128, 8 heads) was launched first and
+ran at ~3.4k SPS against this net's ~12.4k on the same card, which would have
+put 200M steps at 16 h; it was stopped before its first checkpoint
+(logs/arch-swap/train-vit11novalue.s1234.vitl300M-aborted.log) and this run
+took its name. A converged small transformer over an unconverged large one.
+Hidden values, rho=1.0, values (1.0, 0.5), the same dataset. The base for the
+transformer value-axis sweeps. Stream arch-swap, redirect 2026-08-20.
 """
 
 [[entry]]

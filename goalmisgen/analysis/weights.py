@@ -170,6 +170,106 @@ def permutation_cosines(
     return drawn
 
 
+def permutation_norms(
+    offsets: np.ndarray,
+    diffs: np.ndarray,
+    resamples: int = 1000,
+    seed: int = 0,
+) -> np.ndarray:
+    """``|axis|`` when the offsets are shuffled among the diffs.
+
+    The companion of :func:`permutation_cosines`, and the one that answers
+    whether a rung has an axis *at all* rather than whether two axes agree.
+
+    Comparing ``|axis|`` against zero is meaningless: least squares through a
+    cloud of noisy diffs returns a nonzero slope whatever the diffs are, and how
+    large depends on how noisy they are and on the grid's leverage, neither of
+    which is constant across the things being compared. Shuffling which offset
+    belongs to which diff destroys any association with value while leaving the
+    diffs, their spread and the design exactly as they were, so what comes back
+    is the length a slope of *this* grid over *these* diffs reaches with no value
+    signal in it. That is the number ``|axis|`` has to beat.
+
+    It also removes the need to read ``|axis|`` against ``|drift|``, which is a
+    ratio of two things that scale differently with arm length and says nothing
+    calibrated about either.
+    """
+    offsets = np.asarray(offsets, dtype=np.float64)
+    diffs = np.asarray(diffs, dtype=np.float64)
+    if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
+        raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
+    centred_diffs = diffs - diffs.mean(axis=0)
+    gram = centred_diffs @ centred_diffs.T
+    rng = np.random.default_rng(seed)
+    drawn = np.empty(resamples, dtype=np.float64)
+    for index in range(resamples):
+        shuffled = rng.permutation(offsets)
+        centred = shuffled - shuffled.mean()
+        denominator = float(centred @ centred)
+        if denominator < 1e-12:
+            raise ValueError("every arm sits at the same offset, so there is no slope to fit")
+        drawn[index] = float(np.sqrt(max(centred @ gram @ centred, 0.0))) / denominator
+    return drawn
+
+
+def split_half_reliability(
+    offsets: np.ndarray,
+    diffs: np.ndarray,
+    splits: int = 200,
+    seed: int = 0,
+) -> float:
+    """How much of a fitted axis is signal rather than fine-tuning noise.
+
+    The grid is mirrored, so it is made of ``(+m, -m)`` pairs. Splitting *pairs*
+    rather than arms keeps each half balanced about the base, which matters: an
+    unbalanced half lets the common fine-tuning component leak into its axis, and
+    two halves that both leaked it would agree about the leak and report it as
+    reliability. Each half then gives an independent estimate of the same
+    direction, and the cosine between them is what the estimate is worth.
+
+    Averaged over random splits and corrected to full length by Spearman-Brown,
+    ``2r / (1 + r)``, because each half is fitted on half the arms and a half-
+    length reliability understates the whole.
+
+    ``016`` does this with the two widest pairs, which is all a seven-point grid
+    affords. On a twelve-pair grid that throws away five sixths of the splits
+    available and gives one noisy number instead of a distribution.
+
+    Returns ``nan`` when there are fewer than four pairs, which cannot be split
+    into two halves that each fit a slope.
+    """
+    offsets = np.asarray(offsets, dtype=np.float64)
+    diffs = np.asarray(diffs, dtype=np.float64)
+    table = {round(float(o), 6): index for index, o in enumerate(offsets)}
+    pairs = [
+        (table[m], table[-m])
+        for m in sorted({abs(float(o)) for o in offsets if abs(o) > 1e-9}, reverse=True)
+        if m in table and -m in table
+    ]
+    if len(pairs) < 4:
+        return float("nan")
+
+    rng = np.random.default_rng(seed)
+    cosines = []
+    for _ in range(splits):
+        order = rng.permutation(len(pairs))
+        half = len(pairs) // 2
+        estimates = []
+        for chosen in (order[:half], order[half : 2 * half]):
+            rows = [index for pair in (pairs[i] for i in chosen) for index in pair]
+            axis, _ = fit_axis_and_drift(offsets[rows], diffs[rows])
+            estimates.append(axis)
+        if min(np.linalg.norm(e) for e in estimates) < 1e-30:
+            continue
+        cosines.append(cosine(estimates[0], estimates[1]))
+    if not cosines:
+        return float("nan")
+    half_length = float(np.mean(cosines))
+    if half_length <= -1.0:
+        return float("nan")
+    return float(2 * half_length / (1 + half_length))
+
+
 def permutation_p_value(observed: float, null: np.ndarray, alternative: str = "less") -> float:
     """How often the null reaches at least as far as the observation.
 

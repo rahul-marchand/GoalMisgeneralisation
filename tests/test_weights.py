@@ -17,8 +17,10 @@ from goalmisgen.analysis.weights import (
     fit_axis,
     fit_axis_and_drift,
     permutation_cosines,
+    permutation_norms,
     permutation_p_value,
     projected_offset,
+    split_half_reliability,
 )
 
 
@@ -261,3 +263,60 @@ def test_the_permutation_null_still_refuses_a_degenerate_grid() -> None:
     diffs = np.random.default_rng(1).normal(size=(4, 20))
     with pytest.raises(ValueError, match="same offset"):
         permutation_cosines(np.zeros(4), diffs, np.ones(20), resamples=5)
+
+
+def test_the_norm_null_separates_a_real_axis_from_none() -> None:
+    """|axis| against zero is meaningless; against a shuffled grid it is not.
+
+    Least squares returns a nonzero slope through any cloud of diffs, and how
+    large depends on the noise and the grid's leverage. Both are what differ
+    between the things a ladder compares, which is exactly why the raw norm
+    cannot be read down one.
+    """
+    rng = np.random.default_rng(0)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.30, 0.20, 0.10) for s in (1, -1)])
+    axis = rng.normal(size=200)
+
+    signal = np.outer(offsets, axis) + 0.5 * rng.normal(size=(len(offsets), 200))
+    noise = 0.5 * rng.normal(size=(len(offsets), 200)) + rng.normal(size=200)
+
+    for diffs, expected in ((signal, True), (noise, False)):
+        observed = float(np.linalg.norm(fit_axis_and_drift(offsets, diffs)[0]))
+        null = permutation_norms(offsets, diffs, resamples=400, seed=1)
+        significant = permutation_p_value(observed, null, alternative="greater") < 0.05
+        assert significant is expected
+
+
+def test_reliability_is_high_on_a_real_axis_and_nil_on_noise() -> None:
+    rng = np.random.default_rng(3)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)])
+    axis = rng.normal(size=200)
+
+    signal = np.outer(offsets, axis) + 0.5 * rng.normal(size=(len(offsets), 200))
+    noise = 0.5 * rng.normal(size=(len(offsets), 200)) + rng.normal(size=200)
+
+    assert split_half_reliability(offsets, signal, splits=80, seed=4) > 0.7
+    assert abs(split_half_reliability(offsets, noise, splits=80, seed=4)) < 0.3
+
+
+def test_reliability_needs_four_pairs_to_split() -> None:
+    """A grid with fewer cannot make two halves that each fit a slope."""
+    offsets = np.array([0.4, -0.4, 0.2, -0.2])
+    diffs = np.random.default_rng(5).normal(size=(4, 30))
+
+    assert np.isnan(split_half_reliability(offsets, diffs, splits=20, seed=0))
+
+
+def test_reliability_splits_pairs_so_each_half_stays_balanced() -> None:
+    """An unbalanced half leaks the common fine-tuning component into its axis.
+
+    Two halves that both leaked it would agree about the leak, and the agreement
+    would be reported as reliability. Here every diff carries a large shared
+    offset and nothing else: balanced halves must find no reliable direction.
+    """
+    rng = np.random.default_rng(6)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)])
+    common = 50.0 * rng.normal(size=300)
+    diffs = np.tile(common, (len(offsets), 1)) + 0.5 * rng.normal(size=(len(offsets), 300))
+
+    assert abs(split_half_reliability(offsets, diffs, splits=80, seed=7)) < 0.3

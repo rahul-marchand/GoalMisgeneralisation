@@ -78,7 +78,14 @@ from goalmisgen.analysis.behaviour import (  # noqa: E402
     value_distance_decisions,
     write_verdict,
 )
-from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value  # noqa: E402
+from goalmisgen.analysis.weights import (  # noqa: E402
+    cosine,
+    fit_axis_and_drift,
+    permutation_cosines,
+    permutation_norms,
+    permutation_p_value,
+    split_half_reliability,
+)
 from goalmisgen.configs.env import MazeConfig  # noqa: E402
 from goalmisgen.ladder import Rung, discover_rungs  # noqa: E402
 from goalmisgen.volume import discover_arms  # noqa: E402
@@ -286,6 +293,8 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], ro
 
     axes: dict[int, np.ndarray] = {}
     drifts: dict[int, np.ndarray] = {}
+    exists: dict[int, float] = {}
+    reliability: dict[int, float] = {}
     offsets: dict[int, np.ndarray] = {}
     diffs: dict[int, np.ndarray] = {}
     for objective in args.objectives:
@@ -305,9 +314,13 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], ro
         if rollout is not None and objective == args.write_objective:
             written_trained, written_stack = list(trained), diffs[objective]
         axes[objective], drifts[objective] = fit_axis_and_drift(offsets[objective], diffs[objective])
+        norm_null = permutation_norms(offsets[objective], diffs[objective], resamples=args.resamples, seed=args.seed)
+        exists[objective] = permutation_p_value(float(np.linalg.norm(axes[objective])), norm_null, alternative="greater")
+        reliability[objective] = split_half_reliability(offsets[objective], diffs[objective], seed=args.seed)
         print(
             f"  o{objective}: {len(arms):>2} arms  |axis| {np.linalg.norm(axes[objective]):>8.3g}"
             f"  |drift| {np.linalg.norm(drifts[objective]):>8.3g}"
+            f"  p {exists[objective]:.4f}  reliability {reliability[objective]:+.3f}"
             f"  null arm {'present' if base_value in arms else 'ABSENT'}"
         )
 
@@ -319,6 +332,8 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], ro
         "cos": None,
         "p": None,
         "dim2": None,
+        "exists": exists,
+        "reliability": reliability,
     }
     first, second = args.objectives[0], args.objectives[1] if len(args.objectives) > 1 else args.objectives[0]
     if first in axes and second in axes and first != second:
@@ -392,17 +407,57 @@ def main() -> None:
     reference = next((f for f in fitted if f["rung"].agent == args.reference), fitted[-1])
     print(f"\nreference rung: {reference['rung'].label} ({reference['rung'].agent})")
 
-    print("\n\n=== is there an axis, and is it one axis? ===\n")
-    print(f"{'rung':>8}{'|axis_0|':>10}{'|axis_1|':>10}{'|drift|':>10}{'axis/drift':>12}{'cos(a0,a1)':>12}{'p':>8}{'dim2':>8}")
+    print("\n\n=== is there an axis at all? ===\n")
+    print(f"{'rung':>8}{'|axis_0|':>10}{'p_0':>8}{'rel_0':>8}" f"{'|axis_1|':>10}{'p_1':>8}{'rel_1':>8}   verdict")
+    for entry in fitted:
+        first, second = args.objectives[0], args.objectives[1]
+        if first not in entry["axes"] or second not in entry["axes"]:
+            continue
+        p0, p1 = entry["exists"][first], entry["exists"][second]
+        r0, r1 = entry["reliability"][first], entry["reliability"][second]
+        # Both objectives are the same measurement of the same agent, so a rung
+        # that only clears on one of them has not cleared.
+        has = "axis" if max(p0, p1) < 0.05 and min(r0, r1) > 0.2 else "—"
+        print(
+            f"{entry['rung'].label:>8}{entry['norms'][first]:>10.3g}{p0:>8.3f}{r0:>8.2f}"
+            f"{entry['norms'][second]:>10.3g}{p1:>8.3f}{r1:>8.2f}   {has}"
+        )
+    print(
+        "\np is against a permutation null -- the length a slope of this grid reaches over\n"
+        "these diffs with the offsets shuffled, so with no value in them. |axis| on its own\n"
+        "says nothing: least squares returns a slope through any cloud. rel is split-half\n"
+        "reliability, how much of the fitted direction is signal. A rung needs both, on both\n"
+        "objectives: a large axis at low reliability is a long vector pointing nowhere in\n"
+        "particular, and reliability without length is a direction with nothing along it."
+    )
+
+    print("\n\n=== one axis or two? ===\n")
+    print(f"{'rung':>8}{'cos(a0,a1)':>12}{'p':>8}{'disattenuated':>15}{'dim2':>8}   reading")
     for entry in fitted:
         if entry["cos"] is None:
             continue
         first, second = args.objectives[0], args.objectives[1]
-        ratio = np.mean(list(entry["norms"].values())) / entry["drift"] if entry["drift"] else float("nan")
+        r0, r1 = entry["reliability"][first], entry["reliability"][second]
+        # Dividing by reliability is only meaningful when there is reliability to
+        # divide by. results/three-objective.txt has this correction returning
+        # cosines outside the range a cosine can take, which is a correction
+        # announcing it has broken down; refusing is better than printing it.
+        if min(r0, r1) > 0.2 and (adjusted := entry["cos"] / np.sqrt(r0 * r1)) and abs(adjusted) <= 1.0:
+            shown, reading = f"{adjusted:.3f}", "one knob" if adjusted < -0.7 else "two registers"
+        else:
+            shown, reading = "—", "no axis to ask of"
         print(
-            f"{entry['rung'].label:>8}{entry['norms'][first]:>10.3g}{entry['norms'][second]:>10.3g}"
-            f"{entry['drift']:>10.3g}{ratio:>12.2f}{entry['cos']:>12.3f}{entry['p']:>8.3f}{entry['dim2']:>8.3f}"
+            f"{entry['rung'].label:>8}{entry['cos']:>12.3f}{entry['p']:>8.3f}{shown:>15}" f"{entry['dim2']:>8.3f}   {reading}"
         )
+    print(
+        "\nThe raw cosine is attenuated toward zero by noise in both axes, so it understates\n"
+        "collinearity wherever reliability is poor -- which is every early rung. Disattenuating\n"
+        "divides that out, and is refused below a reliability of 0.2 rather than printed as a\n"
+        "number the data cannot support.\n\n"
+        "The distinction that matters: dim2 near 0.5 with a cosine near zero is what TWO value\n"
+        "registers look like AND what two noise vectors look like. The table above is what\n"
+        "separates them. Only a rung with an axis can be said to have one axis or two."
+    )
 
     print("\n\n=== has the axis settled where it ends up? ===\n")
     print(f"{'rung':>8}" + "".join(f"{f'cos(o{o}@t, o{o}@end)':>22}" for o in args.objectives))

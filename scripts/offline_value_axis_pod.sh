@@ -21,8 +21,13 @@
 set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 export PYTHONUNBUFFERED=1
-export XLA_PYTHON_CLIENT_PREALLOCATE=false
+# MEM_FRACTION only caps anything when PREALLOCATE is true (with it false the
+# allocator grows on demand to the whole card: a base run reached 15 GB). Arms
+# run three abreast, so they preallocate a hard 0.3 each; bases default to
+# growing on demand unless the caller says otherwise.
+export XLA_PYTHON_CLIENT_PREALLOCATE="${XLA_PYTHON_CLIENT_PREALLOCATE:-false}"
 export XLA_PYTHON_CLIENT_MEM_FRACTION="${XLA_PYTHON_CLIENT_MEM_FRACTION:-0.3}"
+ARM_MEM_FRACTION="${ARM_MEM_FRACTION:-0.3}"
 
 cd "$(dirname "$0")/.."
 
@@ -82,6 +87,7 @@ arm() {
     dirname="$4"; tag="$5"
     out="${RUNS}/${base}/arms/${dirname}"
     init=$(ls -d "${RUNS}/${base}"/checkpoints/step_* | sort | tail -n1)
+    XLA_PYTHON_CLIENT_PREALLOCATE=true XLA_PYTHON_CLIENT_MEM_FRACTION="${ARM_MEM_FRACTION}" \
     uv run python experiments/023_train_bc.py \
         --demos "${DEMOS}/arms/${tag}.train.rho100" --init-from "${init}" --schedule constant \
         --eval "base=${DEMOS}/test.rho100" "own=${DEMOS}/arms/${tag}.test.rho100" --eval-levels 1024 \

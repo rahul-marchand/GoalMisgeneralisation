@@ -131,6 +131,16 @@ def parse_args() -> argparse.Namespace:
         help="Offsets to write. The extremes carry the test and the interior points say whether "
         "the response is graded rather than a step.",
     )
+    parser.add_argument(
+        "--write-near",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Write only the rungs nearest these step counts, in millions. Every rung is still "
+        "fitted and appears in the weights tables; this decides which ones pay for rollouts. "
+        "A rung with no axis and a base that cannot reach objectives has a foregone write, so "
+        "spending an hour of GPU re-establishing that is not worth it once it is established.",
+    )
     parser.add_argument("--episodes", type=int, default=1024)
     parser.add_argument("--num-envs", type=int, default=64)
     parser.add_argument(
@@ -352,7 +362,7 @@ def fit_rung(args: argparse.Namespace, rung: Rung, values: tuple[float, ...], ro
         entry["dim2"] = second_dimension_share(axes[first], axes[second])
 
     entry["write"] = None
-    if rollout is not None and args.write_objective in axes:
+    if rollout is not None and args.write_objective in axes and rung.steps in rollout["write_rungs"]:
         entry["write"] = write_test(
             args,
             rung,
@@ -402,11 +412,18 @@ def main() -> None:
         # changes.
         config = eval_config(args, values)
         policy, _, _, _, _ = load_train_state(args.data / "runs" / rungs[-1].agent / rungs[-1].checkpoint_path, env_cfg=config)
+        if args.write_near is None:
+            chosen = {rung.steps for rung in rungs}
+        else:
+            chosen = {min(rungs, key=lambda r, t=m * 1_000_000: abs(r.steps - t)).steps for m in args.write_near}
         rollout = {
             "policy": policy,
             "get_action": jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature"),
             "envs": config.make(),
+            "write_rungs": chosen,
         }
+        written_labels = [r.label for r in rungs if r.steps in chosen]
+        print(f"writing {len(chosen)} of {len(rungs)} rungs: {', '.join(written_labels)}\n")
 
     fitted = []
     for rung in rungs:

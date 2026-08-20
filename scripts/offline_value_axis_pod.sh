@@ -46,6 +46,10 @@ bases() {
             echo "done ${name}"
             continue
         fi
+        if tmux has-session -t "${name//./_}" 2>/dev/null; then
+            echo "running ${name}"
+            continue
+        fi
         tmux new-session -d -s "${name}" "uv run python experiments/023_train_bc.py \
             --demos ${DEMOS}/train.rho100 --hide-values \
             --eval rho100=${DEMOS}/valid.rho100 rho050=${DEMOS}/valid.rho050 rho000=${DEMOS}/valid.rho000 \

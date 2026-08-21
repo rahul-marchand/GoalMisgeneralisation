@@ -422,6 +422,60 @@ transformer value-axis sweeps. Stream arch-swap, redirect 2026-08-20.
 """
 
 [[entry]]
+match = "runs/resnet11novalue.s1234-cp130M"
+note = """
+Not a training run: resnet11novalue.s1234's checkpoint cp_130191360 (130.2M
+steps) copied out with its own BASE.json, so the value-axis sweep driver can
+treat it as a base. resnet11novalue.s1234 collapsed between its 130M and 140M
+checkpoints (training return +0.35 -> -3.9, eval success 1.00 -> 0.04, and it
+never recovered; resnet11.s1234 with the value channel shows a milder dip at
+120M that it does recover from), and scripts/arch_swap_value_axis.sh took the
+final checkpoint cp_149995520 as the base, so the first ResNet sweep
+(runs/resnet11novalue.s1234/arms) fine-tuned a collapsed agent (reach 6%).
+cp_130191360 is the last healthy checkpoint: 002 at rho=1.0 gives 94.8%
+chose_optimal, 99.7% reached, the DRC novalue11's level. The sweeps under
+arms/ here are the ResNet value-axis result; the ones under
+runs/resnet11novalue.s1234/arms are kept as the record of what a sweep on a
+non-competent base looks like (|delta| ~0.1, no behaviour, cos +0.73 between
+two noise axes). Stream arch-swap, 2026-08-21.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234/arms/o*@400k"
+note = """
+The wide value grid fine-tuned from resnet11novalue.s1234's *collapsed* final
+checkpoint cp_149995520 (see runs/resnet11novalue.s1234-cp130M): the arms
+start from an agent that reaches 6% of objectives, so none of them learned a
+value (every arm's exchange rate sits inside the base's interval) and the
+014/015 numbers on them (results/arch-swap-value-axis-resnet11novalue.s1234-*)
+are fits to noise. 400k steps, 4 checkpoints, lr 1e-4, DRC hyperparameters.
+Superseded by runs/resnet11novalue.s1234-cp130M/arms.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234-cp130M/arms/o*@400k"
+note = """
+The ResNet value-axis sweeps proper: the wide grid (25 arms an objective,
+o0 and o1) from the pre-collapse ResNet base, 400k steps and 4 checkpoints an
+arm, 013 with the DRC fine-tune hyperparameters (lr 1e-4 constant) and the
+base's own net spec. Analysed by 014/015 into
+results/arch-swap-value-axis-resnet11novalue.s1234-cp130M-*. Stream arch-swap.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234/arms/o*@400k"
+note = """
+The transformer value-axis sweeps: the wide grid (25 arms an objective, o0
+and o1) from vit11novalue.s1234 at 250M, 400k steps and 4 checkpoints an arm,
+013 with the DRC fine-tune hyperparameters and the base's own TransformerSpec.
+Analysed by 014/015 into results/arch-swap-value-axis-vit11novalue.s1234-*.
+The base reaches 86% of objectives and chooses the better one 79% of the time
+at rho=1.0 (DRC novalue11: 100% / ~95%), so its exchange rates span a
+compressed range (1.1-5.4 steps against the DRC's 1.1-15 on the same grid).
+Stream arch-swap.
+"""
+
+[[entry]]
 match = "runs/resnet11.s1234.unscaled-dead"
 note = """
 The first resnet11 launch, stopped at ~30M steps: cleanba's GuezResNet on the

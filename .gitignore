@@ -14,3 +14,9 @@ checkpoints/
 # Level datasets (generated, not tracked). Anchored: an unanchored `data/`
 # also swallowed figures/data, where measured results live.
 /data/
+
+# Ad-hoc editing backups. Kept on disk, out of the history: the notes they back
+# up are tracked, so a committed copy is a second version of the same document
+# with nothing to say which is current.
+*.pre-push-backup.md
+*.stage2-backup-*.md

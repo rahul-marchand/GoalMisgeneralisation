@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 
 from goalmisgen.offline.decode import evaluate
-from goalmisgen.offline.demos import DemoSet
+from goalmisgen.offline.demos import DemoSet, shared_levels
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
 from goalmisgen.offline.train import TrainConfig, load_run_config, train
 
@@ -117,9 +117,9 @@ def main() -> None:
             raise SystemExit(f"--eval expects name=path, got {item!r}")
         held_out[name] = DemoSet.load(path, hide_values=hide_values)
     for name, other in held_out.items():
-        shared = np.intersect1d(np.asarray(demos.level_index), np.asarray(other.level_index))
-        if len(shared) and other.meta.get("source_fingerprint") == demos.meta.get("source_fingerprint"):
-            raise SystemExit(f"evaluation set {name} shares {len(shared)} levels with the training set")
+        shared = shared_levels(demos, other)
+        if shared:
+            raise SystemExit(f"evaluation set {name} shares {shared} levels with the training set")
     indices = np.arange(min(args.eval_levels, *(len(d) for d in held_out.values()))) if held_out else None
 
     args.out.mkdir(parents=True, exist_ok=True)

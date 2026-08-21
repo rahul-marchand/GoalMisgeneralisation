@@ -65,6 +65,26 @@ because a truncated route would teach the model to stop short of the goal.
 _MOVE_INDEX = {move: index for index, move in enumerate(MOVES)}
 
 
+def shared_levels(train: "DemoSet", held_out: "DemoSet") -> int:
+    """How many levels two demonstration sets have in common.
+
+    The invariant this protects is the one CLAUDE.md is most emphatic about:
+    training and evaluation must never share levels, or misgeneralisation becomes
+    confounded with memorisation. It has already caught a real leak -- a null arm
+    whose own dataset overlapped the test split by ~2.9k levels.
+
+    Zero unless the two came from the same level dataset. A level index only
+    means anything relative to the dataset that produced it, so comparing indices
+    across datasets with different fingerprints compares nothing, and a collision
+    between them is arithmetic rather than leakage. Returning zero there is not a
+    claim that the two are disjoint; it is a statement that the question cannot be
+    asked of them by index.
+    """
+    if train.meta.get("source_fingerprint") != held_out.meta.get("source_fingerprint"):
+        return 0
+    return int(len(np.intersect1d(np.asarray(train.level_index), np.asarray(held_out.level_index))))
+
+
 @dataclasses.dataclass(frozen=True)
 class DemoSet:
     """Expert demonstrations on a fixed pool of levels, at one correlation."""

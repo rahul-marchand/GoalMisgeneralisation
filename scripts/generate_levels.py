@@ -22,6 +22,7 @@ from pathlib import Path
 
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.envs.dataset import LevelDataset, block_tasks, dataset_fingerprint, generate_block, split_indices
+from goalmisgen.parallel import worker_pool
 
 
 def usable_cpus(root: pathlib.Path = pathlib.Path("/")) -> int:
@@ -109,7 +110,7 @@ def main() -> None:
 
     start = time.perf_counter()
     if args.workers > 1:
-        with mp.Pool(args.workers) as pool:
+        with worker_pool(args.workers) as pool:
             blocks = pool.starmap(generate_block, tasks)
     else:
         blocks = [generate_block(*task) for task in tasks]

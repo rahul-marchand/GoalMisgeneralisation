@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import multiprocessing as mp
 import pathlib
 from typing import Sequence
 
@@ -33,6 +32,7 @@ from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.level import Level
 from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
 from goalmisgen.envs.solver import MOVES, path_to_objective, solve
+from goalmisgen.parallel import worker_pool
 
 ARRAY_FIELDS: tuple[str, ...] = (
     "level_index",
@@ -257,7 +257,7 @@ class DemoSet:
         chunks = [indices[start : start + chunk_size] for start in range(0, len(indices), chunk_size)]
         tasks = [(dataset, chunk, rho, seed, step_penalty, step_limit, max_actions) for chunk in chunks]
         if workers > 1 and len(tasks) > 1:
-            with mp.Pool(workers) as pool:
+            with worker_pool(workers) as pool:
                 blocks = pool.starmap(demonstrate_block, tasks)
         else:
             blocks = [demonstrate_block(*task) for task in tasks]

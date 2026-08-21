@@ -68,6 +68,23 @@ Mazes are therefore padded to a fixed maximum size. Out-of-distribution *size*
 generalisation would need a custom pooled or fully-convolutional head, added as
 a `PolicySpec` subclass in our code — not by editing theirs.
 
+### Gymnasium shouts on every environment it builds
+
+cleanba reaches through a vector-env wrapper for `num_envs`, `single_action_space`
+and friends, which gymnasium answers with a deprecation warning each time. The
+sweeps redirect stderr into their results file, so those five messages made up
+**84% of `results/`** — 7.0 MB of 8.4 MB — printed *into* the tables. That is not
+only bulk: `provenance.parse_header` reads a file's first few lines, so warnings
+can push a header out of reach, and `early_warning_report` recovers its numbers
+with line-anchored regexes that then have to survive arbitrary text between rows.
+
+`goalmisgen/quiet.py` filters them, applied on importing `goalmisgen` — the only
+place that catches all forty-odd entry points. It matches the deprecation
+phrasing rather than raising gymnasium's log level, so a warning about *our* use
+of an environment still gets through. Note that pytest resets warning filters
+per test, so the messages still appear in test output; `tests/test_quiet.py`
+asserts the filter directly instead of relying on ambient state.
+
 ## Level datasets
 
 Generating a level costs ~3.5 ms (maze construction plus a breadth-first search
@@ -104,6 +121,15 @@ Three things about datasets are easy to get wrong:
 Datasets are stored as directories of plain `.npy` files, not compressed
 archives, so they can be memory-mapped and shared across actor processes.
 `LevelDataset` pickles by path for the same reason. Do not "simplify" either.
+
+**Generation pools are spawned, not forked.** `generate_levels.py` and
+`generate_demos.py` both import `configs.env`, which reaches cleanba and
+therefore JAX, so by the time either builds its pool the parent holds a
+multithreaded JAX runtime. Forking that is the documented deadlock, and it
+*hangs* rather than failing — the same failure mode as the evaluation stall, and
+just as expensive. Use `goalmisgen.parallel.worker_pool`, never `mp.Pool`
+directly. The payload modules (`envs.dataset`, `offline.demos`) are deliberately
+JAX-free, which is what keeps the spawn cheap; keep them that way.
 
 ## Beyond the DRC
 

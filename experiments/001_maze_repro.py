@@ -30,6 +30,7 @@ from pathlib import Path
 import cleanba.cleanba_impala
 from cleanba.cleanba_impala import WandbWriter, train
 
+from goalmisgen import provenance
 from goalmisgen.configs.env import MazeConfig
 from goalmisgen.configs.presets import PRESETS, preset_for, with_final_checkpoint
 from goalmisgen.configs.writers import CsvWriter
@@ -93,6 +94,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    print(provenance.header())
 
     # Only pass what was given on the command line. Passing every argparse
     # default would shadow the preset's own defaults, making them dead code.

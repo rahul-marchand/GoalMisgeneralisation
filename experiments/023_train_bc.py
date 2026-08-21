@@ -29,6 +29,7 @@ from pathlib import Path
 
 import numpy as np
 
+from goalmisgen import provenance
 from goalmisgen.offline.decode import evaluate
 from goalmisgen.offline.demos import DemoSet, shared_levels
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
@@ -78,6 +79,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    print(provenance.header())
     hide_values = args.hide_values
     if args.init_from is not None:
         source = load_run_config(args.init_from.parent.parent)

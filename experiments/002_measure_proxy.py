@@ -29,6 +29,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import bin_by_margin, collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
 
@@ -72,6 +73,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    print(provenance.header())
 
     def env_config(correlation: float) -> MazeConfig:
         return MazeConfig(

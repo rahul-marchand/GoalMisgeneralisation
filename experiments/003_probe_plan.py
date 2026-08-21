@@ -44,6 +44,7 @@ from pathlib import Path
 import jax
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import auc_interval, collect_rollouts, probe, probe_by_distance
 from goalmisgen.analysis.probes import ProbeSource
 from goalmisgen.configs.env import MazeConfig
@@ -103,6 +104,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    print(provenance.header())
 
     def env_config(seed: int, correlation: float | None = None) -> MazeConfig:
         settings = dict(

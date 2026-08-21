@@ -1,9 +1,9 @@
 script 028_bc_value_or_gap.py
-commit c91fa94
+commit 807165d
 argv   /workspace/data/offline/runs/bcnv11.s2 --steps 1000 --json /workspace/data/offline/results/value_or_gap.bcnv11.s2.json
 
-o0: 24 arms
-o1: 24 arms
+o0: 25 arms
+o1: 25 arms
 
 === the two axes ===
   |axis_0| 2.651  |axis_1| 2.653  |drift_0| 1.075  |drift_1| 1.073

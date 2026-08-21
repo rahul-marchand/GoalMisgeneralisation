@@ -1,11 +1,12 @@
 script 027_bc_value_axis.py
-commit c91fa94
+commit 807165d
 argv   /workspace/data/offline/runs/bcnv11.s3 --sweep o0 --steps 1000 --demos /workspace/data/offline/demos/test.rho100 --json /workspace/data/offline/results/value_axis.bcnv11.s3.o0.json
 
 base bcnv11.s3 @ step 30,000; 806,533 parameters; values (1.0, 0.5); values hidden
-sweep o0: 24 arms at offsets -0.45..+0.45 (no null arm)
+sweep o0: 24 arms at offsets -0.45..+0.45 + null arm
 |delta theta| per arm  1.626 +- 0.1185  (min 1.443, max 1.799)
 |drift| 1.061   |axis| per unit value 2.495   cos(drift, axis) -0.024
+null arm |delta| 1.488, cos(null, drift) +0.279, cos(null - drift, axis) +0.046
 
 === collinear? mean pairwise cosine between arms ===
                                  same side    opposite
@@ -39,12 +40,14 @@ sweep o0: 24 arms at offsets -0.45..+0.45 (no null arm)
      +0.43     1.602     1.168        0.592        +0.781     +0.37
      +0.44     1.603     1.169        0.601        +0.789     +0.37
      +0.45     1.614     1.208        0.497        +0.732     +0.35
+      null     1.488     1.568            -        +0.046     +0.03
   implied offset vs trained offset: correlation +0.990, slope 0.96 (1 = the axis reads the offset back at scale)
   split-half reliability of the axis +0.956
 
 === writable? greedy decode on 2048 held-out levels at the base values ===
                                       indiff.   expert   optimal  reached   legal      f0
   base, untouched                       10.60     10.0     0.934    0.975   0.974   0.808
+  null arm (fine-tuned at base values)    10.62     10.0     0.929    0.958   0.960   0.809
 
   each offset: the arm itself | written from an axis fitted WITHOUT it (base + o*axis) | the same plus drift
     offset  expert     arm  written   +drift| reach arm   writ +drift| optimal arm   writ +drift

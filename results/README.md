@@ -189,3 +189,49 @@ unreadable in an agent that cannot finish episodes" both fit, and no rung
 distinguishes them. Note also that `novalue11` becomes competent far later than
 the ~20M in Experiment 1, which was `maze11` — the twenty dense checkpoints
 before 20M are all pre-competence here and carry nothing.
+
+### The high-power rerun — `axis-ladder-power.txt`
+
+Four rungs (50M, 60M, 70M, 140M) remeasured at 4096 episodes instead of 1024,
+with `chose_optimal` printed alongside reach. Two things it settles, one of which
+overturns a reading taken from the 1024-episode run.
+
+**The axis writes at 60.1M, not 70.1M.** At 4x the episodes the extreme writes
+separate cleanly: 2.5 [2.0, 3.0] against 0.5 [0.1, 1.0], monotone across all four
+offsets (2.5, 1.8, 0.7, 0.5), with the norm-matched control at 1.2 against a base
+of 1.2. At 1024 episodes those intervals overlapped and the rung read as no write.
+So the apparent one-rung gap between "axis detectable in the weights" and "axis
+drives behaviour" was a power artefact. **Both thresholds land on the same rung**,
+60.1M — the rung where reliability first clears on both objectives. There is no
+evidence here of representation leading behaviour.
+
+**Reach was the wrong competence measure, and it mattered.** Choice accuracy on
+the episodes the agent finishes:
+
+| rung | reach | chose_optimal |
+|---|---|---|
+| 50.1M | 49.0% | 76.0% |
+| 60.1M | 71.0% | 71.0% |
+| 70.1M | 94.2% | 74.2% |
+| 140.2M | 100.0% | **95.4%** |
+
+Chance is 50%. So choice quality is flat at 71–76% from 50M through 70M while
+reach climbs 49% to 94%, and only reaches 95% by 140M. Navigation saturates
+first; the trade-off itself improves late, over the same 70M-140M stretch in
+which the axis grows (reliability 0.70 to 0.86), tightens (-0.809 to -0.885) and
+rotates (0.16 aligned with its final direction at 70M). The earlier statement
+that "competence arrives at ~70M" was true of reach and false of choice.
+
+**`chose_optimal` on written rows is a second control, and reads inverted.** It
+is scored against the true task values, so a successful write should *lower* it:
+at 140.2M, 95.4% at base falls to 79.3% under a +0.45 write while the random
+control sits at 95.5%. The edit changes the agent's revealed preference, which is
+what it claims to do.
+
+**An aside worth following up.** Writing -0.20 into the 140.2M agent raises
+choice accuracy above what training produced: 98.3% against 95.4%, moving the
+exchange rate from 7.7 steps to 11.1. Experiment 2 found this agent behaves as
+though a step cost 0.061 rather than 0.05 and so gives up on the further
+objective too early; a small write along the axis appears to correct exactly that
+bias. The axis is not only readable and writable but usable to make the agent
+*better* than training left it.

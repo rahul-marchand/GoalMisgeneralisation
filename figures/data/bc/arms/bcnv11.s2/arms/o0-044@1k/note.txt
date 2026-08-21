@@ -1,0 +1,1 @@
+Value-axis arm o0-044@1k of bcnv11.s2: fine-tuned from its last checkpoint for 1000 steps at constant lr 1e-4 on rho=1.0 hidden-value demonstrations at values 0.56-0.50. Evaluated at the base values (test.rho100) and its own.

@@ -332,3 +332,34 @@ results were made with. One seed per architecture.
   structure.
 - `figures/data/{resnet11novalue,vit11novalue}.s1234.json` — the 002 JSON of
   each base (the ResNet's is the collapsed checkpoint).
+
+## The offline-BC twin (route transformer)
+
+`offline-bc-*.txt` come from the `goalmisgen/offline` stream: a small prefix-LM
+transformer trained by next-token prediction on BFS-expert demonstrations of
+the same 11x11 levels the DRC proxy agent trained on, with the colour-value
+correlation carried by the demonstrations (rho=1.0) and, for the control, absent
+(rho=0.5). Routes are decoded greedily and replayed under `MazeEnv`'s rules, so
+`chose_optimal` and `followed_feature_zero` mean exactly what they mean for the
+DRC agents. Runs live on the volume under `offline/runs/bc11.rho{100,050}.s{1,2,3}`;
+the early-warning CSVs and each run's `eval.csv` are in `figures/data/bc/`.
+
+- `offline-bc-proxy.txt` (`024`): final-checkpoint behaviour at rho 1.0/0.5/0.0
+  on the test split, per run and mean +- sd across three seeds per condition.
+- `offline-bc-probe.<run>.txt` (`025`): per-cell linear probe on the residual
+  stream at the maze tokens, before the first action token, one row per depth,
+  against an untrained network of the same shape and the raw observation.
+- `offline-bc-early-warning.<run>.txt` (`026`): per checkpoint, the behavioural
+  rho gap beside a probe fitted at rho=1 and scored at rho=0 against the model's
+  own route, the optimal route and the colour-0 route.
+
+- `offline-bc-value-axis-<base>.<sweep>.txt` (`027`): the imitation twin of
+  Experiment 2 on the hidden-value route model `bcnv11.s<seed>`: the 25-arm
+  fine-tune grid of one objective (`o0` colour 0, `o1` colour 1) read as weight
+  diffs - `dtheta = drift + offset*axis` with the null arm held out, collinearity,
+  leave-one-out fit and leave-one-out *written* exchange rates against each arm's
+  own, norm-matched random directions, drift alone, writes outside the grid.
+- `offline-bc-value-or-gap-<base>.txt` (`028`): `cos(axis_0, axis_1)` for that
+  base, with split-half reliabilities and a permutation null.
+
+What they say is summarised in the offline-bc handoff and below as it lands.

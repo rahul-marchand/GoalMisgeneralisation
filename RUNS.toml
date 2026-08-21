@@ -528,3 +528,72 @@ transformer at 12M, so the network never learned anything. Kept for its
 metrics.csv as the evidence behind goalmisgen.nets.scaled; the resnet11 that
 stands in the results is the relaunch with the input rescaled by 255.
 """
+
+[[entry]]
+match = "offline/demos/arms/*"
+note = """
+Demonstrations for the offline value-axis arms: the solver's optimal route at
+*shifted* values, from the DRC campaign's own level grids
+(`levels/values/<v0>-<v1>@150k`, first 50k train levels and 2048 test levels),
+colours at rho=1.0. `1.45-0.50.train.rho100` teaches colour 0 is worth 1.45;
+the richer objective is walked further for. `scripts/value_axis_arms.py` lists
+the grid (goalmisgen.design.sweep_arms, 25 arms per objective incl. the null
+arm at 1.00-0.50); `scripts/offline_value_axis_pod.sh armdemos` built them.
+"""
+
+[[entry]]
+match = "offline/runs/bcnv11.s*/arms/*"
+note = """
+Value-axis arms of the hidden-value route model: the base (`offline/runs/bcnv11.s<seed>`,
+last checkpoint) fine-tuned for a fixed short budget (1000 steps, batch 256,
+constant lr 1e-4 after 50 warmup; the budget is in the name, `o0+045@1k`) on
+`offline/demos/arms/<values>.train.rho100`, values still hidden, so the only way
+to move what an objective is worth is to move weights. `o0` moves colour 0's
+value, `o1` colour 1's; the null arm (`+000`) is the same budget at the base
+values and measures drift. Evaluated at the base values (test.rho100) and its
+own. The imitation twin of `runs/novalue11.s*/arms/*` (Experiment 2):
+`experiments/027_bc_value_axis.py` fits `dtheta = drift + offset*axis` across
+them, `028` compares the two sweeps' axes. `scripts/offline_value_axis_chain.sh`.
+"""
+
+[[entry]]
+match = "offline/runs/bcnv11.s*"
+note = """
+Hidden-value bases for the offline value-axis campaign: the bc11.rho100 recipe
+(prefix-LM, 4 layers, width 128, 30k steps on `offline/demos/train.rho100`) with
+the value channel dropped from the observation, so (1.0, 0.5) are learned
+constants - the BC twin of `runs/novalue11.s*`. Three seeds; each is the base
+of a 50-arm fine-tune grid under `arms/`. `experiments/023_train_bc.py --hide-values`.
+"""
+
+[[entry]]
+match = "offline/demos/*"
+note = """
+Expert demonstrations for the offline-BC stream: the solver's optimal route on
+every level of one split of `levels/values/1.00-0.50@1M`, with colours assigned
+at the correlation in the name (`train.rho100` = train split at rho=1.0). The
+same split at several correlations is paired level for level -- only the
+colours differ. `train.*` feed the route models; `valid.*` are decoded at every
+checkpoint; `test.*` are held for the final tables. Built by
+`scripts/generate_demos.py`; `meta.json` records the source fingerprint.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho100.s*"
+note = """
+The LLM-shaped twin of maze11: a small prefix-LM transformer (4 layers, width
+128) trained by next-token prediction on `offline/demos/train.rho100`, where
+colour 0 always marks the richer objective. Nothing in the loss knows about
+reward; the correlation lives in the demonstrations. Three seeds, because the
+runs are cheap and the claim is about the training recipe, not one network.
+Checkpoints are log-spaced from step 0 so the early-warning sweep has the
+pre-competence window. `experiments/023_train_bc.py`.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho050.s*"
+note = """
+The single-variable control for the bc11.rho100 runs, trained on
+`offline/demos/train.rho050` where colour carries nothing. Same levels, same
+routes, same model, same seeds; only the colours differ.
+"""

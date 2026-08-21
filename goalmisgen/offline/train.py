@@ -65,6 +65,15 @@ class TrainConfig:
 
     Set for the value-axis arms, which are the base model trained a little
     further on demonstrations at different values.
+
+    **Parameters only. The optimiser starts fresh.** A checkpoint here holds
+    params and nothing else, so Adam's moments and the step count do not carry
+    across and the schedule restarts from zero. Worth stating outright: the DRC
+    side of this project assumed the opposite of its own checkpoints, ran a 110M
+    step extension believing it was a warm restart, and found afterwards that
+    ``save_train_state`` had been carrying ``opt_state`` all along. The arms pass
+    ``--schedule constant`` so the restart costs them no warmup, but anything
+    that switches them to a decaying schedule is starting that decay again.
     """
 
     def __post_init__(self) -> None:

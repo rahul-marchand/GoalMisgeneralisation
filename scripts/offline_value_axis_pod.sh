@@ -87,10 +87,20 @@ arm() {
     dirname="$4"; tag="$5"
     out="${RUNS}/${base}/arms/${dirname}"
     init=$(ls -d "${RUNS}/${base}"/checkpoints/step_* | sort | tail -n1)
+    train="${DEMOS}/arms/${tag}.train.rho100"; own="${DEMOS}/arms/${tag}.test.rho100"
+    if [ "${offset}" = "+0.00" ]; then
+        # The null arm's values are the base's, and levels/values/1.00-0.50@150k is
+        # the first 150k levels of the 1M dataset the base was trained and tested
+        # on, so its train split shares ~2.9k levels with test.rho100 and 023
+        # refuses it. The null arm fine-tunes on valid.rho100 instead: 50k fresh
+        # levels at the base values, disjoint from test, like every other arm's
+        # 50k fresh levels at shifted values.
+        train="${DEMOS}/valid.rho100"; own="${DEMOS}/test.rho100"
+    fi
     XLA_PYTHON_CLIENT_PREALLOCATE=true XLA_PYTHON_CLIENT_MEM_FRACTION="${ARM_MEM_FRACTION}" \
     uv run python experiments/023_train_bc.py \
-        --demos "${DEMOS}/arms/${tag}.train.rho100" --init-from "${init}" --schedule constant \
-        --eval "base=${DEMOS}/test.rho100" "own=${DEMOS}/arms/${tag}.test.rho100" --eval-levels 1024 \
+        --demos "${train}" --init-from "${init}" --schedule constant \
+        --eval "base=${DEMOS}/test.rho100" "own=${own}" --eval-levels 1024 \
         --out "${out}" --seed "${seed}" --steps "${FT_STEPS}" --lr "${FT_LR}" --warmup "${FT_WARMUP}" \
         --checkpoint-first 100000000 \
         --note "Value-axis arm ${dirname} of ${base}: fine-tuned from its last checkpoint for ${FT_STEPS} steps at constant lr ${FT_LR} on rho=1.0 hidden-value demonstrations at values ${tag}. Evaluated at the base values (test.rho100) and its own."

@@ -199,8 +199,22 @@ results were made with. One seed per architecture.
   0.02–0.15 (null arm 0.099), every arm's exchange rate sits inside the
   base's interval at 6% reach, LOO writes reproduce nothing, and the +0.727
   between the two "axes" is the cosine of two noise fits — not a two-register
-  result; a non-result. The sweep from the healthy checkpoint is
-  `arch-swap-value-axis-resnet11novalue.s1234-cp130M-*` (running on pod a at
-  09:05Z 2026-08-21; see the arch-swap HANDOFF).
+  result; a non-result. **`resnet11novalue.s1234-cp130M` (the healthy
+  checkpoint, 94.8% / 99.7%):** the arms learn graded exchange rates at
+  nearly the DRC's range (o0: base 7.6, arms 1.3 at v=0.57 → 12.9 at
+  v=1.40; o1: 14.1 at v=0.06 → 1.5 at v=0.90; DRC 7.7, 1.1 → 15); |Δθ|
+  3.4–4.6 per arm, null 4.20 of which 0.22 common drift. Writing the axis
+  reproduces them in sample and leave-one-out (mean |error| 0.87 steps,
+  max 2.4, over ~11.6 steps, excluding o0 v=1.44, an arm that collapsed
+  within its 400k fine-tune steps to 6% reach — the ResNet's instability
+  again; 3–4 of the 50 arms degraded, the rest reach 94–100%), random
+  directions leave the base at 7.6, extrapolating o1 to unseen 1.0–1.5
+  runs 2.6 → 0.6. `cos(axis_0, axis_1) = −0.497` raw, reliabilities 0.38 /
+  0.34, null sd 0.143, p = 0.0005, disattenuated −1.38 (at the floor). So
+  the one-knob, writable value axis is the task's, not the DRC's: it
+  reproduces on both swapped-in architectures (n=1 each), with the
+  architecture changing the reliability of the fit (DRC 0.75–0.83, ResNet
+  ~0.36, ViT ~0.39 at 400k-step arms) and the arms' range, not the
+  structure.
 - `figures/data/{resnet11novalue,vit11novalue}.s1234.json` — the 002 JSON of
   each base (the ResNet's is the collapsed checkpoint).

@@ -1,0 +1,41 @@
+script 028_bc_value_or_gap.py
+commit c91fa94
+argv   /workspace/data/offline/runs/bcnv11.s1 --steps 1000 --json /workspace/data/offline/results/value_or_gap.bcnv11.s1.json
+
+o0: 24 arms
+o1: 24 arms
+
+=== the two axes ===
+  |axis_0| 2.697  |axis_1| 2.697  |drift_0| 1.152  |drift_1| 1.151
+  cos(drift_0, drift_1) +0.989   (the two sweeps' common components; should be alike)
+
+  cos(axis_0, axis_1) = -0.985
+  about -1: one knob (a threshold on the gap); about 0: two value registers
+
+=== the same gap reached by moving either colour (drift removed) ===
+   gap change  o0 offset  o1 offset     cos
+        +0.05      +0.05      -0.05  +0.761
+        -0.05      -0.05      +0.05  +0.763
+        +0.10      +0.10      -0.10  +0.761
+        -0.10      -0.10      +0.10  +0.770
+        +0.20      +0.20      -0.20  +0.766
+        -0.20      -0.20      +0.20  +0.792
+        +0.30      +0.30      -0.30  +0.765
+        -0.30      -0.30      +0.30  +0.819
+        +0.38      +0.38      -0.38  +0.760
+        -0.38      -0.38      +0.38  +0.836
+        +0.40      +0.40      -0.40  +0.768
+        -0.40      -0.40      +0.40  +0.833
+        +0.45      +0.45      -0.45  +0.784
+        -0.45      -0.45      +0.45  +0.854
+  Under one knob these are the same model reached two ways; their diffs should agree.
+
+=== how much of each axis is signal? ===
+  split-half reliability  axis_0 +0.963   axis_1 +0.962
+  cos corrected for attenuation -1.023  (outside [-1, 1]: the correction has broken down)
+
+=== permutation null ===
+  observed -0.985; null over 2000 shuffles mean -0.013 sd 0.612, 5th pct -0.873; p(null <= observed) 0.0005
+  shuffling the other sweep: null mean +0.013 sd 0.619; p 0.0005
+
+wrote /workspace/data/offline/results/value_or_gap.bcnv11.s1.json

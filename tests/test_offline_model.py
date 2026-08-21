@@ -235,8 +235,14 @@ def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_p
     assert base_step == 3
 
     arm = TrainConfig(
-        total_steps=4, batch_size=8, learning_rate=1e-3, warmup_steps=1, log_every=1,
-        checkpoint_first=100, schedule="constant", init_from=str(base_dir),
+        total_steps=4,
+        batch_size=8,
+        learning_rate=1e-3,
+        warmup_steps=1,
+        log_every=1,
+        checkpoint_first=100,
+        schedule="constant",
+        init_from=str(base_dir),
     )
     params = train(hidden, tiny, arm, tmp_path / "arm", log=lambda s: None)
     checkpoints = list_checkpoints(tmp_path / "arm")
@@ -245,7 +251,9 @@ def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_p
     _, at_base = load_checkpoint(base_dir)
     for a, b in zip(jax.tree_util.tree_leaves(at_zero), jax.tree_util.tree_leaves(at_base)):
         np.testing.assert_array_equal(a, b)
-    moved = sum(float(jnp.sum((a - b) ** 2)) for a, b in zip(jax.tree_util.tree_leaves(params), jax.tree_util.tree_leaves(at_base)))
+    moved = sum(
+        float(jnp.sum((a - b) ** 2)) for a, b in zip(jax.tree_util.tree_leaves(params), jax.tree_util.tree_leaves(at_base))
+    )
     assert moved > 0
     config = json.loads((tmp_path / "arm" / "config.json").read_text())
     assert config["train"]["init_from"] == str(base_dir)

@@ -237,7 +237,7 @@ def main() -> None:
     if args.skip_behaviour:
         return
 
-    print(f"\n\n=== does writing only those channels still move behaviour? ===\n")
+    print("\n\n=== does writing only those channels still move behaviour? ===\n")
     envs = config.make()
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
 

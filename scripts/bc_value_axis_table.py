@@ -45,7 +45,9 @@ def main() -> None:
             vals = [key(r) for r in rows]
             print(f"| {label} | {' / '.join(fmt([v], digits, signed) for v in vals)} | {fmt(vals, digits, signed)} |")
 
-        b = lambda r: r.get("behaviour", {})
+        def b(r):
+            return r.get("behaviour", {})
+
         line("base chose_optimal (test, ρ=1)", lambda r: b(r).get("base", {}).get("chose_optimal"), 3)
         line("base exchange rate (steps; expert 10)", lambda r: b(r).get("base", {}).get("indifference"))
         line("null arm exchange rate", lambda r: b(r).get("null", {}).get("indifference"))
@@ -75,7 +77,11 @@ def main() -> None:
         def random_shift(r):
             c = b(r).get("controls", {})
             base = b(r).get("base", {}).get("indifference")
-            vals = [abs(v["indifference"] - base) for k, v in c.items() if k.startswith("random_0.45") and np.isfinite(v["indifference"])]
+            vals = [
+                abs(v["indifference"] - base)
+                for k, v in c.items()
+                if k.startswith("random_0.45") and np.isfinite(v["indifference"])
+            ]
             return float(np.mean(vals)) if vals else None
 
         line("random dir (|0.45·axis|): mean |shift| from base (steps)", random_shift)
@@ -86,8 +92,16 @@ def main() -> None:
             return float(np.mean(vals)) if vals else None
 
         line("random dir: reached", random_reach, 3)
-        line("written +0.45 (LOO) reached", lambda r: (b(r).get("arms", {}).get("+0.45") or {}).get("written", {}).get("reached"), 3)
-        line("written −0.45 (LOO) reached", lambda r: (b(r).get("arms", {}).get("-0.45") or {}).get("written", {}).get("reached"), 3)
+        line(
+            "written +0.45 (LOO) reached",
+            lambda r: (b(r).get("arms", {}).get("+0.45") or {}).get("written", {}).get("reached"),
+            3,
+        )
+        line(
+            "written −0.45 (LOO) reached",
+            lambda r: (b(r).get("arms", {}).get("-0.45") or {}).get("written", {}).get("reached"),
+            3,
+        )
 
     if gaps:
         print(f"\n### cos(axis_0, axis_1)  ({len(gaps)} seeds)\n")

@@ -24,7 +24,7 @@ from typing import Callable
 import jax
 import numpy as np
 from cleanba.convlstm import ConvLSTMConfig
-from cleanba.network import GuezConvSequence, GuezResNetConfig, Policy
+from cleanba.network import GuezConvSequence, GuezResNetConfig, Policy, PolicySpec
 
 from goalmisgen.nets.scaled import ScaledInputSpec
 from goalmisgen.nets.transformer import TransformerSpec, residual_grids
@@ -109,9 +109,7 @@ class StateReader:
         — steering writes into it — and the probe must read what was written
         rather than what the next pass would compute.
         """
-        raise ValueError(
-            f"{type(self).__name__} reads a network with no state between steps; there is no carry to read"
-        )
+        raise ValueError(f"{type(self).__name__} reads a network with no state between steps; there is no carry to read")
 
     # -- per-architecture -------------------------------------------------
 
@@ -209,5 +207,3 @@ def state_reader_for(policy: Policy) -> StateReader:
         if isinstance(spec, spec_type):
             return reader_type(policy)
     raise TypeError(f"no state reader for {type(spec).__name__}; add one to goalmisgen.nets.readers.READERS")
-
-

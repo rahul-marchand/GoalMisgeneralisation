@@ -306,7 +306,9 @@ def test_swapped_network_trains_evaluates_and_reloads(tmp_path, name):
     checkpoints = sorted((args.base_run_dir / "local-files").glob("cp_*"))
     assert checkpoints, "no checkpoint written"
     policy, carry, loaded_args, train_state, _ = load_train_state(checkpoints[-1], env_cfg=train_env)
-    assert type(loaded_args.net) is type(args.net)
+    # Exact type, not isinstance: the point is that the spec survived a
+    # serialisation round trip unchanged, and a subclass would not be that.
+    assert type(loaded_args.net) is type(args.net)  # noqa: E721
     assert carry == ()
     # The reloaded agent acts, and its state can be read by the probes.
     rollouts = collect_rollouts(

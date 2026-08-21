@@ -94,7 +94,9 @@ def main() -> None:
             n_heads=args.heads,
         )
     elif model_config.n_channels != demos.n_channels:
-        raise SystemExit(f"{args.init_from} reads {model_config.n_channels} channels but {args.demos} gives {demos.n_channels}")
+        raise SystemExit(
+            f"{args.init_from} reads {model_config.n_channels} channels but {args.demos} gives {demos.n_channels}"
+        )
     train_config = TrainConfig(
         total_steps=args.steps,
         batch_size=args.batch_size,
@@ -123,7 +125,9 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     if args.note:
         (args.out / "note.txt").write_text(args.note.strip() + "\n")
-    print(f"training on {args.demos} (rho={demos.rho}, {len(demos):,} demonstrations, values {'hidden' if hide_values else 'shown'})")
+    print(
+        f"training on {args.demos} (rho={demos.rho}, {len(demos):,} demonstrations, values {'hidden' if hide_values else 'shown'})"
+    )
     if args.init_from is not None:
         print(f"fine-tuning from {args.init_from}")
     print(f"model {model_config}")

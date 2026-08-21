@@ -112,9 +112,7 @@ class MazeTransformer(nn.Module):
 
         x = x * self.cfg.input_scale
         tokens = nn.Dense(d_model, name="embed")(x)
-        position = self.param(
-            "position", nn.initializers.normal(stddev=self.cfg.pos_init_std), (height, width, d_model)
-        )
+        position = self.param("position", nn.initializers.normal(stddev=self.cfg.pos_init_std), (height, width, d_model))
         tokens = tokens + position[None]
         self.sow("intermediates", RESIDUAL, tokens)
 

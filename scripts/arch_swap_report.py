@@ -104,7 +104,11 @@ def main() -> None:
         if proxy is None:
             ax_top.text(0.5, 0.5, f"{proxy_name}\nnot found", ha="center", va="center", transform=ax_top.transAxes)
         else:
-            for name, colour, legend in (("rho100", BLUE, "ρ = 1.0"), ("rho050", AQUA, "ρ = 0.5"), ("rho000", ORANGE, "ρ = 0.0")):
+            for name, colour, legend in (
+                ("rho100", BLUE, "ρ = 1.0"),
+                ("rho050", AQUA, "ρ = 0.5"),
+                ("rho000", ORANGE, "ρ = 0.0"),
+            ):
                 s = arm(proxy, name)
                 ax_top.plot(s.index / 1e6, s.values, "-", color=colour, lw=1.8, label=legend)
         ax_top.grid(axis="y", alpha=0.4)

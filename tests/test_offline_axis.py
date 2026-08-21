@@ -29,12 +29,24 @@ def test_sweep_is_found_by_name_and_diffed_against_the_base(demos, tmp_path):
     init = str(list_checkpoints(tmp_path / "base")[-1][1])
     for offset in (0.2, -0.2, 0.0):
         out = tmp_path / "base" / "arms" / arm_dirname("o0", offset, 1000)
-        train(demos, tiny, TrainConfig(total_steps=2, schedule="constant", init_from=init, seed=int(offset * 10) + 5, **quick), out, log=lambda s: None)
+        train(
+            demos,
+            tiny,
+            TrainConfig(total_steps=2, schedule="constant", init_from=init, seed=int(offset * 10) + 5, **quick),
+            out,
+            log=lambda s: None,
+        )
         (out / "done.json").write_text(json.dumps({"steps": 2}))
     # an unfinished arm, an arm of another sweep and one at another budget are invisible
     (tmp_path / "base" / "arms" / arm_dirname("o0", 0.3, 1000)).mkdir()
     for name in (arm_dirname("o1", 0.2, 1000), arm_dirname("o0", 0.2, 2000)):
-        train(demos, tiny, TrainConfig(total_steps=1, schedule="constant", init_from=init, **quick), tmp_path / "base" / "arms" / name, log=lambda s: None)
+        train(
+            demos,
+            tiny,
+            TrainConfig(total_steps=1, schedule="constant", init_from=init, **quick),
+            tmp_path / "base" / "arms" / name,
+            log=lambda s: None,
+        )
         (tmp_path / "base" / "arms" / name / "done.json").write_text("{}")
 
     base = load_base(tmp_path / "base")

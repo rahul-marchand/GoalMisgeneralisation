@@ -65,7 +65,9 @@ def main() -> None:
     observed = cosine(axis0, axis1)
 
     print("\n=== the two axes ===")
-    print(f"  |axis_0| {np.linalg.norm(axis0):.4g}  |axis_1| {np.linalg.norm(axis1):.4g}  |drift_0| {np.linalg.norm(drift0):.4g}  |drift_1| {np.linalg.norm(drift1):.4g}")
+    print(
+        f"  |axis_0| {np.linalg.norm(axis0):.4g}  |axis_1| {np.linalg.norm(axis1):.4g}  |drift_0| {np.linalg.norm(drift0):.4g}  |drift_1| {np.linalg.norm(drift1):.4g}"
+    )
     print(f"  cos(drift_0, drift_1) {cosine(drift0, drift1):+.3f}   (the two sweeps' common components; should be alike)")
     print(f"\n  cos(axis_0, axis_1) = {observed:+.3f}")
     print("  about -1: one knob (a threshold on the gap); about 0: two value registers")
@@ -85,26 +87,46 @@ def main() -> None:
     print("\n=== how much of each axis is signal? ===")
     print(f"  split-half reliability  axis_0 {rel0:+.3f}   axis_1 {rel1:+.3f}")
     corrected = observed / np.sqrt(rel0 * rel1) if rel0 > 0 and rel1 > 0 else float("nan")
-    print(f"  cos corrected for attenuation {corrected:+.3f}" + ("  (outside [-1, 1]: the correction has broken down)" if abs(corrected) > 1 else ""))
+    print(
+        f"  cos corrected for attenuation {corrected:+.3f}"
+        + ("  (outside [-1, 1]: the correction has broken down)" if abs(corrected) > 1 else "")
+    )
 
     print("\n=== permutation null ===")
     null = permutation_cosines(o1, s1, axis0, resamples=args.resamples, seed=args.seed)
     p = permutation_p_value(observed, null, alternative="less")
-    print(f"  observed {observed:+.3f}; null over {args.resamples} shuffles mean {null.mean():+.3f} sd {null.std():.3f}, 5th pct {np.percentile(null, 5):+.3f}; p(null <= observed) {p:.4f}")
+    print(
+        f"  observed {observed:+.3f}; null over {args.resamples} shuffles mean {null.mean():+.3f} sd {null.std():.3f}, 5th pct {np.percentile(null, 5):+.3f}; p(null <= observed) {p:.4f}"
+    )
     null_rev = permutation_cosines(o0, s0, axis1, resamples=args.resamples, seed=args.seed + 1)
     p_rev = permutation_p_value(observed, null_rev, alternative="less")
     print(f"  shuffling the other sweep: null mean {null_rev.mean():+.3f} sd {null_rev.std():.3f}; p {p_rev:.4f}")
 
     if args.json is not None:
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps({
-            "run": str(args.run), "steps": args.steps, "cos": observed, "reliability_0": rel0, "reliability_1": rel1,
-            "cos_disattenuated": corrected, "p_permutation": p, "p_permutation_reverse": p_rev,
-            "null_mean": float(null.mean()), "null_sd": float(null.std()), "same_gap": same_gap,
-            "axis_norm_0": float(np.linalg.norm(axis0)), "axis_norm_1": float(np.linalg.norm(axis1)),
-            "drift_norm_0": float(np.linalg.norm(drift0)), "drift_norm_1": float(np.linalg.norm(drift1)),
-            "cos_drifts": cosine(drift0, drift1),
-        }, indent=1))
+        args.json.write_text(
+            json.dumps(
+                {
+                    "run": str(args.run),
+                    "steps": args.steps,
+                    "cos": observed,
+                    "reliability_0": rel0,
+                    "reliability_1": rel1,
+                    "cos_disattenuated": corrected,
+                    "p_permutation": p,
+                    "p_permutation_reverse": p_rev,
+                    "null_mean": float(null.mean()),
+                    "null_sd": float(null.std()),
+                    "same_gap": same_gap,
+                    "axis_norm_0": float(np.linalg.norm(axis0)),
+                    "axis_norm_1": float(np.linalg.norm(axis1)),
+                    "drift_norm_0": float(np.linalg.norm(drift0)),
+                    "drift_norm_1": float(np.linalg.norm(drift1)),
+                    "cos_drifts": cosine(drift0, drift1),
+                },
+                indent=1,
+            )
+        )
         print(f"\nwrote {args.json}")
 
 

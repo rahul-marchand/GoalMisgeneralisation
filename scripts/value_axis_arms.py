@@ -25,7 +25,9 @@ def main() -> None:
     parser.add_argument("--objective", type=int, nargs="+", default=[0, 1])
     args = parser.parse_args()
     for objective in args.objective:
-        arms = sweep_arms(objective, first_seed=1234 + 100 * objective)  # distinct seeds per sweep, so the two null arms differ
+        arms = sweep_arms(
+            objective, first_seed=1234 + 100 * objective
+        )  # distinct seeds per sweep, so the two null arms differ
         problems = check_no_preference_flip(BASE_VALUES, arms)
         if problems:
             raise SystemExit("\n".join(problems))

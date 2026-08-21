@@ -81,8 +81,18 @@ def load(base: str, sweep: str) -> dict:
 def series(ax, xs, ys, colour, label, marker, **kw):
     order = np.argsort(xs)
     ax.plot(
-        np.asarray(xs)[order], np.asarray(ys)[order], marker, color=colour, ms=4.2, lw=1.6, ls="-",
-        mec=SURFACE, mew=0.7, zorder=3, label=label, **kw,
+        np.asarray(xs)[order],
+        np.asarray(ys)[order],
+        marker,
+        color=colour,
+        ms=4.2,
+        lw=1.6,
+        ls="-",
+        mec=SURFACE,
+        mew=0.7,
+        zorder=3,
+        label=label,
+        **kw,
     )
 
 
@@ -92,19 +102,31 @@ def beyond_grid(ax, xs, ys, colour, label):
     for x, y in sorted(zip(xs, ys)):
         shown = min(max(y, Y_LIM[0] + 0.8), Y_LIM[1] - 0.8)
         ax.plot(
-            [x], [shown], "s", color=colour, mfc=SURFACE, ms=5.0, mew=1.4, zorder=4,
+            [x],
+            [shown],
+            "s",
+            color=colour,
+            mfc=SURFACE,
+            ms=5.0,
+            mew=1.4,
+            zorder=4,
             label=label if first else None,
         )
         first = False
         if shown != y:
             ax.annotate(
-                f"{y:.0f}" + (" ↑" if y > shown else " ↓"), xy=(x, shown), xytext=(0, 7 if y > shown else -12),
-                textcoords="offset points", ha="center", color=colour, fontsize=7.5,
+                f"{y:.0f}" + (" ↑" if y > shown else " ↓"),
+                xy=(x, shown),
+                xytext=(0, 7 if y > shown else -12),
+                textcoords="offset points",
+                ha="center",
+                color=colour,
+                fontsize=7.5,
             )
 
 
 def main() -> None:
-    bases = sorted({p.name[len("value_axis."):-len(".o0.json")] for p in DATA.glob("value_axis.*.json")})
+    bases = sorted({p.name[len("value_axis.") : -len(".o0.json")] for p in DATA.glob("value_axis.*.json")})
     fig, axes = plt.subplots(len(bases), 2, figsize=(10.5, 3.4 * len(bases)), squeeze=False)
 
     for row, base in enumerate(bases):
@@ -125,16 +147,25 @@ def main() -> None:
             ax.plot(grid, opt, color=MUTED, lw=1.1, ls="--", zorder=1)
             peak = int(np.argmax(opt)) if swept == 0 else int(np.argmin(grid))
             ax.annotate(
-                "expert", xy=(grid[peak], opt[peak]), xytext=(8, -10), textcoords="offset points",
-                color=MUTED, fontsize=8,
+                "expert",
+                xy=(grid[peak], opt[peak]),
+                xytext=(8, -10),
+                textcoords="offset points",
+                color=MUTED,
+                fontsize=8,
             )
             ax.axhline(0, color=INK2, lw=0.8, alpha=0.45, zorder=1)
             ax.axhline(d["behaviour"]["base"]["indifference"], color=MUTED, lw=0.7, ls=":", zorder=0)
 
-            series(ax, values, [arms[o]["arm"]["indifference"] for o in arms], BLUE,
-                   "trained: one fine-tune per value", "o")
-            series(ax, values, [arms[o]["written"]["indifference"] for o in arms], ORANGE,
-                   "the axis, written (that value held out)", "s")
+            series(ax, values, [arms[o]["arm"]["indifference"] for o in arms], BLUE, "trained: one fine-tune per value", "o")
+            series(
+                ax,
+                values,
+                [arms[o]["written"]["indifference"] for o in arms],
+                ORANGE,
+                "the axis, written (that value held out)",
+                "s",
+            )
 
             controls = d["behaviour"]["controls"]
             extra = {k: v for k, v in controls.items() if k.startswith("extrapolate_")}
@@ -157,7 +188,9 @@ def main() -> None:
     axes[0][0].legend(handles, labels, loc="upper left", fontsize=8.5)
     fig.suptitle(
         "Route model (imitation, values hidden): the exchange rate each arm learnt, and the one the axis writes",
-        color=INK, fontsize=10.5, y=0.995,
+        color=INK,
+        fontsize=10.5,
+        y=0.995,
     )
     fig.tight_layout()
     for ext in ("png", "pdf"):

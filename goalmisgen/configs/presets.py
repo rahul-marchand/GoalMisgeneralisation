@@ -217,9 +217,7 @@ def maze_transformer_large(**kwargs) -> Args:
     arm's exchange rate to mean anything.
     """
     out = maze_drc33(**kwargs)
-    out.net = TransformerSpec(
-        yang_init=False, norm=IdentityNorm(), normalize_input=False, d_model=128, n_layers=6, n_heads=8
-    )
+    out.net = TransformerSpec(yang_init=False, norm=IdentityNorm(), normalize_input=False, d_model=128, n_layers=6, n_heads=8)
     return out
 
 

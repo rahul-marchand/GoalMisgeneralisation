@@ -107,7 +107,9 @@ def fig_bc_rho_response() -> None:
         for ax, key in zip(axes, ("chose_optimal", "followed_feature_zero")):
             values = np.array([[a[key] for a in r["arms"]] for r in runs])
             mean, sd = values.mean(0), values.std(0, ddof=1) if len(values) > 1 else np.zeros(len(rhos))
-            ax.errorbar(rhos, mean, yerr=sd, color=colour, marker="o", ms=4, lw=1.4, capsize=2, label=f"trained at ρ={trained}")
+            ax.errorbar(
+                rhos, mean, yerr=sd, color=colour, marker="o", ms=4, lw=1.4, capsize=2, label=f"trained at ρ={trained}"
+            )
     for ax, title in zip(axes, ("chose the optimal objective", "went to colour 0")):
         ax.set_title(title)
         ax.set_xlabel("evaluation ρ")
@@ -143,12 +145,24 @@ def fig_bc_early_warning() -> None:
             ax.plot(steps, delta, color=BLUE, lw=1.2, marker="s", ms=2.5, alpha=0.75)
         ax.axhline(0, color=MUTED, lw=0.8)
         ax.set_xscale("log")
-        ax.set_title({"rho100": "trained at ρ=1.0", "rho050": "trained at ρ=0.5 (control)"}[condition] + f"  ({len(groups[condition])} seeds)")
+        ax.set_title(
+            {"rho100": "trained at ρ=1.0", "rho050": "trained at ρ=0.5 (control)"}[condition]
+            + f"  ({len(groups[condition])} seeds)"
+        )
         ax.set_xlabel("training step")
         ax.grid(True, axis="y")
     axes[0][0].set_ylabel("gap")
-    axes[0][0].text(0.02, 0.94, "behaviour: optimal@ρ=1 − optimal@ρ=0", color=ORANGE, transform=axes[0][0].transAxes, fontsize=8)
-    axes[0][0].text(0.02, 0.87, "probe: AUC(colour-0 route) − AUC(optimal route) at ρ=0", color=BLUE, transform=axes[0][0].transAxes, fontsize=8)
+    axes[0][0].text(
+        0.02, 0.94, "behaviour: optimal@ρ=1 − optimal@ρ=0", color=ORANGE, transform=axes[0][0].transAxes, fontsize=8
+    )
+    axes[0][0].text(
+        0.02,
+        0.87,
+        "probe: AUC(colour-0 route) − AUC(optimal route) at ρ=0",
+        color=BLUE,
+        transform=axes[0][0].transAxes,
+        fontsize=8,
+    )
     save(fig, "fig_bc_early_warning")
 
 
@@ -178,12 +192,26 @@ def fig_bc_value_axis() -> None:
             written = np.array([arms[key]["written"]["indifference"] for key in keys])
             if k == 0:
                 ax.plot(offsets, expected, color=MUTED, lw=1.0, ls=":", label="expert")
-            ax.plot(offsets, fine, color=ORANGE, marker="o", ms=3, lw=1.0, alpha=0.7, label="fine-tuned arm" if k == 0 else None)
-            ax.plot(offsets, written, color=BLUE, marker="s", ms=3, lw=1.0, alpha=0.7, label="written, arm held out" if k == 0 else None)
+            ax.plot(
+                offsets, fine, color=ORANGE, marker="o", ms=3, lw=1.0, alpha=0.7, label="fine-tuned arm" if k == 0 else None
+            )
+            ax.plot(
+                offsets,
+                written,
+                color=BLUE,
+                marker="s",
+                ms=3,
+                lw=1.0,
+                alpha=0.7,
+                label="written, arm held out" if k == 0 else None,
+            )
             base = payload["behaviour"].get("base", {}).get("indifference")
             if base is not None and np.isfinite(base):
                 ax.axhline(base, color=INK2, lw=0.6, ls="--", alpha=0.5)
-        ax.set_title({"o0": "colour 0's value moved", "o1": "colour 1's value moved"}.get(sweep, sweep) + f"  ({len(by_sweep[sweep])} seeds)")
+        ax.set_title(
+            {"o0": "colour 0's value moved", "o1": "colour 1's value moved"}.get(sweep, sweep)
+            + f"  ({len(by_sweep[sweep])} seeds)"
+        )
         ax.set_xlabel("offset from the base value")
         ax.grid(True, axis="y")
     axes[0][0].set_ylabel("exchange rate: extra steps walked for colour 0")

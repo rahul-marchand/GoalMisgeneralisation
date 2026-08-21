@@ -221,9 +221,7 @@ def collect_rollouts(
             probe_carry = carry
         else:
             probe_carry = policy.apply(probe_params, key, envs.observation_space.shape, method=policy.initialize_carry)
-            probe_carry, _, _, _, state = reader.step(
-                features_params, probe_carry, observations, starts, key, temperature=0.0
-            )
+            probe_carry, _, _, _, state = reader.step(features_params, probe_carry, observations, starts, key, temperature=0.0)
         # Applied *before* the extra passes, so probe_steps_to_think measures
         # how much of the displacement survives them. Steering the arithmetic is
         # easy; showing the shift outlives nine gated recurrent updates is what
@@ -235,9 +233,7 @@ def collect_rollouts(
             state = reader.state_of_carry(probe_carry)
 
         for _ in range(probe_steps_to_think):
-            probe_carry, _, _, _, state = reader.step(
-                features_params, probe_carry, observations, starts, key, temperature=0.0
-            )
+            probe_carry, _, _, _, state = reader.step(features_params, probe_carry, observations, starts, key, temperature=0.0)
 
         initial_obs = np.asarray(observations)
 

@@ -120,11 +120,11 @@ def main() -> None:
 
         b_level, b_at = arrival(bx, by)
         p_level, p_at = arrival(px, py)
-        first = "-" if np.isnan(b_at) or np.isnan(p_at) else ("probe" if p_at < b_at else "behaviour" if b_at < p_at else "same")
-        fmt = lambda v: "-" if v != v else f"{v / 1e6:.1f}M"  # noqa: E731
-        print(
-            f"{agent:>22}{len(blocks):>13}{b_level:>+15.3f}{fmt(b_at):>10}{p_level:>+11.3f}{fmt(p_at):>10}   {first}"
+        first = (
+            "-" if np.isnan(b_at) or np.isnan(p_at) else ("probe" if p_at < b_at else "behaviour" if b_at < p_at else "same")
         )
+        fmt = lambda v: "-" if v != v else f"{v / 1e6:.1f}M"  # noqa: E731
+        print(f"{agent:>22}{len(blocks):>13}{b_level:>+15.3f}{fmt(b_at):>10}{p_level:>+11.3f}{fmt(p_at):>10}   {first}")
     axes[0][0].set_ylabel("gap  (ρ=1.0 − ρ=0.0)")
     axes[0][0].legend(fontsize=7.5, loc="upper left")
     fig.tight_layout()

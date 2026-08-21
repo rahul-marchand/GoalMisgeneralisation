@@ -58,7 +58,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=1000, help="Arm budget, as in the arm directory names.")
     parser.add_argument("--demos", type=Path, required=True, help="Held-out demonstrations at the base values (test split).")
     parser.add_argument("--levels", type=int, default=2048)
-    parser.add_argument("--extrapolate", type=float, nargs="*", default=[0.6, -0.6, 0.9, -0.9], help="Offsets outside the grid to write with the full axis.")
+    parser.add_argument(
+        "--extrapolate",
+        type=float,
+        nargs="*",
+        default=[0.6, -0.6, 0.9, -0.9],
+        help="Offsets outside the grid to write with the full axis.",
+    )
     parser.add_argument("--random-draws", type=int, default=3)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--skip-behaviour", action="store_true")
@@ -73,7 +79,9 @@ def main() -> None:
 
     base = load_base(args.run)
     objective = int(args.sweep[-1])
-    print(f"base {args.run.name} @ step {base.step:,}; {base.flat.size:,} parameters; values {base.values}; values {'hidden' if base.hide_values else 'shown'}")
+    print(
+        f"base {args.run.name} @ step {base.step:,}; {base.flat.size:,} parameters; values {base.values}; values {'hidden' if base.hide_values else 'shown'}"
+    )
     arms = arm_dirs(args.run, args.sweep, args.steps)
     if not arms:
         sys.exit(f"no finished arms of sweep {args.sweep} at {args.steps} steps under {args.run / 'arms'}")
@@ -86,11 +94,20 @@ def main() -> None:
         sys.exit("need at least three arms away from the base before any of this means anything")
     axis, drift = fit_axis_and_drift(offsets, stacked)
     norms = np.array([np.linalg.norm(fitted[o]) for o in offsets])
-    print(f"sweep {args.sweep}: {len(offsets)} arms at offsets {offsets.min():+.2f}..{offsets.max():+.2f}" + (" + null arm" if null is not None else " (no null arm)"))
-    print(f"|delta theta| per arm  {norms.mean():.4g} +- {norms.std(ddof=1):.4g}  (min {norms.min():.4g}, max {norms.max():.4g})")
-    print(f"|drift| {np.linalg.norm(drift):.4g}   |axis| per unit value {np.linalg.norm(axis):.4g}   cos(drift, axis) {cosine(drift, axis):+.3f}")
+    print(
+        f"sweep {args.sweep}: {len(offsets)} arms at offsets {offsets.min():+.2f}..{offsets.max():+.2f}"
+        + (" + null arm" if null is not None else " (no null arm)")
+    )
+    print(
+        f"|delta theta| per arm  {norms.mean():.4g} +- {norms.std(ddof=1):.4g}  (min {norms.min():.4g}, max {norms.max():.4g})"
+    )
+    print(
+        f"|drift| {np.linalg.norm(drift):.4g}   |axis| per unit value {np.linalg.norm(axis):.4g}   cos(drift, axis) {cosine(drift, axis):+.3f}"
+    )
     if null is not None:
-        print(f"null arm |delta| {np.linalg.norm(null):.4g}, cos(null, drift) {cosine(null, drift):+.3f}, cos(null - drift, axis) {cosine(null - drift, axis):+.3f}")
+        print(
+            f"null arm |delta| {np.linalg.norm(null):.4g}, cos(null, drift) {cosine(null, drift):+.3f}, cos(null - drift, axis) {cosine(null - drift, axis):+.3f}"
+        )
 
     # --- collinear? ---------------------------------------------------------
     residual = {o: fitted[o] - drift for o in offsets}
@@ -104,7 +121,9 @@ def main() -> None:
     print(f"  {'':>28}{'same side':>12}{'opposite':>12}")
     print(f"  {'raw diffs':>28}{np.mean(same_raw):>+12.3f}{np.mean(opp_raw):>+12.3f}")
     print(f"  {'common component removed':>28}{np.mean(same_res):>+12.3f}{np.mean(opp_res):>+12.3f}")
-    print("  Raw positive everywhere = 'was fine-tuned'. With drift removed, same side should agree and opposite sides oppose.")
+    print(
+        "  Raw positive everywhere = 'was fine-tuned'. With drift removed, same side should agree and opposite sides oppose."
+    )
 
     # --- graded and predictive? --------------------------------------------
     print("\n=== graded and predictive? leave-one-out fit ===")
@@ -114,13 +133,25 @@ def main() -> None:
         others = [p for p in offsets if p != o]
         held_axis, held_drift = fit_axis_and_drift(np.array(others), np.stack([fitted[p] for p in others]))
         left = fitted[o] - held_drift
-        loo[o] = dict(axis=held_axis, drift=held_drift, r2=explained(left, o, held_axis), cos=cosine(left, held_axis), implied=projected_offset(left, held_axis))
-        print(f"  {o:>+8.2f}{np.linalg.norm(fitted[o]):>10.4g}{np.linalg.norm(residual[o]):>10.4g}{loo[o]['r2']:>13.3f}{loo[o]['cos']:>+14.3f}{loo[o]['implied']:>+10.2f}")
+        loo[o] = dict(
+            axis=held_axis,
+            drift=held_drift,
+            r2=explained(left, o, held_axis),
+            cos=cosine(left, held_axis),
+            implied=projected_offset(left, held_axis),
+        )
+        print(
+            f"  {o:>+8.2f}{np.linalg.norm(fitted[o]):>10.4g}{np.linalg.norm(residual[o]):>10.4g}{loo[o]['r2']:>13.3f}{loo[o]['cos']:>+14.3f}{loo[o]['implied']:>+10.2f}"
+        )
     if null is not None:
-        print(f"  {'null':>8}{np.linalg.norm(null):>10.4g}{np.linalg.norm(null - drift):>10.4g}{'-':>13}{cosine(null - drift, axis):>+14.3f}{projected_offset(null - drift, axis):>+10.2f}")
+        print(
+            f"  {'null':>8}{np.linalg.norm(null):>10.4g}{np.linalg.norm(null - drift):>10.4g}{'-':>13}{cosine(null - drift, axis):>+14.3f}{projected_offset(null - drift, axis):>+10.2f}"
+        )
     implied = np.array([loo[o]["implied"] for o in offsets])
     slope = float(np.polyfit(offsets, implied, 1)[0])
-    print(f"  implied offset vs trained offset: correlation {np.corrcoef(offsets, implied)[0, 1]:+.3f}, slope {slope:.2f} (1 = the axis reads the offset back at scale)")
+    print(
+        f"  implied offset vs trained offset: correlation {np.corrcoef(offsets, implied)[0, 1]:+.3f}, slope {slope:.2f} (1 = the axis reads the offset back at scale)"
+    )
 
     # split-half reliability: two independent fits of the same axis
     halves = (offsets[0::2], offsets[1::2])
@@ -129,15 +160,24 @@ def main() -> None:
     print(f"  split-half reliability of the axis {reliability:+.3f}")
 
     out = {
-        "run": str(args.run), "sweep": args.sweep, "steps": args.steps, "base_step": base.step,
-        "parameters": int(base.flat.size), "offsets": offsets.tolist(),
-        "arm_norms": norms.tolist(), "drift_norm": float(np.linalg.norm(drift)), "axis_norm": float(np.linalg.norm(axis)),
+        "run": str(args.run),
+        "sweep": args.sweep,
+        "steps": args.steps,
+        "base_step": base.step,
+        "parameters": int(base.flat.size),
+        "offsets": offsets.tolist(),
+        "arm_norms": norms.tolist(),
+        "drift_norm": float(np.linalg.norm(drift)),
+        "axis_norm": float(np.linalg.norm(axis)),
         "cos_drift_axis": cosine(drift, axis),
         "null_norm": None if null is None else float(np.linalg.norm(null)),
-        "cos_same_raw": float(np.mean(same_raw)), "cos_opposite_raw": float(np.mean(opp_raw)),
-        "cos_same_residual": float(np.mean(same_res)), "cos_opposite_residual": float(np.mean(opp_res)),
+        "cos_same_raw": float(np.mean(same_raw)),
+        "cos_opposite_raw": float(np.mean(opp_raw)),
+        "cos_same_residual": float(np.mean(same_res)),
+        "cos_opposite_residual": float(np.mean(opp_res)),
         "loo": {f"{o:+.2f}": {k: float(v) for k, v in loo[o].items() if k in ("r2", "cos", "implied")} for o in offsets},
-        "implied_slope": slope, "reliability": reliability,
+        "implied_slope": slope,
+        "reliability": reliability,
         "behaviour": {},
     }
 
@@ -148,9 +188,12 @@ def main() -> None:
     # --- writable? -----------------------------------------------------------
     demos = DemoSet.load(args.demos, hide_values=base.hide_values)
     indices = np.arange(min(args.levels, len(demos)))
+
     def say(label, m, expected=None):
         e = "" if expected is None else f"{expected:>9.1f}"
-        print(f"  {label:<34}{m.indifference:>9.2f}{e:>9}{m.chose_optimal:>10.3f}{m.reached:>9.3f}{m.legal:>8.3f}{m.followed_f0:>8.3f}")
+        print(
+            f"  {label:<34}{m.indifference:>9.2f}{e:>9}{m.chose_optimal:>10.3f}{m.reached:>9.3f}{m.legal:>8.3f}{m.followed_f0:>8.3f}"
+        )
 
     print(f"\n=== writable? greedy decode on {len(indices)} held-out levels at the base values ===")
     print(f"  {'':<34}{'indiff.':>9}{'expert':>9}{'optimal':>10}{'reached':>9}{'legal':>8}{'f0':>8}")
@@ -163,7 +206,9 @@ def main() -> None:
         out["behaviour"]["null"] = null_m.as_row()
 
     print("\n  each offset: the arm itself | written from an axis fitted WITHOUT it (base + o*axis) | the same plus drift")
-    print(f"  {'offset':>8}{'expert':>8}{'arm':>8}{'written':>9}{'+drift':>9}{'| reach arm':>11}{'writ':>7}{'+drift':>7}{'| optimal arm':>13}{'writ':>7}{'+drift':>7}")
+    print(
+        f"  {'offset':>8}{'expert':>8}{'arm':>8}{'written':>9}{'+drift':>9}{'| reach arm':>11}{'writ':>7}{'+drift':>7}{'| optimal arm':>13}{'writ':>7}{'+drift':>7}"
+    )
     per_arm = {}
     errors, errors_drift = [], []
     for o in offsets:
@@ -171,7 +216,12 @@ def main() -> None:
         written_m = measure_flat(base, base.flat + o * loo[o]["axis"], demos, indices)
         with_drift_m = measure_flat(base, base.flat + loo[o]["drift"] + o * loo[o]["axis"], demos, indices)
         expected = expected_indifference(base.values, objective, float(o))
-        per_arm[f"{o:+.2f}"] = {"expected": expected, "arm": arm_m.as_row(), "written": written_m.as_row(), "written_with_drift": with_drift_m.as_row()}
+        per_arm[f"{o:+.2f}"] = {
+            "expected": expected,
+            "arm": arm_m.as_row(),
+            "written": written_m.as_row(),
+            "written_with_drift": with_drift_m.as_row(),
+        }
         errors.append(written_m.indifference - arm_m.indifference)
         errors_drift.append(with_drift_m.indifference - arm_m.indifference)
         print(
@@ -183,18 +233,31 @@ def main() -> None:
     errors, errors_drift = np.array(errors), np.array(errors_drift)
     arm_points = np.array([per_arm[f"{o:+.2f}"]["arm"]["indifference"] for o in offsets])
     finite = np.isfinite(errors) & np.isfinite(arm_points)
-    lo, hi = expected_indifference(base.values, objective, float(offsets.min())), expected_indifference(base.values, objective, float(offsets.max()))
-    print(f"\n  arms' exchange rates span {np.nanmin(arm_points):.1f}..{np.nanmax(arm_points):.1f} steps (expert {min(lo, hi):.1f}..{max(lo, hi):.1f})")
-    print(f"  leave-one-out write error, mean |written - arm|: {np.nanmean(np.abs(errors[finite])):.2f} steps (signed mean {np.nanmean(errors[finite]):+.2f}); with drift {np.nanmean(np.abs(errors_drift[finite])):.2f} ({np.nanmean(errors_drift[finite]):+.2f})")
+    lo, hi = (
+        expected_indifference(base.values, objective, float(offsets.min())),
+        expected_indifference(base.values, objective, float(offsets.max())),
+    )
+    print(
+        f"\n  arms' exchange rates span {np.nanmin(arm_points):.1f}..{np.nanmax(arm_points):.1f} steps (expert {min(lo, hi):.1f}..{max(lo, hi):.1f})"
+    )
+    print(
+        f"  leave-one-out write error, mean |written - arm|: {np.nanmean(np.abs(errors[finite])):.2f} steps (signed mean {np.nanmean(errors[finite]):+.2f}); with drift {np.nanmean(np.abs(errors_drift[finite])):.2f} ({np.nanmean(errors_drift[finite]):+.2f})"
+    )
     slope_arm = float(np.polyfit(offsets[finite], arm_points[finite], 1)[0])
     written_points = np.array([per_arm[f"{o:+.2f}"]["written"]["indifference"] for o in offsets])
     ok = np.isfinite(written_points)
     slope_written = float(np.polyfit(offsets[ok], written_points[ok], 1)[0]) if ok.sum() > 2 else float("nan")
     slope_expert = 20.0 if objective == 0 else -20.0
-    print(f"  slope of exchange rate vs offset: arms {slope_arm:+.1f}, written {slope_written:+.1f}, expert {slope_expert:+.1f} steps per unit value")
+    print(
+        f"  slope of exchange rate vs offset: arms {slope_arm:+.1f}, written {slope_written:+.1f}, expert {slope_expert:+.1f} steps per unit value"
+    )
     out["behaviour"]["loo_error_mean_abs"] = float(np.nanmean(np.abs(errors[finite])))
     out["behaviour"]["loo_error_mean_abs_with_drift"] = float(np.nanmean(np.abs(errors_drift[finite])))
-    out["behaviour"]["slope_arms"], out["behaviour"]["slope_written"], out["behaviour"]["slope_expert"] = slope_arm, slope_written, slope_expert
+    out["behaviour"]["slope_arms"], out["behaviour"]["slope_written"], out["behaviour"]["slope_expert"] = (
+        slope_arm,
+        slope_written,
+        slope_expert,
+    )
 
     print("\n  controls and extrapolation (full axis)")
     print(f"  {'':<34}{'indiff.':>9}{'expert':>9}{'optimal':>10}{'reached':>9}{'legal':>8}{'f0':>8}")

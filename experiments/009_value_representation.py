@@ -31,14 +31,13 @@ from __future__ import annotations
 
 import argparse
 import operator
-import subprocess
-import sys
 from pathlib import Path
 
 import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_rollouts, geometry, metrics
 from goalmisgen.analysis.probes import Feature, apply_linear, fit_ridge, layer_slice
 from goalmisgen.configs.env import MazeConfig
@@ -117,8 +116,7 @@ def score(train, test, seed: int = 0):
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     def env_config(seed: int, split: str) -> MazeConfig:
         settings: dict[str, object] = dict(

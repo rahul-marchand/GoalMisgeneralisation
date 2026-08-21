@@ -379,6 +379,6 @@ def test_info_reports_both_objectives_not_only_the_optimal_one():
         for index, objective in enumerate(env.level.objectives):
             assert info[f"feature_{objective.feature_id}_value"] == objective.value
             expected = -1 if distances[index] is None else distances[index]
-            assert info[f"feature_{objective.feature_id}_distance"] == expected, (
-                f"feature {objective.feature_id} distance disagrees with the solver"
-            )
+            assert (
+                info[f"feature_{objective.feature_id}_distance"] == expected
+            ), f"feature {objective.feature_id} distance disagrees with the solver"

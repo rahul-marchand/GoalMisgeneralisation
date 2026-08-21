@@ -31,14 +31,13 @@ from __future__ import annotations
 
 import argparse
 import operator
-import subprocess
-import sys
 from pathlib import Path
 
 import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_rollouts, geometry, metrics
 from goalmisgen.analysis.probes import Feature, apply_logistic, fit_logistic, layer_slice
 from goalmisgen.configs.env import MazeConfig
@@ -115,17 +114,14 @@ def score(train, test, seed: int = 0):
 
     episodes = np.arange(len(y_test))
     auc = metrics.roc_auc(y_test, predicted)
-    low, high = metrics.bootstrap_episodes(
-        lambda rows: metrics.roc_auc(y_test[rows], predicted[rows]), episodes, seed=seed
-    )
+    low, high = metrics.bootstrap_episodes(lambda rows: metrics.roc_auc(y_test[rows], predicted[rows]), episodes, seed=seed)
     accuracy = float(((predicted >= 0.5) == y_test).mean())
     return auc, (low, high), accuracy
 
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     def env_config(seed: int, split: str) -> MazeConfig:
         settings: dict[str, object] = dict(
@@ -171,7 +167,13 @@ def main() -> None:
     fit_untrained = rollouts(0, args.fit_episodes, args.fit_split, untrained)
     test_untrained = rollouts(9999, args.test_episodes, args.split, untrained)
 
-    taken = np.array([r.info.get("reached_feature_id") == args.feature for r in test_trained if r.info.get("reached_feature_id") is not None])
+    taken = np.array(
+        [
+            r.info.get("reached_feature_id") == args.feature
+            for r in test_trained
+            if r.info.get("reached_feature_id") is not None
+        ]
+    )
     print(f"\nfeature {args.feature} was taken in {taken.mean():.1%} of {len(taken)} decided episodes")
     print(f"reading {'the last layer only' if args.last_layer_only else 'all layers'}\n")
 

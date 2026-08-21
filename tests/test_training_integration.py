@@ -274,9 +274,7 @@ def test_training_survives_an_evaluation_pass(tmp_path, n_objectives):
     # the sampler says so rather than looping; two extra cells per extra
     # objective is enough to keep the fixture fast.
     size = 5 + 2 * (n_objectives - 2)
-    base = MazeConfig(
-        max_episode_steps=30, min_size=size, max_size=size, n_objectives=n_objectives, objective_values=values
-    )
+    base = MazeConfig(max_episode_steps=30, min_size=size, max_size=size, n_objectives=n_objectives, objective_values=values)
     LevelDataset.generate(base.live_sampler(), n_levels=200, seed=0, block_size=100).save(tmp_path / "levels")
 
     args = maze_smoke_test()

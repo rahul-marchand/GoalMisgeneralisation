@@ -67,3 +67,82 @@ def test_the_agent_never_sees_a_value_channel():
     env = value_axis.finetune_config(args).train_env
     assert env.value_encoding == "none"
     assert env.colour_is_the_only_value_cue is True
+
+
+def test_the_value_channel_is_read_from_the_base_not_assumed(tmp_path) -> None:
+    """013 was written for novalue11 and hardcoded hide_values=True, so
+    fine-tuning maze11 -- which has a value channel -- built a four-channel
+    network against five-channel weights and died on a shape error."""
+    import json
+
+    novalue = tmp_path / "novalue"
+    novalue.mkdir()
+    (novalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"colour_is_the_only_value_cue": True}}}))
+    withvalue = tmp_path / "withvalue"
+    withvalue.mkdir()
+    (withvalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"colour_is_the_only_value_cue": False}}}))
+
+    assert value_axis.base_hides_values(novalue) is True
+    assert value_axis.base_hides_values(withvalue) is False
+
+
+def test_an_unreadable_base_config_keeps_the_old_behaviour(tmp_path) -> None:
+    """Every existing sweep was on an agent without a value channel."""
+    assert value_axis.base_hides_values(tmp_path) is True
+
+
+def test_an_agent_recording_only_value_encoding_is_read_correctly(tmp_path) -> None:
+    """maze11's config has no colour_is_the_only_value_cue key at all, so a
+    lookup with a default silently returned the wrong answer. value_encoding is
+    recorded by every run and says directly whether there is a value channel."""
+    import json
+
+    withvalue = tmp_path / "withvalue"
+    withvalue.mkdir()
+    (withvalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"value_encoding": "at_objective"}}}))
+    novalue = tmp_path / "novalue"
+    novalue.mkdir()
+    (novalue / "cfg.json").write_text(json.dumps({"cfg": {"train_env": {"value_encoding": "none"}}}))
+
+    assert value_axis.base_hides_values(withvalue) is False
+    assert value_axis.base_hides_values(novalue) is True
+
+
+def test_the_network_is_read_from_the_base_not_assumed(tmp_path) -> None:
+    """013 built every arm with maze_drc33. For a ResNet or transformer base the
+    reset checkpoint would then pair DRC configuration with non-DRC weights.
+    The saved spec is used as is, so a non-default transformer keeps its size."""
+    import json
+
+    import farconf
+    from cleanba.convlstm import ConvLSTMConfig
+
+    from goalmisgen.configs.presets import maze_resnet, maze_transformer_large
+    from goalmisgen.nets.scaled import ScaledInputSpec
+    from goalmisgen.nets.transformer import TransformerSpec
+
+    for name, net in {
+        "resnet": maze_resnet().net,
+        "vitl": maze_transformer_large().net,
+        "drc": ConvLSTMConfig(),
+    }.items():
+        base = tmp_path / name
+        base.mkdir()
+        payload = {"cfg": {"net": farconf.to_dict(net), "train_env": {"value_encoding": "none"}}}
+        (base / "cfg.json").write_text(json.dumps(payload))
+        args = run([str(base), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
+        config = value_axis.finetune_config(args)
+        assert config.net == net, name
+        assert config.train_env.objective_values == (1.0, 0.7)
+        assert config.train_env.value_encoding == "none"
+    assert isinstance(maze_resnet().net, ScaledInputSpec)
+    assert isinstance(maze_transformer_large().net, TransformerSpec)
+    assert maze_transformer_large().net.d_model != TransformerSpec().d_model
+
+
+def test_an_unreadable_base_config_builds_the_drc(tmp_path) -> None:
+    from cleanba.convlstm import ConvLSTMConfig
+
+    assert value_axis.base_net(tmp_path) is None
+    args = run([str(tmp_path), "--value", "0.7", "--levels", "/tmp/levels", "--run-dir", "/tmp/run"])
+    assert isinstance(value_axis.finetune_config(args).net, ConvLSTMConfig)

@@ -1,9 +1,9 @@
 """Is each arm actually good at the task it was fine-tuned on?
 
     uv run python experiments/021_own_task.py \
-        --arms /workspace/data/threeobj2/runs --levels /workspace/data/threeobj2/levels \
-        --base /workspace/data/threeobj/runs/base/local-files/cp_70103040 \
-        --base-levels /workspace/data/threeobj/levels/base --base-values 1.0 0.65 0.3
+        --arms /workspace/data/runs/threeobj.even.s1234/arms --levels /workspace/data/levels/values \
+        --base /workspace/data/runs/threeobj.even.s1234/local-files/cp_70103040 \
+        --base-levels /workspace/data/levels/values/1.00-0.65-0.30@1M --base-values 1.0 0.65 0.3
 
 Every three-objective grid so far produced three collinear axes, and the
 explanation on offer is that the base task admitted a one-parameter solution and
@@ -61,9 +61,6 @@ grids are a fact about the measurement rather than about the agent.
 from __future__ import annotations
 
 import argparse
-import re
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -71,8 +68,10 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import arm_trained_values
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,13 +90,7 @@ def parse_args() -> argparse.Namespace:
 
 def values_of(tag: str, base: tuple[float, ...]) -> tuple[float, ...] | None:
     """The value triple an arm trained at, from its directory name."""
-    if (single := re.fullmatch(r"o(\d)_(\d{3})", tag)) is not None:
-        values = list(base)
-        values[int(single.group(1))] = int(single.group(2)) / 100
-        return tuple(values)
-    if re.fullmatch(r"m(?:_\d{3}){%d}" % len(base), tag) is not None:
-        return tuple(int(part) / 100 for part in tag.split("_")[1:])
-    return None
+    return arm_trained_values(tag, base)
 
 
 def asymmetry(values: tuple[float, ...]) -> float:
@@ -130,7 +123,9 @@ def evaluate(checkpoint: Path, levels: str, values: tuple[float, ...], args) -> 
     policy, _, _, state, _ = load_train_state(checkpoint, env_cfg=config)
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     envs = config.make()
-    carry = policy.apply(state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+    carry = policy.apply(
+        state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+    )
     holder = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
     def act(observations, starts):
@@ -146,8 +141,7 @@ def evaluate(checkpoint: Path, levels: str, values: tuple[float, ...], args) -> 
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     base_values = tuple(args.base_values)
     print(f"  {'arm':>16}{'values':>24}{'asymmetry':>11}{'optimal':>10}{'reached':>10}")

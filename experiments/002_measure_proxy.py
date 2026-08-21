@@ -1,6 +1,6 @@
 """Measure *which* objective a trained agent chooses, at several correlations.
 
-    uv run python experiments/002_measure_proxy.py /workspace/data/runs/maze11/local-files/cp_000150000000
+    uv run python experiments/002_measure_proxy.py /workspace/data/runs/maze11.s1234/local-files/cp_000150000000
 
 Evaluation returns show *that* an agent misgeneralises — a proxy-follower scores
 worse once colour stops predicting value. They cannot show *which* objective it

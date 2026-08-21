@@ -1,9 +1,9 @@
 """With three objectives, does the agent hold a value per objective?
 
     uv run python experiments/016_three_objective_values.py \
-        --base /workspace/data/threeobj/runs/base/local-files/cp_XXXXXXXX \
-        --arms /workspace/data/threeobj/runs \
-        --levels /workspace/data/threeobj/levels/base
+        --base /workspace/data/runs/threeobj.even.s1234/local-files/cp_XXXXXXXX \
+        --arms /workspace/data/runs/threeobj.even.s1234/arms \
+        --levels /workspace/data/levels/values/1.00-0.65-0.30@1M
 
 ``015`` could not decide between a value per objective and a single threshold on
 the distance gap, because with two objectives the choice turns on one difference
@@ -42,8 +42,6 @@ from __future__ import annotations
 
 import argparse
 import itertools
-import re
-import subprocess
 import sys
 from functools import partial
 from pathlib import Path
@@ -53,10 +51,12 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
-from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
+from goalmisgen import provenance
+from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import arm_trained_values
 
 BASE_VALUES = (1.0, 0.65, 0.3)
 """What the base agent was trained at. Overridden by --base-values, since the
@@ -109,15 +109,7 @@ def arm_values(name: str) -> tuple[float, ...] | None:
     the analysis honest if a grid is edited: a table here could drift out of
     step with what was actually run, a directory name cannot.
     """
-    if (single := re.fullmatch(r"o(\d)_(\d{3})", name)) is not None:
-        index, value = int(single.group(1)), int(single.group(2)) / 100
-        values = list(BASE_VALUES)
-        values[index] = value
-        return tuple(values)
-    if (mixed := re.fullmatch(r"m(?:_(\d{3})){3}", name)) is not None:
-        del mixed
-        return tuple(int(part) / 100 for part in name.split("_")[1:])
-    return None
+    return arm_trained_values(name, BASE_VALUES)
 
 
 def load_arms(root: Path, at: int, base_flat, config) -> dict[str, tuple[tuple[float, ...], np.ndarray]]:
@@ -159,8 +151,7 @@ def measure(params, policy, get_action, envs, args, label: str) -> float:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = eval_config(args)
     policy, _, _, base_state, _ = load_train_state(args.base, env_cfg=config)
@@ -208,7 +199,9 @@ def main() -> None:
 
     print("\n\n=== how much of each axis is signal? ===\n")
     for index in range(3):
-        print(f"  objective {index}: |axis| {np.linalg.norm(axes[index]):>9.4g}   split-half reliability {reliability.get(index, float('nan')):+.3f}")
+        print(
+            f"  objective {index}: |axis| {np.linalg.norm(axes[index]):>9.4g}   split-half reliability {reliability.get(index, float('nan')):+.3f}"
+        )
     print(
         "\n  Two disjoint symmetric pairs of arms give two estimates of the same axis.\n"
         "  Everything below is attenuated by whatever this falls short of 1."
@@ -227,7 +220,9 @@ def main() -> None:
         floor = full.get(i, float("nan")) * full.get(j, float("nan"))
         corrected = raw / np.sqrt(floor) if floor > 0 else float("nan")
         flag = "  <- too noisy to read" if min(full.get(i, 0), full.get(j, 0)) < 0.1 else ""
-        print(f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}   {full.get(i, float('nan')):.3f}, {full.get(j, float('nan')):.3f}{flag}")
+        print(
+            f"  {f'{i} vs {j}':>10}{raw:>10.3f}{corrected:>12.3f}   {full.get(i, float('nan')):.3f}, {full.get(j, float('nan')):.3f}{flag}"
+        )
     print(
         "\n  One shared knob puts every pair at -1; a representation holding only the\n"
         "  differences puts them at -0.5, since three symmetric vectors summing to zero\n"

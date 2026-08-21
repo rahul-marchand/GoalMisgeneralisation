@@ -58,8 +58,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -68,6 +66,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_rollouts, geometry, metrics, plans, steering
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import (
@@ -479,8 +478,7 @@ def switch_by_gap(records: list[dict], edges=(0.0, 0.15, 0.35, 0.75, 10.0)) -> l
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     fixed_values = args.feature_values
     if args.hide_values and fixed_values is None:
@@ -556,7 +554,7 @@ def main() -> None:
     typical = float(
         np.mean(
             [
-                np.linalg.norm(r.cell_state[:, :, : channels][geometry.free_cells(r.observation)], axis=-1).mean()
+                np.linalg.norm(r.cell_state[:, :, :channels][geometry.free_cells(r.observation)], axis=-1).mean()
                 for r in fit_rollouts[:256]
             ]
         )
@@ -591,8 +589,18 @@ def main() -> None:
 
     def run(arm: str, table: dict[int, np.ndarray], alpha: float) -> tuple[dict, list[dict]]:
         records = measure(
-            envs, policy, params, get_action, args.batches, args.seed, table, alpha * typical,
-            arm, fixed_values, channels, args.mode,
+            envs,
+            policy,
+            params,
+            get_action,
+            args.batches,
+            args.seed,
+            table,
+            alpha * typical,
+            arm,
+            fixed_values,
+            channels,
+            args.mode,
         )
         return summarise(records, seed=args.seed, mode=args.mode), records
 
@@ -666,11 +674,7 @@ def main() -> None:
                     switched, reached, other_switched, other_reached, seed=args.seed
                 )
                 against_self = f"{gap:>10.1%}" + f"{f'[{gap_low:+.3f},{gap_high:+.3f}]':>18}"
-            print(
-                f"{arm:>10}{entry['alpha']:>7.2f}{change:>13.1%}"
-                + f"{f'[{low:+.3f},{high:+.3f}]':>18}"
-                + against_self
-            )
+            print(f"{arm:>10}{entry['alpha']:>7.2f}{change:>13.1%}" + f"{f'[{low:+.3f},{high:+.3f}]':>18}" + against_self)
     print(
         "An interval excluding zero is a real shift. 'vs self' is the strongest form of the comparison:\n"
         "identical machinery, identical cells, identical norm, pointed the other way.\n\n"
@@ -714,13 +718,12 @@ def main() -> None:
             "that is followed regardless is overwriting the decision rather than entering it."
         )
 
-
     if args.json is not None:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(
             json.dumps(
                 {
-                    "commit": commit,
+                    "commit": provenance.commit(),
                     "mode": args.mode,
                     "checkpoint": str(args.checkpoint),
                     "update": update,

@@ -10,6 +10,12 @@
 # style, most specific first: the first match wins, so a single run can override
 # the group it belongs to.
 #
+# Patterns are matched most-specific-first and the FIRST match wins, so a
+# per-agent glob placed above a per-campaign one silently claims runs the
+# campaign note describes. That already happened: `runs/novalue11.s5678/arms/*`
+# took every 400k wide arm and labelled it "fourteen arms, 750k steps each".
+# `scripts/manifest.py` now warns when a path matches more than one entry.
+#
 # Add an entry when you launch something. `013 --note` and `001 --note` write the
 # same text onto the volume at launch, and that copy is the fallback when
 # nothing here matches.
@@ -24,7 +30,7 @@ readout of the raw observation already reaches 0.871 on seven free cells.
 """
 
 [[entry]]
-match = "runs/maze11"
+match = "runs/maze11.s1234"
 note = """
 11x11, rho=1.0, fixed values, value channel present, 150M steps. The first real
 agent. Colour perfectly predicts which objective is worth more, so the proxy is
@@ -32,7 +38,7 @@ available and the agent is free to take it.
 """
 
 [[entry]]
-match = "runs/clean11fv"
+match = "runs/clean11fv.s1234"
 note = """
 11x11, rho=0.5, fixed values, 150M steps. The single-variable control for
 maze11: colour is uninformative, everything else identical, so the difference
@@ -40,7 +46,7 @@ between them is attributable to the correlation and nothing else.
 """
 
 [[entry]]
-match = "runs/clean11"
+match = "runs/clean11.s1234"
 note = """
 11x11, rho=0.5, values redrawn every episode, 130M steps. Randomised values give
 a probe something to correlate against, which the fixed-value runs cannot: with
@@ -48,7 +54,7 @@ constants there is no per-episode value to regress on.
 """
 
 [[entry]]
-match = "runs/novalue11"
+match = "runs/novalue11.s1234"
 note = """
 11x11, rho=1.0, no value channel at all — colour is the only cue to what an
 objective is worth, so the values are learned constants rather than inputs. The
@@ -58,7 +64,84 @@ episode for a probe to read.
 """
 
 [[entry]]
-match = "runs/novalue11_seed*"
+match = "runs/novalue11.s1234.to250M"
+note = """
+novalue11.s1234 carried from its 140.2M checkpoint to roughly 250M. Training
+performance had flattened long before this -- maze11's return over 125-150M is
++0.3579 against +0.3550 over 70-100M, a gain of +0.003 across 50M steps -- so
+this is not an attempt at a better agent. The question is whether the value axis
+keeps compiling after behaviour has stopped changing, which is the same claim as
+the early-warning experiment at the other end of training.
+
+Run at the fine-tune settings rather than the base run's: constant lr 1e-4,
+values unchanged at (1.0, 0.5). That makes it exactly a null arm taken to its
+limit -- same script, same rate, same values, 147x longer than a 750k arm -- so
+its drift is in the units every arm's drift is measured in.
+
+One thing it is not: the agent a 250M anneal would have produced. The original
+run annealed 4e-4 to 4e-6 over 150M and sat near 3e-5 at 140M, so the rate steps
+up here. That step is visible -- return fell from +0.3735 to a minimum of +0.2956
+before recovering to +0.3573, against the base run's ~+0.358. So 110M further
+steps at the fine-tune rate left training performance where it found it, which is
+the premise the experiment rests on.
+
+It is *not* a warm restart, contrary to what was assumed when it was launched.
+``save_train_state`` serialises the whole TrainState, so ``model`` carries
+``opt_state`` and not merely the parameters: the base checkpoint holds 87
+opt_state leaves, 60 of them non-zero, with step=219072. ``reset_checkpoint``
+copies that file byte for byte and resets only the two counters that would
+otherwise end the run before it began, and ``finetune_with_noop_head`` is False
+so the branch that rebuilds the optimiser never runs. Adam's moments were
+carried across. The learning rate is genuinely the constant 1e-4 that was asked
+for, confirmed against ``losses/learning_rate`` rather than assumed -- the
+restored hyperparameter is overwritten each update by ``inject_hyperparams``.
+"""
+
+[[entry]]
+match = "runs/novalue11.s1234.at*/arms/*@400k"
+note = """
+The base-checkpoint ladder: the value sweep run again from nine points in
+novalue11.s1234's own training -- 2M, 5M, 10M, 15M, 20M, 30M, 40M, 70M and the
+140.2M the agent finished at. Both objectives at every rung, 25 arms each at 400k
+steps, matching the 70M and 140M sweeps that already existed so the rungs are
+comparable.
+
+Phase 3 of the Preregistration asked one question of this -- whether the axis
+direction is settled well before training ends -- from two rungs. This asks two
+more that two rungs cannot answer. *When does the axis appear at all*, which
+needs rungs on both sides of competence at ~20M, hence the dense early ladder.
+And *is it one axis or two*, which needs both objectives at every rung rather
+than colour 1 alone: cos(axis_0, axis_1) near zero is two value registers and
+near -1 is one threshold on the difference, so the rung where that changes is
+where two axes became one, if they ever were two.
+
+Read with experiments/022_axis_ladder.py. The decisive column is --write: a rung
+has an axis when writing offset*axis into that rung's own weights moves the
+agent's exchange rate further than the measurement's uncertainty, with a
+norm-matched random direction of the same length moving nothing. Norms and
+cosines cannot separate an axis from a direction fitted to noise; the write can.
+
+Early rungs are confounded in the unhelpful direction and the analysis says so:
+below ~20M the base is still moving fast on its own, so a 400k arm at lr 1e-4 is
+partly continued training, and the drift is largest exactly where the axis is
+smallest. Every cosine is therefore read against a permutation null rather than
+against zero, which would have manufactured the trend being looked for.
+"""
+
+[[entry]]
+match = "runs/novalue11.s1234.at*"
+note = """
+A rung of the base-checkpoint ladder -- an agent view of one earlier checkpoint of
+novalue11.s1234, created by scripts/base_ladder.py. It owns nothing but a
+BASE.json and a symlink to the checkpoints it shares with the run it came from,
+so it costs no meaningful space; the arms beneath it are the experiment.
+
+Its BASE.json records the rung's own position in training rather than the parent
+run's total_timesteps, which is the number anything plotting a ladder wants.
+"""
+
+[[entry]]
+match = "runs/novalue11.s5678"
 note = """
 A second seed of novalue11, identical in every respect but the seed. Every
 value-axis result rests on one agent, so until this exists none of them can
@@ -68,7 +151,7 @@ one run cannot support. Compare at cp_140206080, which both runs save.
 """
 
 [[entry]]
-match = "threeobj_v2/*"
+match = "runs/threeobj.uneven.s1234/arms/*@750k"
 note = """
 The three-objective experiment on values (1.0, 0.55, 0.4), run on a separate
 pod. Gaps of 0.45 and 0.15 give thresholds of 9 and 3 steps against rank gaps of
@@ -86,7 +169,7 @@ reads them.
 """
 
 [[entry]]
-match = "valueaxis_s5678/runs/*"
+match = "runs/novalue11.s5678/arms/*@750k"
 note = """
 The whole two-objective value sweep repeated on a second, independently trained
 agent — both objectives, fourteen arms, 750k steps each. The point is which of
@@ -103,7 +186,7 @@ results/seed-comparison.txt.
 """
 
 [[entry]]
-match = "valueaxis/runs/v050"
+match = "runs/novalue11.s1234/arms/o1+000@3M"
 note = """
 The null arm of the colour-1 sweep: fine-tuned onto the value it already had.
 Whatever it moved is the cost of 585 updates rather than the value, and it is
@@ -113,7 +196,7 @@ extra steps, identical to the base.
 """
 
 [[entry]]
-match = "valueaxis/runs/v*"
+match = "runs/novalue11.s1234/arms/o1*@3M"
 note = """
 Colour 1's value swept 0.3 to 0.9 with colour 0 held at 1.0, 3M steps each from
 novalue11, identical in seed, rate and updates. Fits the value axis. Established
@@ -122,11 +205,11 @@ norm-matched random directions do nothing.
 """
 
 [[entry]]
-match = "valueaxis/runs/c100"
+match = "runs/novalue11.s1234/arms/o0+000@3M"
 note = "The null arm of the colour-0 sweep — same role as v050, at the other objective."
 
 [[entry]]
-match = "valueaxis/runs/c*"
+match = "runs/novalue11.s1234/arms/o0*@3M"
 note = """
 Colour 0's value swept 0.6 to 1.2 with colour 1 held at 0.5, covering the same
 gaps as the colour-1 sweep. Exists to separate a value from the gap between two
@@ -136,7 +219,7 @@ one shared knob rather than two registers.
 """
 
 [[entry]]
-match = "threeobj/runs/base"
+match = "runs/threeobj.even.s1234"
 note = """
 Three objectives worth (1.0, 0.65, 0.3), 11x11, no value channel, trained 80M
 steps. Three objectives because with two the choice turns on a single difference
@@ -156,7 +239,7 @@ better subject. See results/three-objective-gate.txt.
 """
 
 [[entry]]
-match = "threeobj/runs/m_*"
+match = "runs/threeobj.even.s1234/arms/m_*@1M"
 note = """
 Two of the three values moved at once, 1M steps. Held out of every fit: these
 are the composition test. If each objective's worth is held separately then
@@ -167,7 +250,7 @@ predicted at 83.0%.
 """
 
 [[entry]]
-match = "threeobj/runs/o*"
+match = "runs/threeobj.even.s1234/arms/o*@1M"
 note = """
 One objective's value moved at a time, offsets +/-0.1 and +/-0.2, 1M steps.
 Fits one axis per objective. Symmetric offsets on purpose: with them balanced
@@ -176,14 +259,14 @@ which is what produced a confident-looking null in the first two-objective grid.
 """
 
 [[entry]]
-match = "threeobj2/runs/m_*"
+match = "runs/threeobj.even.s1234/arms/m_*@3M"
 note = """
 The composition arms again at the wider offsets, plus one moving all three
 values at once. Held out of every fit, as before.
 """
 
 [[entry]]
-match = "threeobj2/runs/*"
+match = "runs/threeobj.even.s1234/arms/*@3M"
 note = """
 The three-objective grid rerun wide: same base agent, offsets doubled to +/-0.2
 and +/-0.4, arms tripled to 3M steps. The first grid answered composition
@@ -198,11 +281,11 @@ wider grid.
 """
 
 [[entry]]
-match = "levels11"
+match = "levels/values/1.00-0.50@1M"
 note = "The 1M-level dataset every 11x11 fixed-value agent trained on. Fingerprint d0e70f346ac4a46a."
 
 [[entry]]
-match = "levels11rv"
+match = "levels/randomised/levels11rv"
 note = "As levels11, with values redrawn per level. Used by clean11."
 
 [[entry]]
@@ -210,7 +293,7 @@ match = "archive/*"
 note = "Datasets generated before the 2026-08-04 fix; they do not load against current code."
 
 [[entry]]
-match = "valueaxis/levels/*"
+match = "levels/values/*@500k"
 note = """
 One dataset per point of the two-objective sweeps. Values are drawn at
 generation and stored per level, so sweeping them needs one dataset each.
@@ -220,15 +303,297 @@ split membership included, are byte-identical across the grid.
 """
 
 [[entry]]
-match = "threeobj/levels/base"
+match = "levels/values/1.00-0.65-0.30@1M"
 note = "1M levels at (1.0, 0.65, 0.3), for training the three-objective base agent."
 
 [[entry]]
-match = "threeobj*/levels/*"
+match = "levels/values/*-*-*@150k"
 note = """
 Arm datasets for the three-objective grids, 150k levels each. Far smaller than
 the base dataset because the arms are far shorter runs: 1M steps is about 100k
 episodes, so 140k training levels is already more than one apiece. Three
 objectives cost 1.75 ms a level against 0.42 for two, so 500k-level arms would
 have put nearly three hours of generation in front of the training run.
+"""
+
+[[entry]]
+match = "levels/values/*@400k"
+note = """
+Arm datasets for the three-objective grid rerun wide, 400k levels each because
+those arms are 3M steps rather than 1M. Same library, keyed by what the
+objectives pay and how many levels there are, so the size is part of the key:
+two datasets at the same values and different counts are not interchangeable,
+since split membership is stored in the dataset itself.
+"""
+
+[[entry]]
+match = "levels/values/1.00-0.55-0.40@1M"
+note = "1M levels at the uneven three-objective values, for training threeobj.uneven.s1234."
+
+[[entry]]
+match = "retired/*"
+note = """
+The pre-migration layout, set aside by `scripts/migrate_volume.py --retire` on
+2026-08-13 after every copy verified byte-identical (146/146). Nothing here is
+referenced by anything; it exists so the rename is reversible by a human who has
+looked at what is in it. Delete it once the analysis has run against the new
+layout, which frees about half the volume.
+"""
+
+[[entry]]
+match = "runs/*/arms/*@400k"
+note = """
+The wide value grid, 25 arms an objective at offsets spanning +/-0.45 with most
+of them in a tight band at the extremes. Leverage 3.05 against the first grid's
+0.28, because the axis is a fitted slope and its precision goes as the spread of
+the offsets, not their number -- see goalmisgen/design.py.
+
+400k steps with eight checkpoints each, so every sweep carries its own
+arm-length curve and the read-out length is chosen when the axis is fitted
+rather than guessed beforehand. That mattered: reliability rose monotonically at
+every length measured, from 0.14 at 3M to 0.51 at 187k, and never turned over,
+so no length could be defended in advance.
+"""
+
+[[entry]]
+match = "runs/novalue11.s1234.at*"
+note = """
+A view of an earlier checkpoint of novalue11.s1234, so a grid can be fine-tuned
+from it: local-files is a symlink and only BASE.json is real. Asks whether the
+value axis is settled long before base training ends, which is what the 250M
+extension should have been gated on and was not.
+"""
+
+[[entry]]
+match = "runs/novalue11.s9012"
+note = """
+A third seed of novalue11, identical but for the seed. Two seeds cannot put an
+interval on anything, so this is the smallest number that lets "DRC agents
+trained this way do X" be said at all. Predictions for it were registered in
+Preregistration.md before it was trained, including two expected to fail: its
+indifference point should match neither existing seed, and its channel
+localisation should overlap theirs at chance.
+"""
+
+[[entry]]
+match = "runs/threeobj.uneven.s*"
+note = """
+Further seeds of the uneven three-objective task (1.0, 0.55, 0.4), testing out
+of sample a hierarchical account that was fitted to one agent after seeing its
+numbers. The registered prediction is cos(axis_1, axis_2) = 0.53 +/- 0.12 with
+12-22% of the variance in the second dimension. Sign alone separates it from
+every rival: absolute value registers predict ~0, difference-only axes -0.5, one
+shared knob -1, and only the hierarchical account predicts a positive cosine.
+
+Swept at the original grid rather than the current default -- +/-0.2 and +/-0.4,
+and +/-0.15 and +/-0.3 for objective 2 -- because a replication has to use the
+design it is replicating. Those offsets cross rank boundaries deliberately.
+"""
+
+[[entry]]
+match = "runs/maze11.s1234/arms/*"
+note = """
+Abandoned. This was to be the value grid on an agent that has a value channel,
+as a control against novalue11 which does not, but fine-tuning a value-channel
+agent is not a question this project wants to spend on. Any partial arms here
+were deleted; the directory should not exist. See the 2026-08-16 amendment in
+Preregistration.md.
+"""
+
+
+[[entry]]
+match = "runs/resnet11.s1234"
+note = """
+maze11 with the network swapped: cleanba's GuezResNet (nine 32-channel 3x3
+stages, no state between steps; input rescaled by 255 through
+goalmisgen.nets.scaled, see runs/resnet11.s1234.unscaled-dead) in place of the
+DRC(3,3), everything else the DRC's to the last hyperparameter. 11x11, rho=1.0, fixed values (1.0, 0.5),
+value channel present, same 1M-level dataset. Asks whether competence, the
+misgeneralisation gap, the t=0 plan probe and "proxy after competence" are the
+task's or the DRC's. Stream arch-swap, 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/resnet11clean.s1234"
+note = """
+clean11fv with the network swapped for the ResNet: rho=0.5, colour uninformative.
+The single-variable control for resnet11, as clean11fv is for maze11.
+"""
+
+[[entry]]
+match = "runs/vit11.s1234"
+note = """
+maze11 with the network swapped for a ViT-style transformer of ours
+(goalmisgen.nets.transformer: one token per cell, learned 2-D position
+embedding, 4 pre-LN blocks, d_model 64, 4 heads, same flattened Dense(256)
+readout as the DRC and the ResNet; input rescaled by 255 to undo cleanba's
+uint8 division, see the module docstring). rho=1.0, otherwise maze11.
+"""
+
+[[entry]]
+match = "runs/vit11clean.s1234"
+note = """
+clean11fv with the network swapped for the transformer: rho=0.5. The
+single-variable control for vit11.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234"
+note = """
+novalue11 with the network swapped for the rescaled GuezResNet (the resnet11
+net): 11x11, rho=1.0, values (1.0, 0.5), no value channel, colour the only
+value cue, the same 1M-level dataset, 150M steps. The hidden-value base for
+the ResNet value-axis sweeps (013/014/015 under arms/), which ask whether the
+value axis, its writability and cos(axis_0, axis_1) = -1 are the task's or the
+DRC's. Stream arch-swap, redirect 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234"
+note = """
+novalue11 with the network swapped for the vit11 transformer (4 layers,
+d_model 64, 4 heads), 250M steps instead of 150M: vit11 was still climbing at
+150M with the value channel present (82% chose_optimal against 92-96% for the
+DRC and ResNet), and the pipeline has to fit ~9 h on one 4090. The larger
+maze_transformer_large (6 layers, d_model 128, 8 heads) was launched first and
+ran at ~3.4k SPS against this net's ~12.4k on the same card, which would have
+put 200M steps at 16 h; it was stopped before its first checkpoint
+(logs/arch-swap/train-vit11novalue.s1234.vitl300M-aborted.log) and this run
+took its name. A converged small transformer over an unconverged large one.
+Hidden values, rho=1.0, values (1.0, 0.5), the same dataset. The base for the
+transformer value-axis sweeps. Stream arch-swap, redirect 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234-cp130M"
+note = """
+Not a training run: resnet11novalue.s1234's checkpoint cp_130191360 (130.2M
+steps) copied out with its own BASE.json, so the value-axis sweep driver can
+treat it as a base. resnet11novalue.s1234 collapsed between its 130M and 140M
+checkpoints (training return +0.35 -> -3.9, eval success 1.00 -> 0.04, and it
+never recovered; resnet11.s1234 with the value channel shows a milder dip at
+120M that it does recover from), and scripts/arch_swap_value_axis.sh took the
+final checkpoint cp_149995520 as the base, so the first ResNet sweep
+(runs/resnet11novalue.s1234/arms) fine-tuned a collapsed agent (reach 6%).
+cp_130191360 is the last healthy checkpoint: 002 at rho=1.0 gives 94.8%
+chose_optimal, 99.7% reached, the DRC novalue11's level. The sweeps under
+arms/ here are the ResNet value-axis result; the ones under
+runs/resnet11novalue.s1234/arms are kept as the record of what a sweep on a
+non-competent base looks like (|delta| ~0.1, no behaviour, cos +0.73 between
+two noise axes). Stream arch-swap, 2026-08-21.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234/arms/o*@400k"
+note = """
+The wide value grid fine-tuned from resnet11novalue.s1234's *collapsed* final
+checkpoint cp_149995520 (see runs/resnet11novalue.s1234-cp130M): the arms
+start from an agent that reaches 6% of objectives, so none of them learned a
+value (every arm's exchange rate sits inside the base's interval) and the
+014/015 numbers on them (results/arch-swap-value-axis-resnet11novalue.s1234-*)
+are fits to noise. 400k steps, 4 checkpoints, lr 1e-4, DRC hyperparameters.
+Superseded by runs/resnet11novalue.s1234-cp130M/arms.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234-cp130M/arms/o*@400k"
+note = """
+The ResNet value-axis sweeps proper: the wide grid (25 arms an objective,
+o0 and o1) from the pre-collapse ResNet base, 400k steps and 4 checkpoints an
+arm, 013 with the DRC fine-tune hyperparameters (lr 1e-4 constant) and the
+base's own net spec. Analysed by 014/015 into
+results/arch-swap-value-axis-resnet11novalue.s1234-cp130M-*. Stream arch-swap.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234/arms/o*@400k"
+note = """
+The transformer value-axis sweeps: the wide grid (25 arms an objective, o0
+and o1) from vit11novalue.s1234 at 250M, 400k steps and 4 checkpoints an arm,
+013 with the DRC fine-tune hyperparameters and the base's own TransformerSpec.
+Analysed by 014/015 into results/arch-swap-value-axis-vit11novalue.s1234-*.
+The base reaches 86% of objectives and chooses the better one 79% of the time
+at rho=1.0 (DRC novalue11: 100% / ~95%), so its exchange rates span a
+compressed range (1.1-5.4 steps against the DRC's 1.1-15 on the same grid).
+Stream arch-swap.
+"""
+
+[[entry]]
+match = "runs/resnet11.s1234.unscaled-dead"
+note = """
+The first resnet11 launch, stopped at ~30M steps: cleanba's GuezResNet on the
+raw 1/255-scaled observations. Entropy stayed at ln 4 and the value loss at
+its initial level from 2M to 30M steps while the DRC took off at 15M and the
+transformer at 12M, so the network never learned anything. Kept for its
+metrics.csv as the evidence behind goalmisgen.nets.scaled; the resnet11 that
+stands in the results is the relaunch with the input rescaled by 255.
+"""
+
+[[entry]]
+match = "offline/demos/arms/*"
+note = """
+Demonstrations for the offline value-axis arms: the solver's optimal route at
+*shifted* values, from the DRC campaign's own level grids
+(`levels/values/<v0>-<v1>@150k`, first 50k train levels and 2048 test levels),
+colours at rho=1.0. `1.45-0.50.train.rho100` teaches colour 0 is worth 1.45;
+the richer objective is walked further for. `scripts/value_axis_arms.py` lists
+the grid (goalmisgen.design.sweep_arms, 25 arms per objective incl. the null
+arm at 1.00-0.50); `scripts/offline_value_axis_pod.sh armdemos` built them.
+"""
+
+[[entry]]
+match = "offline/runs/bcnv11.s*/arms/*"
+note = """
+Value-axis arms of the hidden-value route model: the base (`offline/runs/bcnv11.s<seed>`,
+last checkpoint) fine-tuned for a fixed short budget (1000 steps, batch 256,
+constant lr 1e-4 after 50 warmup; the budget is in the name, `o0+045@1k`) on
+`offline/demos/arms/<values>.train.rho100`, values still hidden, so the only way
+to move what an objective is worth is to move weights. `o0` moves colour 0's
+value, `o1` colour 1's; the null arm (`+000`) is the same budget at the base
+values and measures drift. Evaluated at the base values (test.rho100) and its
+own. The imitation twin of `runs/novalue11.s*/arms/*` (Experiment 2):
+`experiments/027_bc_value_axis.py` fits `dtheta = drift + offset*axis` across
+them, `028` compares the two sweeps' axes. `scripts/offline_value_axis_chain.sh`.
+"""
+
+[[entry]]
+match = "offline/runs/bcnv11.s*"
+note = """
+Hidden-value bases for the offline value-axis campaign: the bc11.rho100 recipe
+(prefix-LM, 4 layers, width 128, 30k steps on `offline/demos/train.rho100`) with
+the value channel dropped from the observation, so (1.0, 0.5) are learned
+constants - the BC twin of `runs/novalue11.s*`. Three seeds; each is the base
+of a 50-arm fine-tune grid under `arms/`. `experiments/023_train_bc.py --hide-values`.
+"""
+
+[[entry]]
+match = "offline/demos/*"
+note = """
+Expert demonstrations for the offline-BC stream: the solver's optimal route on
+every level of one split of `levels/values/1.00-0.50@1M`, with colours assigned
+at the correlation in the name (`train.rho100` = train split at rho=1.0). The
+same split at several correlations is paired level for level -- only the
+colours differ. `train.*` feed the route models; `valid.*` are decoded at every
+checkpoint; `test.*` are held for the final tables. Built by
+`scripts/generate_demos.py`; `meta.json` records the source fingerprint.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho100.s*"
+note = """
+The LLM-shaped twin of maze11: a small prefix-LM transformer (4 layers, width
+128) trained by next-token prediction on `offline/demos/train.rho100`, where
+colour 0 always marks the richer objective. Nothing in the loss knows about
+reward; the correlation lives in the demonstrations. Three seeds, because the
+runs are cheap and the claim is about the training recipe, not one network.
+Checkpoints are log-spaced from step 0 so the early-warning sweep has the
+pre-competence window. `experiments/023_train_bc.py`.
+"""
+
+[[entry]]
+match = "offline/runs/bc11.rho050.s*"
+note = """
+The single-variable control for the bc11.rho100 runs, trained on
+`offline/demos/train.rho050` where colour carries nothing. Same levels, same
+routes, same model, same seeds; only the colours differ.
 """

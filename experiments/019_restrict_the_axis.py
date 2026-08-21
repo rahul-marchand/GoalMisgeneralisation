@@ -1,9 +1,9 @@
 """Keep only the channels that carry the axis, and see what still works.
 
     uv run python experiments/019_restrict_the_axis.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs --prefix v --base-value 0.5 \
-        --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms --prefix v --base-value 0.5 \
+        --levels /workspace/data/levels/values/1.00-0.50@500k --objective-values 1.0 0.5
 
 ``018`` found the axis enriched about twice over in a couple of hidden channels
 of each recurrent layer. This asks what happens if the rest is thrown away.
@@ -33,8 +33,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -43,10 +41,12 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.weights import fit_axis_and_drift, projected_offset
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import parse_arm_dirname, sweep_index
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,8 +107,7 @@ def channel_masks(shapes: dict[str, tuple], keep: dict[int, np.ndarray], encoder
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = MazeConfig(
         max_episode_steps=120,
@@ -134,13 +133,14 @@ def main() -> None:
 
     offsets, stack = [], []
     for run in sorted(args.arms.iterdir()):
-        match = re.fullmatch(rf"{args.prefix}(\d{{3}})", run.name)
+        parsed = parse_arm_dirname(run.name)
+        match = parsed if parsed and parsed.sweep == f"o{sweep_index(args.prefix)}" else None
         if not match or not (run / "local-files").is_dir():
             continue
         checkpoints = sorted((run / "local-files").glob("cp_*"))
         if not checkpoints:
             continue
-        offset = int(match.group(1)) / 100 - args.base_value
+        offset = parsed.offset
         if abs(offset) < 1e-9:
             continue
         _, _, _, state, _ = load_train_state(checkpoints[args.at], env_cfg=config)
@@ -162,13 +162,14 @@ def main() -> None:
     if args.rank_from:
         other_offsets, other_stack = [], []
         for run in sorted(args.arms.iterdir()):
-            match = re.fullmatch(rf"{args.rank_from}(\d{{3}})", run.name)
+            parsed = parse_arm_dirname(run.name)
+            match = parsed if parsed and parsed.sweep == f"o{sweep_index(args.rank_from)}" else None
             if not match or not (run / "local-files").is_dir():
                 continue
             checkpoints = sorted((run / "local-files").glob("cp_*"))
             if not checkpoints:
                 continue
-            offset = int(match.group(1)) / 100 - (args.rank_base_value if args.rank_base_value is not None else args.base_value)
+            offset = parsed.offset
             if abs(offset) < 1e-9:
                 continue
             _, _, _, state, _ = load_train_state(checkpoints[args.at], env_cfg=config)
@@ -236,12 +237,14 @@ def main() -> None:
     if args.skip_behaviour:
         return
 
-    print(f"\n\n=== does writing only those channels still move behaviour? ===\n")
+    print("\n\n=== does writing only those channels still move behaviour? ===\n")
     envs = config.make()
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
 
     def measure(params, label):
-        carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+        carry = policy.apply(
+            params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+        )
         state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
         def act(observations, starts):

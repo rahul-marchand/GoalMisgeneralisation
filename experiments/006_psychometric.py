@@ -25,8 +25,6 @@ where it does it.
 from __future__ import annotations
 
 import argparse
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -34,6 +32,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, metrics
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.configs.env import MazeConfig
@@ -61,8 +60,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     settings: dict[str, object] = dict(
         max_episode_steps=120,
@@ -86,7 +84,9 @@ def main() -> None:
 
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
     envs = config.make()
-    carry = policy.apply(train_state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+    carry = policy.apply(
+        train_state.params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+    )
     state = {"carry": carry, "key": jax.random.PRNGKey(args.seed)}
 
     def act(observations, starts):

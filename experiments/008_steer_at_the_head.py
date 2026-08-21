@@ -36,8 +36,6 @@ from __future__ import annotations
 
 import argparse
 import operator
-import subprocess
-import sys
 from pathlib import Path
 
 import jax
@@ -45,6 +43,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, collect_rollouts, fields, geometry, steering, targets
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import Feature, apply_linear, fit_ridge, layer_slice
@@ -110,8 +109,7 @@ def _actor(module, hidden):
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     def env_config(seed: int, split: str) -> MazeConfig:
         settings: dict[str, object] = dict(
@@ -223,7 +221,6 @@ def main() -> None:
         logits, _ = policy.apply(params, hidden, method=_actor)
         return carry, jnp.argmax(logits, axis=1)
 
-
     def objective_mask(observations) -> np.ndarray:
         """Ones at the two objectives' cells, zero elsewhere.
 
@@ -234,14 +231,10 @@ def main() -> None:
         marks = obs[:, geometry.FIRST_FEATURE_CHANNEL : geometry.FIRST_FEATURE_CHANNEL + N_FEATURES]
         return (marks.max(axis=1) > 0.5).astype(np.float32)[..., None]
 
-
-
     def measure(direction, alpha: float):
-
         envs = env_config(args.seed, args.split).make()
         key = jax.random.PRNGKey(args.seed)
         state = {"carry": policy.apply(params, key, envs.observation_space.shape, method=policy.initialize_carry)}
-
 
         depth = len(contrast.delta)
         delta = jnp.zeros(depth) if direction is None or alpha == 0 else jnp.asarray(direction.scaled(alpha))

@@ -1,9 +1,9 @@
 """Is the knob a value, or the gap between two values?
 
     uv run python experiments/015_value_or_gap.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs \
-        --levels /workspace/data/valueaxis/levels/v050
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms \
+        --levels /workspace/data/levels/values/1.00-0.50@500k
 
 ``014`` found a direction that sets the agent's exchange rate, and showed it
 writes values it was never fitted on. That is weaker than it sounds, because on
@@ -41,10 +41,20 @@ Two traps, one of which this script fell into.
 
 **Attenuation.** Both axes are fitted from diffs that are mostly movement with no
 behavioural effect, so each is a noisy estimate of its own direction and the
-cosine between them is pulled toward zero whichever hypothesis holds. Split-half
-reliability measures that and is reported beside the cosine. At the reliabilities
-this grid achieves — around 0.15 — the correction multiplies by nearly seven, so
-it bounds the answer rather than giving it.
+cosine between them is pulled toward zero whichever hypothesis holds. Dividing by
+split-half reliability corrects for that in principle; in practice it multiplied
+by nearly seven on this grid, and in ``results/three-objective.txt`` it returned
+cosines outside the range a cosine can take, which is a correction announcing
+that it has broken down.
+
+So the headline test is a **permutation null** instead. Shuffling which offset
+belongs to which diff destroys the association between value and direction while
+leaving untouched the large common component every arm carries — the cost of
+running the updates, which the null arm measures directly. What comes back is the
+distribution of cosines these diffs can produce with no value signal in them,
+which is what the observed cosine has to beat. It assumes nothing about how the
+noise scales. The reliability correction is still printed, as a secondary
+reading.
 
 **``--cross`` does not discriminate.** It was added to settle the question
 causally and cannot. Raising colour 0 by ``d`` and lowering colour 1 by ``d``
@@ -58,8 +68,6 @@ a single scalar cannot express the problem.
 from __future__ import annotations
 
 import argparse
-import re
-import subprocess
 import sys
 from functools import partial
 from pathlib import Path
@@ -69,10 +77,12 @@ import numpy as np
 from cleanba.cleanba_impala import load_train_state
 from jax.flatten_util import ravel_pytree
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, metrics, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
-from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, projected_offset
+from goalmisgen.analysis.weights import cosine, fit_axis_and_drift, permutation_cosines, permutation_p_value
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import discover_arms, sweep_family, sweep_index
 
 COLOUR_ZERO_BASE = 1.0
 COLOUR_ONE_BASE = 0.5
@@ -82,13 +92,29 @@ COLOUR_ONE_BASE = 0.5
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base", type=Path, required=True)
-    parser.add_argument("--arms", type=Path, required=True, help="Holds both the vXXX and cXXX run directories.")
+    parser.add_argument(
+        "--arms", type=Path, required=True, help="An agent's arms/ directory, holding both objectives' sweeps."
+    )
     parser.add_argument("--levels", type=str, required=True, help="Levels at the base values; the test split is used.")
     parser.add_argument("--episodes", type=int, default=2048)
+    parser.add_argument(
+        "--resamples",
+        type=int,
+        default=2000,
+        help="Shuffles of the offsets against the diffs, building the null the observed "
+        "cosine is read against. The p-value cannot go below 1/(resamples+1).",
+    )
     parser.add_argument("--num-envs", type=int, default=64)
     parser.add_argument("--size", type=int, default=11)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--at", type=int, default=-1, help="Which checkpoint of each arm, in step order.")
+    parser.add_argument(
+        "--arm-steps",
+        type=int,
+        default=None,
+        help="Which sweep to read when the agent has been swept at more than one arm "
+        "length, e.g. 750000. Arms of different lengths are not comparable.",
+    )
     parser.add_argument("--skip-behaviour", action="store_true")
     parser.add_argument(
         "--cross",
@@ -117,30 +143,28 @@ def eval_config(args: argparse.Namespace) -> MazeConfig:
     )
 
 
-def arm_checkpoints(root: Path, prefix: str, at: int) -> dict[float, Path]:
-    """The chosen checkpoint of every ``<prefix>XXX`` run directory."""
-    found: dict[float, Path] = {}
-    for run in sorted(root.iterdir()):
-        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
-        if not match or not (run / "local-files").is_dir():
-            continue
-        checkpoints = sorted((run / "local-files").glob("cp_*"))
-        if checkpoints:
-            try:
-                found[int(match.group(1)) / 100] = checkpoints[at]
-            except IndexError:
-                print(f"  {run.name}: no checkpoint at index {at}, skipping")
-    return found
+def arm_checkpoints(root: Path, prefix: str, at: int, base_value: float, steps: int | None) -> dict[float, Path]:
+    """The chosen checkpoint of every arm in one sweep, keyed by the value it trained at.
+
+    ``steps`` picks which sweep is meant when an agent has been swept more than
+    once at different arm lengths, which are not comparable and which
+    ``discover_arms`` refuses to mix silently.
+    """
+    return discover_arms(root, sweep_index(prefix), base_value, steps=steps, at=at, family=sweep_family(prefix))
 
 
-def load_sweep(root: Path, prefix: str, at: int, base_value: float, base_flat, config) -> dict[float, np.ndarray]:
+def load_sweep(
+    root: Path, prefix: str, at: int, base_value: float, base_flat, config, steps: int | None = None
+) -> dict[float, np.ndarray]:
     """Weight diffs for one sweep, keyed by the value the arm was trained at."""
     diffs: dict[float, np.ndarray] = {}
-    for value, checkpoint in sorted(arm_checkpoints(root, prefix, at).items()):
+    for value, checkpoint in sorted(arm_checkpoints(root, prefix, at, base_value, steps).items()):
         _, _, _, state, _ = load_train_state(checkpoint, env_cfg=config)
         flat, _ = ravel_pytree(state.params)
         diffs[value] = np.asarray(flat - base_flat, dtype=np.float64)
-        print(f"  {prefix}{int(round(value * 100)):03d}  value {value:.2f}  offset {value - base_value:+.2f}  |delta| {np.linalg.norm(diffs[value]):.4g}")
+        print(
+            f"  o{sweep_index(prefix)}{value - base_value:+.2f}  value {value:.2f}  offset {value - base_value:+.2f}  |delta| {np.linalg.norm(diffs[value]):.4g}"
+        )
     return diffs
 
 
@@ -166,16 +190,13 @@ def measure(params, policy, get_action, envs, args, label: str) -> float:
 
 def fit(diffs: dict[float, np.ndarray], base_value: float) -> tuple[np.ndarray, np.ndarray, list[float]]:
     values = sorted(v for v in diffs if abs(v - base_value) > 1e-9)
-    axis, drift = fit_axis_and_drift(
-        np.array(values) - base_value, np.stack([diffs[v] for v in values])
-    )
+    axis, drift = fit_axis_and_drift(np.array(values) - base_value, np.stack([diffs[v] for v in values]))
     return axis, drift, values
 
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = eval_config(args)
     policy, _, _, base_state, _ = load_train_state(args.base, env_cfg=config)
@@ -183,9 +204,9 @@ def main() -> None:
     print(f"base {args.base.name}  ({base_flat.size:,} parameters)\n")
 
     print("colour 1 swept, colour 0 held at 1.0")
-    one = load_sweep(args.arms, "v", args.at, COLOUR_ONE_BASE, base_flat, config)
+    one = load_sweep(args.arms, "v", args.at, COLOUR_ONE_BASE, base_flat, config, args.arm_steps)
     print("\ncolour 0 swept, colour 1 held at 0.5")
-    zero = load_sweep(args.arms, "c", args.at, COLOUR_ZERO_BASE, base_flat, config)
+    zero = load_sweep(args.arms, "c", args.at, COLOUR_ZERO_BASE, base_flat, config, args.arm_steps)
 
     if len(one) < 4 or len(zero) < 4:
         sys.exit("\nBoth sweeps need at least four arms before the comparison means anything.")
@@ -212,8 +233,7 @@ def main() -> None:
         if v_one not in one or v_zero not in zero:
             continue
         print(
-            f"  {gap:>6.1f}{v_one:>13.2f}{v_zero:>13.2f}"
-            f"{cosine(one[v_one] - drift_one, zero[v_zero] - drift_zero):>14.3f}"
+            f"  {gap:>6.1f}{v_one:>13.2f}{v_zero:>13.2f}" f"{cosine(one[v_one] - drift_one, zero[v_zero] - drift_zero):>14.3f}"
         )
     print(
         "\n  Under one knob these arms are the same agent reached two ways, so their\n"
@@ -229,10 +249,7 @@ def main() -> None:
 
     def split_half(diffs, values, base_value):
         halves = (values[0::2], values[1::2])
-        fits = [
-            fit_axis_and_drift(np.array(half) - base_value, np.stack([diffs[v] for v in half]))[0]
-            for half in halves
-        ]
+        fits = [fit_axis_and_drift(np.array(half) - base_value, np.stack([diffs[v] for v in half]))[0] for half in halves]
         return cosine(*fits)
 
     reliability_one = split_half(one, values_one, COLOUR_ONE_BASE)
@@ -240,14 +257,40 @@ def main() -> None:
     observed = cosine(axis_zero, axis_one)
     print(f"  split-half reliability of axis_1  {reliability_one:+.3f}")
     print(f"  split-half reliability of axis_0  {reliability_zero:+.3f}")
+
+    # The headline test. Shuffling which offset belongs to which diff destroys
+    # the association between value and direction while leaving the drift every
+    # arm shares exactly where it is, so the null says what cosine these diffs
+    # can produce with no value signal in them. Assuming a null of zero instead
+    # would read that shared drift as evidence.
+    print("\n=== is the cosine more than these diffs would give anyway? ===\n")
+    offsets_one = np.array(values_one) - COLOUR_ONE_BASE
+    null = permutation_cosines(
+        offsets_one,
+        np.stack([one[v] for v in values_one]),
+        axis_zero,
+        resamples=args.resamples,
+        seed=args.seed,
+    )
+    p_value = permutation_p_value(observed, null, alternative="less")
+    print(f"  observed cos(axis_0, axis_1)     {observed:+.3f}")
+    print(f"  null over {args.resamples} shuffles         mean {null.mean():+.3f}, sd {null.std():.3f}")
+    print(f"  null 5th percentile              {np.percentile(null, 5):+.3f}")
+    print(f"  p(null at least this negative)   {p_value:.4f}")
+    print(
+        "\n  One knob predicts a cosine at -1 and this p-value small. Two value\n"
+        "  registers predict an observation sitting inside the null. Nothing here\n"
+        "  assumes how the noise scales."
+    )
+
+    # Kept as a secondary reading rather than the argument. On the first grid the
+    # correction reached x7, and in results/three-objective.txt it returned
+    # cosines outside the range a cosine can take.
     if reliability_one > 0 and reliability_zero > 0:
         corrected = observed / np.sqrt(reliability_one * reliability_zero)
-        print(f"\n  cos corrected for attenuation    {corrected:+.3f}")
-        print(
-            "\n  Still near -1 after correction means one knob measured through noise.\n"
-            "  Near 0 means two. The correction can overshoot past -1 when the halves are\n"
-            "  this small, so it bounds rather than settles the question."
-        )
+        print(f"\n  secondary: cos corrected for attenuation  {corrected:+.3f}")
+        if abs(corrected) > 1:
+            print("  ...which is outside the range a cosine can take, so the correction has broken down.")
 
     if args.skip_behaviour:
         return
@@ -264,16 +307,24 @@ def main() -> None:
         print("\n\n=== can colour 1's axis write colour 0's arms? ===\n")
         print(f"  {'':>32}{'steps':>8}  {'95% interval':>14}{'reached':>11}")
         measure(base_state.params, policy, get_action, envs, args, "base, untouched")
-        checkpoints = arm_checkpoints(args.arms, "c", args.at)
+        checkpoints = arm_checkpoints(args.arms, "c", args.at, COLOUR_ZERO_BASE, args.arm_steps)
         crossed: list[tuple[float, float, float, float]] = []
         for value in values_zero:
             offset = value - COLOUR_ZERO_BASE
             own = measure(
-                unravel(base_flat + offset * axis_zero), policy, get_action, envs, args,
+                unravel(base_flat + offset * axis_zero),
+                policy,
+                get_action,
+                envs,
+                args,
                 f"colour 0 = {value:.2f} via axis_0",
             )
             other = measure(
-                unravel(base_flat - offset * axis_one), policy, get_action, envs, args,
+                unravel(base_flat - offset * axis_one),
+                policy,
+                get_action,
+                envs,
+                args,
                 f"colour 0 = {value:.2f} via -axis_1",
             )
             _, _, _, arm_state, _ = load_train_state(checkpoints[value], env_cfg=config)
@@ -301,10 +352,16 @@ def main() -> None:
         others = [v for v in values_zero if v != value]
         held, _ = fit_axis_and_drift(np.array(others) - COLOUR_ZERO_BASE, np.stack([zero[v] for v in others]))
         written = measure(
-            unravel(base_flat + (value - COLOUR_ZERO_BASE) * held), policy, get_action, envs, args,
+            unravel(base_flat + (value - COLOUR_ZERO_BASE) * held),
+            policy,
+            get_action,
+            envs,
+            args,
             f"colour 0 = {value:.2f} written, held out",
         )
-        _, _, _, arm_state, _ = load_train_state(arm_checkpoints(args.arms, "c", args.at)[value], env_cfg=config)
+        _, _, _, arm_state, _ = load_train_state(
+            arm_checkpoints(args.arms, "c", args.at, COLOUR_ZERO_BASE, args.arm_steps)[value], env_cfg=config
+        )
         trained = measure(arm_state.params, policy, get_action, envs, args, f"colour 0 = {value:.2f} fine-tuned")
         rows.append((value, trained, written))
 

@@ -1,9 +1,9 @@
 """Do the enriched channels carry the decision, in the agent's own activations?
 
     uv run python experiments/020_are_they_value_channels.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
         --channels 7 1 --layer 0 \
-        --levels /workspace/data/valueaxis/levels/v050 --objective-values 1.0 0.5
+        --levels /workspace/data/levels/values/1.00-0.50@500k --objective-values 1.0 0.5
 
 Everything so far is about weights. ``018`` found two channels of the first
 recurrent layer carrying about twice their share of the value axis, and ``019``
@@ -36,8 +36,6 @@ objective wins, and that is what a value comparison would have to produce.
 from __future__ import annotations
 
 import argparse
-import subprocess
-import sys
 from functools import partial
 from pathlib import Path
 
@@ -45,6 +43,7 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, summarise
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import roc_auc
@@ -136,8 +135,7 @@ def run(params, policy, envs, args, label, transform=None):
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = config_for(args)
     policy, _, _, state, _ = load_train_state(args.base, env_cfg=config)
@@ -151,12 +149,24 @@ def main() -> None:
         print("=== ablation: zero those channels in the untouched agent ===\n")
         print(f"  {'':>40}{'steps':>8}")
         run(params, policy, envs, args, "untouched")
-        run(params, policy, envs, args, f"channels {target} zeroed",
-            partial(edit_layer, layer=args.layer, channels=target, mode="zero"))
+        run(
+            params,
+            policy,
+            envs,
+            args,
+            f"channels {target} zeroed",
+            partial(edit_layer, layer=args.layer, channels=target, mode="zero"),
+        )
         for trial in range(args.controls):
             pick = list(rng.choice([c for c in range(32) if c not in target], size=len(target), replace=False))
-            run(params, policy, envs, args, f"random pair {pick} zeroed",
-                partial(edit_layer, layer=args.layer, channels=pick, mode="zero"))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"random pair {pick} zeroed",
+                partial(edit_layer, layer=args.layer, channels=pick, mode="zero"),
+            )
         print(
             "\n  A value comparison removed should push the exchange rate toward zero -- the\n"
             "  agent taking whichever objective is nearest -- while it still reaches one.\n"
@@ -168,12 +178,24 @@ def main() -> None:
         print(f"  {'':>40}{'steps':>8}")
         run(params, policy, envs, args, "untouched")
         for alpha in args.alphas:
-            run(params, policy, envs, args, f"channels {target} {alpha:+.1f}",
-                partial(edit_layer, layer=args.layer, channels=target, mode="shift", amount=alpha))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"channels {target} {alpha:+.1f}",
+                partial(edit_layer, layer=args.layer, channels=target, mode="shift", amount=alpha),
+            )
         pick = list(rng.choice([c for c in range(32) if c not in target], size=len(target), replace=False))
         for alpha in (min(args.alphas), max(args.alphas)):
-            run(params, policy, envs, args, f"random pair {pick} {alpha:+.1f}",
-                partial(edit_layer, layer=args.layer, channels=pick, mode="shift", amount=alpha))
+            run(
+                params,
+                policy,
+                envs,
+                args,
+                f"random pair {pick} {alpha:+.1f}",
+                partial(edit_layer, layer=args.layer, channels=pick, mode="shift", amount=alpha),
+            )
         print(
             "\n  A channel holding what an objective is worth should move the exchange rate\n"
             "  monotonically in the amount added, and the random pair should not."
@@ -186,7 +208,9 @@ def main() -> None:
         batches = -(-args.episodes // args.num_envs)
         for batch in range(batches):
             observations, _ = envs.reset(seed=args.seed + 10_000 + batch)
-            carry = policy.apply(params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry)
+            carry = policy.apply(
+                params, jax.random.PRNGKey(args.seed), envs.observation_space.shape, method=policy.initialize_carry
+            )
             key = jax.random.PRNGKey(args.seed)
             starts = np.ones(envs.num_envs, dtype=bool)
             carry, action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
@@ -229,7 +253,10 @@ def main() -> None:
         order = np.argsort(scores)[::-1]
         print("  channels ranked by how well their activation predicts the choice:")
         print("    " + "  ".join(f"ch{c:02d}({0.5 + scores[c]:.3f})" for c in order[:8]))
-        print(f"\n  the weight-space picks {target} sit at ranks " + ", ".join(str(int(np.where(order == c)[0][0]) + 1) for c in target))
+        print(
+            f"\n  the weight-space picks {target} sit at ranks "
+            + ", ".join(str(int(np.where(order == c)[0][0]) + 1) for c in target)
+        )
         print(
             "\n  An independent ranking that puts the same channels on top would be two\n"
             "  unrelated methods agreeing. One that does not means the axis wrote where it\n"

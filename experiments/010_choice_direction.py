@@ -32,8 +32,6 @@ from __future__ import annotations
 
 import argparse
 import operator
-import subprocess
-import sys
 from pathlib import Path
 
 import jax
@@ -41,6 +39,7 @@ import jax.numpy as jnp
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import collect_episode_outcomes, collect_rollouts, geometry, steering
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.analysis.probes import Feature, layer_slice
@@ -138,8 +137,7 @@ def choice_contrast(rollouts, feature: Feature, gap_tolerance: float = 6.0):
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     def env_config(seed: int, split: str) -> MazeConfig:
         settings: dict[str, object] = dict(
@@ -162,9 +160,7 @@ def main() -> None:
     print(f"checkpoint {args.checkpoint.name}  (update {update})\n")
 
     last = layer_slice(Feature("activations", operator.attrgetter("features")), LAST_LAYER, N_LAYERS)
-    fit_rollouts = collect_rollouts(
-        env_config(0, args.fit_split).make(), policy, params, args.fit_episodes, seed=0
-    )
+    fit_rollouts = collect_rollouts(env_config(0, args.fit_split).make(), policy, params, args.fit_episodes, seed=0)
     raw, pairs = choice_contrast(fit_rollouts, last)
     choice = steering.Direction("choice (f0 - f1)", raw / np.linalg.norm(raw))
     print(f"choice direction from {pairs} gap-matched pairs, raw norm {np.linalg.norm(raw):.4f}")

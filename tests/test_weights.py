@@ -11,7 +11,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from goalmisgen.analysis.weights import cosine, explained, fit_axis, fit_axis_and_drift, projected_offset
+from goalmisgen.analysis.weights import (
+    cosine,
+    explained,
+    fit_axis,
+    fit_axis_and_drift,
+    permutation_cosines,
+    permutation_norms,
+    permutation_p_value,
+    projected_offset,
+    split_half_reliability,
+)
 
 
 def linear_family(rng: np.random.Generator, offsets: np.ndarray, noise: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
@@ -164,3 +174,168 @@ def test_an_asymmetric_grid_yields_too_few_pairs_to_estimate_reliability() -> No
     table = {round(o, 3): None for o in offsets}
     pairs = [(m, -m) for m in sorted({abs(o) for o in table}, reverse=True) if m in table and -m in table]
     assert len(pairs) == 2  # 0.2 and 0.1 pair; 0.3 and 0.4 have no partner
+
+
+def test_permutation_null_is_not_centred_on_zero_when_the_diffs_share_drift() -> None:
+    """The whole reason for a permutation null rather than assuming zero.
+
+    Every arm carries the same common component, so two axes fitted from the same
+    agent share structure whether or not value is represented. A null of zero
+    would read that shared drift as evidence.
+    """
+    rng = np.random.default_rng(7)
+    offsets = np.array([-0.4, -0.2, -0.1, 0.1, 0.2, 0.4])
+    drift = 40.0 * rng.normal(size=64)
+    diffs = drift + np.outer(offsets, rng.normal(size=64)) + 0.5 * rng.normal(size=(len(offsets), 64))
+
+    null = permutation_cosines(offsets, diffs, rng.normal(size=64), resamples=200, seed=1)
+
+    assert null.std() > 0.05, "a degenerate null would make every observation look significant"
+
+
+def test_a_real_axis_beats_its_own_permutation_null() -> None:
+    rng = np.random.default_rng(3)
+    offsets = np.array([-0.4, -0.3, -0.2, 0.2, 0.3, 0.4])
+    axis, diffs = linear_family(rng, offsets, noise=0.3)
+
+    observed = cosine(fit_axis_and_drift(offsets, diffs)[0], axis)
+    null = permutation_cosines(offsets, diffs, axis, resamples=400, seed=2)
+
+    assert permutation_p_value(observed, null, alternative="greater") < 0.01
+
+
+def test_shuffled_data_does_not_beat_the_null() -> None:
+    """Guards the test above: the procedure must not declare everything significant."""
+    rng = np.random.default_rng(4)
+    offsets = np.array([-0.4, -0.3, -0.2, 0.2, 0.3, 0.4])
+    reference = rng.normal(size=64)
+    diffs = rng.normal(size=(len(offsets), 64))
+
+    observed = cosine(fit_axis_and_drift(offsets, diffs)[0], reference)
+    null = permutation_cosines(offsets, diffs, reference, resamples=400, seed=5)
+
+    assert permutation_p_value(observed, null, alternative="greater") > 0.05
+
+
+def test_the_null_is_reproducible_from_its_seed() -> None:
+    rng = np.random.default_rng(11)
+    offsets = np.array([-0.3, -0.1, 0.1, 0.3])
+    _, diffs = linear_family(rng, offsets)
+    reference = rng.normal(size=64)
+
+    first = permutation_cosines(offsets, diffs, reference, resamples=50, seed=9)
+    assert np.array_equal(first, permutation_cosines(offsets, diffs, reference, resamples=50, seed=9))
+
+
+def test_p_value_can_never_be_exactly_zero() -> None:
+    """A finite number of resamples cannot license a p of 0."""
+    null = np.zeros(100)
+    assert permutation_p_value(-1.0, null, alternative="less") == pytest.approx(1 / 101)
+
+
+def test_an_unknown_alternative_is_refused() -> None:
+    with pytest.raises(ValueError, match="'less', 'greater' or 'two-sided'"):
+        permutation_p_value(0.0, np.zeros(10), alternative="sideways")
+
+
+def test_the_permutation_null_matches_the_least_squares_it_replaces() -> None:
+    """The fast path is an algebraic rewrite, not an approximation.
+
+    Permuting offsets leaves the diffs alone, so the axis's cosine against a
+    reference can be had from the Gram matrix and one projection instead of a
+    fresh least squares over the whole parameter vector each time. If that is
+    ever rewritten again, this is what says it still computes the same thing.
+    """
+    rng = np.random.default_rng(0)
+    offsets = np.array([-0.45, -0.3, -0.2, -0.05, 0.05, 0.2, 0.3, 0.45])
+    diffs = rng.normal(size=(8, 400)) + offsets[:, None] * rng.normal(size=400)
+    reference = rng.normal(size=400)
+
+    fast = permutation_cosines(offsets, diffs, reference, resamples=200, seed=7)
+
+    replay = np.random.default_rng(7)
+    slow = np.array([cosine(fit_axis_and_drift(replay.permutation(offsets), diffs)[0], reference) for _ in range(200)])
+
+    assert np.allclose(fast, slow, atol=1e-12)
+
+
+def test_the_permutation_null_still_refuses_a_degenerate_grid() -> None:
+    diffs = np.random.default_rng(1).normal(size=(4, 20))
+    with pytest.raises(ValueError, match="same offset"):
+        permutation_cosines(np.zeros(4), diffs, np.ones(20), resamples=5)
+
+
+def test_the_norm_null_separates_a_real_axis_from_none() -> None:
+    """|axis| against zero is meaningless; against a shuffled grid it is not.
+
+    Least squares returns a nonzero slope through any cloud of diffs, and how
+    large depends on the noise and the grid's leverage. Both are what differ
+    between the things a ladder compares, which is exactly why the raw norm
+    cannot be read down one.
+    """
+    rng = np.random.default_rng(0)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.30, 0.20, 0.10) for s in (1, -1)])
+    axis = rng.normal(size=200)
+
+    signal = np.outer(offsets, axis) + 0.5 * rng.normal(size=(len(offsets), 200))
+    noise = 0.5 * rng.normal(size=(len(offsets), 200)) + rng.normal(size=200)
+
+    for diffs, expected in ((signal, True), (noise, False)):
+        observed = float(np.linalg.norm(fit_axis_and_drift(offsets, diffs)[0]))
+        null = permutation_norms(offsets, diffs, resamples=400, seed=1)
+        significant = permutation_p_value(observed, null, alternative="greater") < 0.05
+        assert significant is expected
+
+
+def test_reliability_is_high_on_a_real_axis_and_nil_on_noise() -> None:
+    rng = np.random.default_rng(3)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)])
+    axis = rng.normal(size=200)
+
+    signal = np.outer(offsets, axis) + 0.5 * rng.normal(size=(len(offsets), 200))
+    noise = 0.5 * rng.normal(size=(len(offsets), 200)) + rng.normal(size=200)
+
+    assert split_half_reliability(offsets, signal, splits=80, seed=4) > 0.7
+    assert abs(split_half_reliability(offsets, noise, splits=80, seed=4)) < 0.3
+
+
+def test_reliability_needs_four_pairs_to_split() -> None:
+    """A grid with fewer cannot make two halves that each fit a slope."""
+    offsets = np.array([0.4, -0.4, 0.2, -0.2])
+    diffs = np.random.default_rng(5).normal(size=(4, 30))
+
+    assert np.isnan(split_half_reliability(offsets, diffs, splits=20, seed=0))
+
+
+def test_reliability_splits_pairs_so_each_half_stays_balanced() -> None:
+    """An unbalanced half leaks the common fine-tuning component into its axis.
+
+    Two halves that both leaked it would agree about the leak, and the agreement
+    would be reported as reliability. Here every diff carries a large shared
+    offset and nothing else: balanced halves must find no reliable direction.
+    """
+    rng = np.random.default_rng(6)
+    offsets = np.array([m * s for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)])
+    common = 50.0 * rng.normal(size=300)
+    diffs = np.tile(common, (len(offsets), 1)) + 0.5 * rng.normal(size=(len(offsets), 300))
+
+    assert abs(split_half_reliability(offsets, diffs, splits=80, seed=7)) < 0.3
+
+
+def test_reliability_finds_its_pairs_when_the_offsets_are_inexact() -> None:
+    """Offsets are differences of floats, and the base value decides how inexact.
+
+    Colour 0's grid is values minus 1.0, so +0.45 arrives as 0.4500000000000002
+    and -0.45 as -0.44999999999999996. Matching magnitudes against rounded keys
+    found no pairs at all and returned nan for every rung of a ladder, while
+    colour 1 -- base 0.5, arithmetic exact -- looked fine.
+    """
+    base = 1.0
+    values = [round(base + m * s, 2) for m in (0.45, 0.44, 0.43, 0.30, 0.20, 0.10) for s in (1, -1)]
+    offsets = np.array([v - base for v in values])
+    assert any(abs(o) not in {0.45, 0.44, 0.43, 0.30, 0.20, 0.10} for o in np.abs(offsets)), "need inexact offsets"
+
+    rng = np.random.default_rng(8)
+    diffs = np.outer(offsets, rng.normal(size=200)) + 0.5 * rng.normal(size=(len(offsets), 200))
+
+    assert split_half_reliability(offsets, diffs, splits=80, seed=9) > 0.7

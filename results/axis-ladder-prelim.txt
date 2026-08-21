@@ -1,0 +1,107 @@
+script 022_axis_ladder.py
+commit 4e51cf7
+argv   --data /workspace/data --agent novalue11.s1234 --levels /workspace/data/levels/values/1.00-0.50@150k --arm-steps 400000 --objectives 0 1
+
+agent novalue11.s1234, base values (1.0, 0.5), arms at 400,000 steps
+11 rungs: 2.0M, 5.0M, 10.0M, 15.0M, 20.0M, 30.0M, 40.1M, 50.1M, 60.1M, 70.1M, 140.2M
+
+=== 2.0M  (cp_002001920) ===
+  o0: 25 arms  |axis|     2.62  |drift|     2.24  p 0.1889  reliability +nan  null arm present
+  o1: 25 arms  |axis|      2.5  |drift|     2.15  p 0.2594  reliability +0.032  null arm present
+=== 5.0M  (cp_005007360) ===
+  o0: 25 arms  |axis|     2.08  |drift|     1.61  p 0.3378  reliability +nan  null arm present
+  o1: 25 arms  |axis|     2.02  |drift|     1.64  p 0.3578  reliability -0.042  null arm present
+=== 10.0M  (cp_010014720) ===
+  o0: 25 arms  |axis|     1.02  |drift|     1.14  p 0.4583  reliability +nan  null arm present
+  o1: 25 arms  |axis|    0.905  |drift|     1.33  p 0.2449  reliability +0.133  null arm present
+=== 15.0M  (cp_015022080) ===
+  o0: 25 arms  |axis|     1.16  |drift|     1.18  p 0.2079  reliability +nan  null arm present
+  o1: 25 arms  |axis|    0.763  |drift|     1.12  p 0.9705  reliability -0.473  null arm present
+=== 20.0M  (cp_020029440) ===
+  o0: 25 arms  |axis|    0.901  |drift|        1  p 0.2104  reliability +nan  null arm present
+  o1: 25 arms  |axis|    0.933  |drift|     1.03  p 0.4393  reliability +0.232  null arm present
+=== 30.0M  (cp_030044160) ===
+  o0: 25 arms  |axis|     1.85  |drift|     2.96  p 0.6857  reliability +nan  null arm present
+  o1: 25 arms  |axis|     2.08  |drift|     2.99  p 0.0705  reliability +0.110  null arm present
+=== 40.1M  (cp_040058880) ===
+  o0: 25 arms  |axis|     2.33  |drift|      3.7  p 0.6092  reliability +nan  null arm present
+  o1: 25 arms  |axis|     2.39  |drift|     3.65  p 0.4523  reliability +0.025  null arm present
+=== 50.1M  (cp_050073600) ===
+  o0: 22 arms  |axis|     2.66  |drift|     3.26  p 0.0090  reliability +nan  null arm ABSENT
+  o1: 0 arms, too few to fit a slope -- skipping
+=== 60.1M  (cp_060088320) ===
+  o0: 25 arms  |axis|     3.55  |drift|     3.62  p 0.0005  reliability +nan  null arm present
+  o1: 2 arms, too few to fit a slope -- skipping
+=== 70.1M  (cp_070103040) ===
+  o0: 25 arms  |axis|     5.11  |drift|     3.58  p 0.0005  reliability +nan  null arm present
+  o1: 25 arms  |axis|     5.01  |drift|     3.63  p 0.0005  reliability +0.629  null arm present
+=== 140.2M  (cp_140206080) ===
+  o0: 25 arms  |axis|     8.59  |drift|     2.63  p 0.0005  reliability +nan  null arm present
+  o1: 25 arms  |axis|     8.39  |drift|     2.62  p 0.0005  reliability +0.823  null arm present
+
+reference rung: 140.2M (novalue11.s1234)
+
+
+=== is there an axis at all? ===
+
+    rung  |axis_0|     p_0   rel_0  |axis_1|     p_1   rel_1   verdict
+    2.0M      2.62   0.189     nan       2.5   0.259    0.03   —
+    5.0M      2.08   0.338     nan      2.02   0.358   -0.04   —
+   10.0M      1.02   0.458     nan     0.905   0.245    0.13   —
+   15.0M      1.16   0.208     nan     0.763   0.971   -0.47   —
+   20.0M     0.901   0.210     nan     0.933   0.439    0.23   —
+   30.0M      1.85   0.686     nan      2.08   0.070    0.11   —
+   40.1M      2.33   0.609     nan      2.39   0.452    0.02   —
+   70.1M      5.11   0.000     nan      5.01   0.000    0.63   —
+  140.2M      8.59   0.000     nan      8.39   0.000    0.82   —
+
+p is against a permutation null -- the length a slope of this grid reaches over
+these diffs with the offsets shuffled, so with no value in them. |axis| on its own
+says nothing: least squares returns a slope through any cloud. rel is split-half
+reliability, how much of the fitted direction is signal. A rung needs both, on both
+objectives: a large axis at low reliability is a long vector pointing nowhere in
+particular, and reliability without length is a direction with nothing along it.
+
+
+=== one axis or two? ===
+
+    rung  cos(a0,a1)       p  disattenuated    dim2   reading
+    2.0M      -0.025   0.337              —   0.488   no axis to ask of
+    5.0M       0.124   0.994              —   0.438   no axis to ask of
+   10.0M       0.134   0.887              —   0.433   no axis to ask of
+   15.0M       0.132   0.912              —   0.434   no axis to ask of
+   20.0M       0.339   0.956              —   0.330   no axis to ask of
+   30.0M       0.032   0.649              —   0.484   no axis to ask of
+   40.1M       0.004   0.527              —   0.498   no axis to ask of
+   70.1M      -0.560   0.000              —   0.220   no axis to ask of
+  140.2M      -0.760   0.000              —   0.120   no axis to ask of
+
+The raw cosine is attenuated toward zero by noise in both axes, so it understates
+collinearity wherever reliability is poor -- which is every early rung. Disattenuating
+divides that out, and is refused below a reliability of 0.2 rather than printed as a
+number the data cannot support.
+
+The distinction that matters: dim2 near 0.5 with a cosine near zero is what TWO value
+registers look like AND what two noise vectors look like. The table above is what
+separates them. Only a rung with an axis can be said to have one axis or two.
+
+
+=== has the axis settled where it ends up? ===
+
+    rung     cos(o0@t, o0@end)     cos(o1@t, o1@end)
+    2.0M                -0.005                -0.001
+    5.0M                 0.001                -0.002
+   10.0M                 0.003                 0.000
+   15.0M                 0.001                 0.017
+   20.0M                 0.008                -0.041
+   30.0M                 0.028                 0.003
+   40.1M                 0.025                 0.027
+   50.1M                 0.052                     —
+   60.1M                 0.098                     —
+   70.1M                 0.161                 0.174
+  140.2M                 1.000                 1.000
+
+Read the first table down the |axis|/|drift| column: an axis buried under the drift 
+of its own fine-tune is not yet an axis, whatever its cosine says. Then read cos(a0,a1): 
+near zero is two registers, near -1 is one threshold, and the rung where that changes 
+is the answer to what the ladder was built for.

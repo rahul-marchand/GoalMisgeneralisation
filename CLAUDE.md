@@ -105,6 +105,67 @@ Datasets are stored as directories of plain `.npy` files, not compressed
 archives, so they can be memory-mapped and shared across actor processes.
 `LevelDataset` pickles by path for the same reason. Do not "simplify" either.
 
+## Beyond the DRC
+
+Three subsystems arrived after the DRC work and are not obvious from the
+directory names.
+
+### `goalmisgen/nets` — other architectures, as `PolicySpec` subclasses
+
+The plug-in point the section above predicts. `TransformerSpec` is a ViT-style
+policy and `ScaledInputSpec` wraps any spec to undo cleanba's input scaling.
+cleanba stays untouched.
+
+**The scaling is not cosmetic.** `Policy._maybe_normalize_input_image` divides
+every observation by 255 in its `else` branch, because cleanba's environments
+emit uint8 images. Ours are already in [0, 1], so a wrapped network sees inputs
+of order 1/255. The DRC survives it — sigmoids and tanhs make its hidden state
+O(1) whatever the input scale — but a plain ReLU ResNet does not: every
+activation and logit is proportional to the input, so the policy stays uniform.
+`resnet11` sat at entropy ln 4 for 25M steps before this was found. Wrap a new
+spec in `ScaledInputSpec` unless you know it normalises its own input.
+
+Note that `Policy` reads `yang_init`, `norm`, `normalize_input` and `head_scale`
+from the *outer* spec, so a wrapper does not inherit the inner spec's head
+settings. `presets.py` passes them explicitly; anything else should too.
+
+**Probes read any architecture through `StateReader`.** They were written against
+the DRC's carry; `state_reader_for(policy)` returns per-cell grids for a ResNet
+stage or a transformer residual stream instead. Networks with nothing carried
+between steps have no cell state, and `PerCellState.stacked` hands back the
+features in that slot so shape-reading code keeps working — so anything that
+*writes* must check `has_cell_state` first, as the steering path does.
+
+### `goalmisgen/offline` — the same task by imitation
+
+A prefix-LM trained on expert routes, as an LLM-shaped twin of the maze agent.
+It shares the levels, the solver and `analysis.behaviour`, so its numbers are
+comparable with the DRC's — with one exception that matters.
+
+**The expert is undiscounted.** Demonstrations come from `solve()` maximising
+`value - 0.05 x distance`, so the route model's target exchange rate is
+`(v0 - v1) / 0.05` = 10 steps at the base values. The DRC is trained with
+gamma = 0.995 and its optimum is the *discounted* threshold, ~9.3 at the same
+values. Both are right against their own expert; a sentence comparing the two
+architectures' exchange rates has to say which optimum it means.
+
+`done.json` is written after training returns and is what marks a run or an arm
+finished — the same rule as judging a DRC arm by the length it reached.
+`--init-from` carries **parameters only**; the optimiser starts fresh.
+
+### The base-checkpoint ladder
+
+`scripts/base_ladder.py` re-runs a value sweep from several points in one
+agent's own training, to ask when the axis appears rather than what it is at the
+end. A rung is an ordinary agent — `runs/<agent>.at<steps>/BASE.json` plus a
+symlink — so nothing downstream needs a special case.
+
+**Ask for rungs by step count, not by name.** Checkpoint directories are padded
+to `ceil(log10(total_timesteps))` digits, so 70,103,040 steps is `cp_070103040`
+in a 150M run and `cp_70103040` in an 80M one. `campaign.sh` hardcoded
+`cp_100146560`, which is not a checkpoint of anything, printed "not saved,
+skipping that rung" and reported success — for every run of the campaign.
+
 ## Design conventions
 
 The environment gets extended repeatedly over the project (new correlation

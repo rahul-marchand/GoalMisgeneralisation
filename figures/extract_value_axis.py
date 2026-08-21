@@ -57,16 +57,16 @@ def main() -> None:
     # fails two thirds of its episodes is not a preference.
     ood_rows = rows(
         (RESULTS / "value-axis-ood.txt").read_text(),
-        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+"
-        r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
-        17, "out-of-grid writes",
+        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+" r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
+        17,
+        "out-of-grid writes",
     )
 
     ood0_rows = rows(
         (RESULTS / "value-axis-ood-colour0.txt").read_text(),
-        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+"
-        r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
-        18, "colour-0 out-of-grid writes",
+        r"v=(-?\d\.\d\d) written \((?:unseen|grid)\)\s+(-?\d+\.\d)\s+" r"\[\s*(-?\d+\.\d),\s*(-?\d+\.\d)\]\s+(\d+\.\d)%",
+        18,
+        "colour-0 out-of-grid writes",
     )
 
     payload = {
@@ -88,18 +88,16 @@ def main() -> None:
         # the absolute values rather than only their difference, is also what
         # gives each sweep its own optimal curve.
         "written_ood_colour0": [
-            {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100}
-            for v, st, lo, hi, r in ood0_rows
+            {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100} for v, st, lo, hi, r in ood0_rows
         ],
-        "written_ood": [
-            {"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100}
-            for v, st, lo, hi, r in ood_rows
-        ],
+        "written_ood": [{"value": v, "steps": st, "low": lo, "high": hi, "reached": r / 100} for v, st, lo, hi, r in ood_rows],
     }
     (OUT / "value_axis.json").write_text(json.dumps(payload, indent=2) + "\n")
     print(f"wrote {OUT / 'value_axis.json'}")
-    print(f"  base {base} steps, {len(trained)} arms, {len(heldout)} held-out writes, "
-          f"{len(beyond)} beyond the grid, {len(random)} controls")
+    print(
+        f"  base {base} steps, {len(trained)} arms, {len(heldout)} held-out writes, "
+        f"{len(beyond)} beyond the grid, {len(random)} controls"
+    )
 
 
 if __name__ == "__main__":

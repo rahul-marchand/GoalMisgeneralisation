@@ -81,9 +81,7 @@ def test_distance_split_separates_a_plan_from_an_imminent_action():
     has the full route in its features, the other only its next two steps.
     """
     full = probe_by_distance(make_rollouts(40, seed=0), make_rollouts(20, seed=1))
-    near = probe_by_distance(
-        make_rollouts(40, seed=0, marked_until=1), make_rollouts(20, seed=1, marked_until=1)
-    )
+    near = probe_by_distance(make_rollouts(40, seed=0, marked_until=1), make_rollouts(20, seed=1, marked_until=1))
 
     assert {b.step for b in full} == {b.step for b in near}
     # Step 0 is absent by construction: the agent's own cell is the only cell at

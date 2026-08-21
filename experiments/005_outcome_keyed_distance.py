@@ -42,14 +42,13 @@ from __future__ import annotations
 
 import argparse
 import operator
-import subprocess
-import sys
 from pathlib import Path
 
 import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis import fields, metrics, targets
 from goalmisgen.analysis.activations import Capture, RolloutCache, collect_rollouts, require_one_actor
 from goalmisgen.analysis.probes import Feature
@@ -81,14 +80,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def provenance() -> str:
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    return f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}"
-
-
 def main() -> None:
     args = parse_args()
-    print(provenance())
+    print(provenance.header())
 
     def env_config(seed: int, split: str) -> MazeConfig:
         settings: dict[str, object] = dict(
@@ -299,9 +293,7 @@ def one_split(split, rollouts, selector, episodes) -> str:
     scores = {
         name: metrics.stratified_correlation(prediction, y, stratum) for name, (y, prediction, stratum) in packed.items()
     }
-    low, high = metrics.bootstrap_paired(
-        statistic("first"), statistic("second"), np.unique(packed["first"][2] // 1000)
-    )
+    low, high = metrics.bootstrap_paired(statistic("first"), statistic("second"), np.unique(packed["first"][2] // 1000))
     mark = "" if low <= 0 <= high else "  *"
     return f"{scores['first']:>9.3f}{scores['second']:>9.3f}{f'[{low:+.3f}, {high:+.3f}]':>18}{mark:>2}"
 

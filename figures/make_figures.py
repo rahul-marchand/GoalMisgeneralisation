@@ -54,10 +54,7 @@ mpl.rcParams.update(
     }
 )
 
-AGENTS = {
-    name: json.loads((DATA / f"{name}.json").read_text())
-    for name in ("smoke5b", "maze11", "clean11", "clean11fv")
-}
+AGENTS = {name: json.loads((DATA / f"{name}.json").read_text()) for name in ("smoke5b", "maze11", "clean11", "clean11fv")}
 
 
 def arms(agent: str, field: str) -> tuple[list[float], list[float]]:
@@ -176,8 +173,10 @@ def fig_no_value_task():
     # than on the figure: there is no room for it under the panels without it
     # colliding with the maze, and it is prose rather than data. Printed here so
     # that regenerating the figure shows whether the caption still holds.
-    print(f"  fig9 caption check: colour 0 worth {vals[0]:.1f} at {d[0]} steps, "
-          f"colour 1 worth {vals[1]:.1f} at {d[1]} steps, take colour {best}")
+    print(
+        f"  fig9 caption check: colour 0 worth {vals[0]:.1f} at {d[0]} steps, "
+        f"colour 1 worth {vals[1]:.1f} at {d[1]} steps, take colour {best}"
+    )
     save(fig, "fig9_no_value_task")
 
 
@@ -198,25 +197,56 @@ def fig_written_value():
     gamma = d["discount"]
     c = penalty / (1 - gamma)
     grid = np.linspace(0.14, 1.18, 100)
-    ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma),
-            color=MUTED, lw=1.2, ls="--", zorder=1)
+    ax.plot(grid, np.log((c + grid) / (c + other)) / np.log(gamma), color=MUTED, lw=1.2, ls="--", zorder=1)
     ax.annotate("optimal threshold", xy=(0.33, 14.3), color=MUTED, fontsize=8.5)
 
     ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0)
 
-    ax.plot([r["value"] for r in d["trained"]], [r["steps"] for r in d["trained"]],
-            "o-", color=BLUE, lw=2, ms=6, zorder=3, label="fine-tuned on that value")
-    ax.plot([r["value"] for r in d["written_heldout"]], [r["written"] for r in d["written_heldout"]],
-            "s", color=ORANGE, ms=7, mec=SURFACE, mew=1.4, zorder=4, label="written, that arm held out")
-    ax.plot([r["value"] for r in d["written_beyond_grid"]], [r["steps"] for r in d["written_beyond_grid"]],
-            "s", color=SURFACE, ms=7, mec=ORANGE, mew=1.6, zorder=4, label="written, outside the fitted grid")
+    ax.plot(
+        [r["value"] for r in d["trained"]],
+        [r["steps"] for r in d["trained"]],
+        "o-",
+        color=BLUE,
+        lw=2,
+        ms=6,
+        zorder=3,
+        label="fine-tuned on that value",
+    )
+    ax.plot(
+        [r["value"] for r in d["written_heldout"]],
+        [r["written"] for r in d["written_heldout"]],
+        "s",
+        color=ORANGE,
+        ms=7,
+        mec=SURFACE,
+        mew=1.4,
+        zorder=4,
+        label="written, that arm held out",
+    )
+    ax.plot(
+        [r["value"] for r in d["written_beyond_grid"]],
+        [r["steps"] for r in d["written_beyond_grid"]],
+        "s",
+        color=SURFACE,
+        ms=7,
+        mec=ORANGE,
+        mew=1.6,
+        zorder=4,
+        label="written, outside the fitted grid",
+    )
 
     # Plotted at the value each edit was scaled to match. The direction is random,
     # so the sign is arbitrary; what the marker says is that an edit of that size
     # pointed anywhere else moves the agent nowhere.
-    ax.plot([d["base_value"] + r["magnitude"] for r in d["random_controls"]],
-            [r["steps"] for r in d["random_controls"]],
-            "^", color=INK2, ms=7, zorder=3, label="random direction, same size of edit")
+    ax.plot(
+        [d["base_value"] + r["magnitude"] for r in d["random_controls"]],
+        [r["steps"] for r in d["random_controls"]],
+        "^",
+        color=INK2,
+        ms=7,
+        zorder=3,
+        label="random direction, same size of edit",
+    )
 
     ax.set_xlabel("what colour 1 is worth")
     ax.set_ylabel("extra steps walked for colour 0")
@@ -230,8 +260,7 @@ def fig_written_value():
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
     ax.set_axisbelow(True)
-    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.5,
-                    borderpad=0.2, labelspacing=0.35)
+    leg = ax.legend(loc="upper right", frameon=False, fontsize=8.2, handletextpad=0.5, borderpad=0.2, labelspacing=0.35)
     for t in leg.get_texts():
         t.set_color(INK2)
     save(fig, "fig10_written_value")
@@ -260,19 +289,23 @@ def fig_ood_writes():
     penalty, other, base_value = d["step_penalty"], d["other_objective"], d["base_value"]
     gamma = d["discount"]
     c = penalty / (1 - gamma)
-    optimal = lambda v0, v1: np.log((c + v1) / (c + v0)) / np.log(gamma)
+
+    def optimal(v0, v1):
+        return np.log((c + v1) / (c + v0)) / np.log(gamma)
 
     # (rows, gap from the written value, optimal at that gap, colour, label)
     sweeps = [
-        (d["written_ood"], lambda v: other - v, lambda g: optimal(other, other - g),
-         BLUE, "colour 1 written down"),
-        (d["written_ood_colour0"], lambda v: v - base_value, lambda g: optimal(base_value + g, base_value),
-         ORANGE, "colour 0 written up"),
+        (d["written_ood"], lambda v: other - v, lambda g: optimal(other, other - g), BLUE, "colour 1 written down"),
+        (
+            d["written_ood_colour0"],
+            lambda v: v - base_value,
+            lambda g: optimal(base_value + g, base_value),
+            ORANGE,
+            "colour 0 written up",
+        ),
     ]
 
-    fig, (ax, axr) = plt.subplots(
-        2, 1, figsize=(6.8, 5.4), sharex=True, height_ratios=[2.6, 1], gridspec_kw={"hspace": 0.12}
-    )
+    fig, (ax, axr) = plt.subplots(2, 1, figsize=(6.8, 5.4), sharex=True, height_ratios=[2.6, 1], gridspec_kw={"hspace": 0.12})
 
     fitted = [r["value"] for r in d["trained"]]
     lo_grid, hi_grid = other - max(fitted), other - min(fitted)
@@ -289,25 +322,30 @@ def fig_ood_writes():
         ax.plot(grid, [opt(g) for g in grid], color=colour, lw=1.1, ls="--", alpha=0.55, zorder=2)
         pts = sorted(((to_gap(r["value"]), r) for r in rows_), key=lambda t: t[0])
         ok = [(g, r) for g, r in pts if r["reached"] >= WORKS]
-        ax.plot([g for g, _ in ok], [r["steps"] for _, r in ok],
-                "o-", color=colour, lw=2, ms=5, zorder=4, label=label)
+        ax.plot([g for g, _ in ok], [r["steps"] for _, r in ok], "o-", color=colour, lw=2, ms=5, zorder=4, label=label)
         for side in ([p for p in pts if p[0] < ok[0][0]], [p for p in pts if p[0] > ok[-1][0]]):
             if not side:
                 continue
             chain = sorted(side + [ok[0] if side[0][0] < ok[0][0] else ok[-1]], key=lambda t: t[0])
-            ax.plot([g for g, _ in chain], [r["steps"] for _, r in chain],
-                    "o:", color=colour, lw=1.5, ms=5, mfc=SURFACE, mew=1.3, zorder=3)
-        axr.plot([g for g, _ in pts], [100 * r["reached"] for _, r in pts],
-                 "o-", color=colour, lw=1.8, ms=4.5, zorder=3)
+            ax.plot(
+                [g for g, _ in chain],
+                [r["steps"] for _, r in chain],
+                "o:",
+                color=colour,
+                lw=1.5,
+                ms=5,
+                mfc=SURFACE,
+                mew=1.3,
+                zorder=3,
+            )
+        axr.plot([g for g, _ in pts], [100 * r["reached"] for _, r in pts], "o-", color=colour, lw=1.8, ms=4.5, zorder=3)
 
     ax.annotate("dashed: optimal for that sweep", xy=(-2.05, 30.5), color=MUTED, fontsize=8.5)
     ax.annotate("fitted grids", xy=(0.12, 30.5), color=INK2, fontsize=8.5, alpha=0.7)
-    ax.annotate("open markers: the write is costing episodes",
-                xy=(-2.05, 27.0), color=MUTED, fontsize=8.5)
+    ax.annotate("open markers: the write is costing episodes", xy=(-2.05, 27.0), color=MUTED, fontsize=8.5)
     ax.set_ylabel("extra steps walked for colour 0")
     ax.set_ylim(-6, 33)
-    leg = ax.legend(loc="lower right", frameon=False, fontsize=8.5, handletextpad=0.6,
-                    borderpad=0.2, labelspacing=0.35)
+    leg = ax.legend(loc="lower right", frameon=False, fontsize=8.5, handletextpad=0.6, borderpad=0.2, labelspacing=0.35)
     for t in leg.get_texts():
         t.set_color(INK2)
 
@@ -317,6 +355,130 @@ def fig_ood_writes():
     axr.set_xlim(-2.2, 2.2)
 
     save(fig, "fig11_ood_writes")
+
+
+# ---------------------------------------------------------------- figure 12
+def fig_written_ood():
+    """Figure 10's panel, with the written values run off the end of the grid.
+
+    Same x axis as figure 10 -- one sweep, one optimal curve, what colour 1 is
+    worth -- so the two panels can be read against each other. The only change is
+    that the writing is not stopped at the values the axis was fitted on.
+
+    The y limit is set by the optimal curve rather than by the data. It reaches
+    -33 steps at the right-hand edge, and clipping it would hide the whole result
+    on that side: the agent does not go a third of the way there, it goes nowhere.
+    Squashing the fitted region to a fifth of the panel is the price, and figure
+    10 is the panel that shows that region properly.
+
+    Open markers are writes where the agent stopped finishing episodes. A
+    threshold measured on a policy that fails two episodes in three is not a
+    preference, and past a gap of about 1.5 in either direction it falls rather
+    than saturating -- which is what a broken policy looks like and not what a
+    weaker one does.
+    """
+    d = json.loads((DATA / "value_axis.json").read_text())
+    penalty, other, base = d["step_penalty"], d["other_objective"], d["base_exchange_rate"]
+    gamma = d["discount"]
+    c = penalty / (1 - gamma)
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.6))
+
+    fitted = [r["value"] for r in d["trained"]]
+    ax.axvspan(min(fitted), max(fitted), color=INK2, alpha=0.06, lw=0, zorder=0)
+
+    grid = np.linspace(-0.62, 3.12, 300)
+    ax.plot(
+        grid,
+        np.log((c + grid) / (c + other)) / np.log(gamma),
+        color=MUTED,
+        lw=1.2,
+        ls="--",
+        zorder=1,
+        label="optimal threshold",
+    )
+    ax.axhline(base, color=MUTED, lw=0.8, ls=":", zorder=0, label="unedited agent")
+    ax.axhline(0, color=INK2, lw=0.8, alpha=0.5, zorder=1)
+
+    pts = sorted(d["written_ood"], key=lambda r: r["value"])
+    WORKS = 0.99
+    ok = [r for r in pts if r["reached"] >= WORKS]
+    ax.plot(
+        [r["value"] for r in ok],
+        [r["steps"] for r in ok],
+        "s-",
+        color=ORANGE,
+        lw=2,
+        ms=6,
+        zorder=4,
+        label="written from the axis",
+    )
+    for side in ([r for r in pts if r["value"] < ok[0]["value"]], [r for r in pts if r["value"] > ok[-1]["value"]]):
+        if not side:
+            continue
+        chain = sorted(side + [ok[0] if side[0]["value"] < ok[0]["value"] else ok[-1]], key=lambda r: r["value"])
+        ax.plot(
+            [r["value"] for r in chain],
+            [r["steps"] for r in chain],
+            "s:",
+            color=ORANGE,
+            lw=1.5,
+            ms=6,
+            mfc=SURFACE,
+            mew=1.5,
+            zorder=3,
+            label="written, agent failing episodes" if side is not None and side[0]["value"] > ok[-1]["value"] else None,
+        )
+
+    ax.plot(
+        [r["value"] for r in d["trained"]],
+        [r["steps"] for r in d["trained"]],
+        "o-",
+        color=BLUE,
+        lw=2,
+        ms=6,
+        zorder=5,
+        label="fine-tuned on that value",
+    )
+
+    # The elbow lands exactly here, which is the point of drawing it: the write
+    # keeps working while colour 0 is still the richer of the two and stops the
+    # moment it is not. Left unlabelled -- the rule at parity and the band over
+    # the fitted values are one sentence each in the text, and spelling them out
+    # on the panel cost more in small print than they returned.
+    ax.axvline(other, color=INK2, lw=0.8, ls=(0, (2, 3)), alpha=0.45, zorder=1)
+
+    ax.set_xlabel("what colour 1 is written as worth")
+    ax.set_ylabel("extra steps walked for colour 0")
+    ax.set_xlim(-0.65, 3.15)
+    ax.set_ylim(-35, 35)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", color=MUTED, alpha=0.22, lw=0.6)
+    ax.set_axisbelow(True)
+    handles, labels = ax.get_legend_handles_labels()
+    order = [
+        labels.index(k)
+        for k in [
+            "fine-tuned on that value",
+            "written from the axis",
+            "written, agent failing episodes",
+            "optimal threshold",
+            "unedited agent",
+        ]
+    ]
+    leg = ax.legend(
+        [handles[i] for i in order],
+        [labels[i] for i in order],
+        loc="upper right",
+        frameon=False,
+        fontsize=8.2,
+        handletextpad=0.5,
+        borderpad=0.2,
+        labelspacing=0.35,
+    )
+    for t in leg.get_texts():
+        t.set_color(INK2)
+    save(fig, "fig12_written_ood")
 
 
 # ---------------------------------------------------------------- figure 2
@@ -595,9 +757,7 @@ def fig_distance_field():
     reach = np.nanmax(truth.reshape(len(truth), -1), axis=1)
     chosen = np.argsort(-reach)[:3]
 
-    diverging = mpl.colors.LinearSegmentedColormap.from_list("error", [ORANGE, "#e6e5e0", BLUE]).with_extremes(
-        bad="#d8d6d0"
-    )
+    diverging = mpl.colors.LinearSegmentedColormap.from_list("error", [ORANGE, "#e6e5e0", BLUE]).with_extremes(bad="#d8d6d0")
     sequential = mpl.colormaps["Blues"].with_extremes(bad="#d8d6d0")
 
     fig, axes = plt.subplots(3, 3, figsize=(6.6, 6.6))
@@ -682,8 +842,14 @@ def fig_distance_accuracy():
         axis.set_xlabel(label.replace("by ", "") + " (cells)")
         axis.set_ylabel("mean error (cells)")
         axis.grid(zorder=0)
-        axis.annotate(f"overall {np.abs(error).mean():.1f}", (xs[0], np.abs(error).mean()),
-                      textcoords="offset points", xytext=(4, 5), fontsize=7.5, color=MUTED)
+        axis.annotate(
+            f"overall {np.abs(error).mean():.1f}",
+            (xs[0], np.abs(error).mean()),
+            textcoords="offset points",
+            xytext=(4, 5),
+            fontsize=7.5,
+            color=MUTED,
+        )
 
     save(fig, "fig7_distance_accuracy")
 
@@ -718,11 +884,16 @@ def fig_intervention():
     )
 
     ax.axhline(10.0, color=INK2, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.annotate("task optimum  10.0", (0.02, 10.0), textcoords="offset points",
-                xytext=(0, 5), fontsize=7.5, color=INK2)
+    ax.annotate("task optimum  10.0", (0.02, 10.0), textcoords="offset points", xytext=(0, 5), fontsize=7.5, color=INK2)
     ax.axhline(baseline["indifference"], color=MUTED, lw=0.9, ls=(0, (1, 2)), zorder=1)
-    ax.annotate(f"agent alone  {baseline['indifference']:.1f}", (0.02, baseline["indifference"]),
-                textcoords="offset points", xytext=(0, -12), fontsize=7.5, color=MUTED)
+    ax.annotate(
+        f"agent alone  {baseline['indifference']:.1f}",
+        (0.02, baseline["indifference"]),
+        textcoords="offset points",
+        xytext=(0, -12),
+        fontsize=7.5,
+        color=MUTED,
+    )
 
     for arm, colour, label, dy in series:
         entries = sorted(data["arms"][arm], key=lambda e: e["alpha"])
@@ -737,15 +908,14 @@ def fig_intervention():
         # not a shifted trade-off — so it is drawn, but drawn differently.
         # The last point still worth reading, not the first one that is not.
         keep = int(np.argmax(reached < INTACT)) - 1 if (reached < INTACT).any() else len(xs) - 1
-        ax.fill_between(xs[: keep + 1], low[: keep + 1], high[: keep + 1],
-                        color=colour, alpha=0.13, lw=0, zorder=2)
+        ax.fill_between(xs[: keep + 1], low[: keep + 1], high[: keep + 1], color=colour, alpha=0.13, lw=0, zorder=2)
         ax.plot(xs[: keep + 1], ys[: keep + 1], "-o", color=colour, lw=2, ms=5, zorder=3, clip_on=False)
         ax.plot(xs[keep:], ys[keep:], ":o", color=colour, lw=1.4, ms=4, mfc=SURFACE, zorder=3, clip_on=False)
-        ax.annotate(label, (xs[keep], ys[keep]), textcoords="offset points", xytext=(3, dy),
-                    ha="left", fontsize=8, color=colour)
+        ax.annotate(
+            label, (xs[keep], ys[keep]), textcoords="offset points", xytext=(3, dy), ha="left", fontsize=8, color=colour
+        )
 
-    ax.annotate("dotted: the write is costing episodes", (0.02, 3.2), ha="left",
-                fontsize=7.5, color=MUTED)
+    ax.annotate("dotted: the write is costing episodes", (0.02, 3.2), ha="left", fontsize=7.5, color=MUTED)
     ax.set_xlabel("write strength (cell-state norms)")
     ax.set_ylabel("extra steps walked for the richer objective")
     ax.set_xlim(0, 1.05)
@@ -763,13 +933,20 @@ def fig_intervention():
 
     for offset, table, colour, name in (
         (-width / 2, bands, MUTED, "agent alone"),
-        (width / 2, steered, BLUE, f"+ written route"),
+        (width / 2, steered, BLUE, "+ written route"),
     ):
         heights = [100 * table[b]["switched"] for b in labels]
         ax.bar(x + offset, heights, width, color=colour, zorder=3, label=name)
         for xi, height in zip(x + offset, heights):
-            ax.annotate(f"{height:.0f}%", (xi, height), textcoords="offset points",
-                        xytext=(0, 3), ha="center", fontsize=7.5, color=INK2)
+            ax.annotate(
+                f"{height:.0f}%",
+                (xi, height),
+                textcoords="offset points",
+                xytext=(0, 3),
+                ha="center",
+                fontsize=7.5,
+                color=INK2,
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels([f"{b.replace('-10.00', '+')}\nn={bands[b]['n']}" for b in labels], fontsize=8)
@@ -795,3 +972,4 @@ if __name__ == "__main__":
     fig_no_value_task()
     fig_written_value()
     fig_ood_writes()
+    fig_written_ood()

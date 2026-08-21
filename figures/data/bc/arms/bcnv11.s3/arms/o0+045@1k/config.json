@@ -1,0 +1,50 @@
+{
+  "model": {
+    "size": 11,
+    "n_channels": 4,
+    "n_actions": 4,
+    "max_actions": 64,
+    "d_model": 128,
+    "n_layers": 4,
+    "n_heads": 4,
+    "mlp_ratio": 4
+  },
+  "train": {
+    "total_steps": 1000,
+    "batch_size": 256,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "warmup_steps": 50,
+    "clip_norm": 1.0,
+    "seed": 1234,
+    "log_every": 50,
+    "checkpoint_first": 100000000,
+    "checkpoint_ratio": 1.4,
+    "schedule": "constant",
+    "init_from": "/workspace/data/offline/runs/bcnv11.s3/checkpoints/step_00030000"
+  },
+  "demos": {
+    "source": "/workspace/data/levels/values/1.45-0.50@150k",
+    "source_fingerprint": "f41dc70b2ac7959b",
+    "code_fingerprint": "0083f337d17d74f2",
+    "split": "train",
+    "rho": 1.0,
+    "seed": 0,
+    "values": [
+      1.45,
+      0.5
+    ],
+    "step_penalty": 0.05,
+    "step_limit": 120,
+    "max_actions": 64,
+    "n": 50000,
+    "size": 11,
+    "path": "/workspace/data/offline/demos/arms/1.45-0.50.train.rho100",
+    "hide_values": true
+  },
+  "parameters": 806533,
+  "checkpoints": [
+    0,
+    1000
+  ]
+}

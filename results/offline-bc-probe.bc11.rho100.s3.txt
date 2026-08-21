@@ -1,0 +1,37 @@
+script 025_bc_probe_plan.py
+commit 992f19c
+argv   /workspace/data/offline/runs/bc11.rho100.s3 --demos /workspace/data/offline/demos/test.rho100 --by-distance
+
+bc11.rho100.s3 @ step 30,000; test.rho100 (rho=1.0); 512 train / 256 test episodes
+
+   depth         probe      AUC            95% CI   bal.acc
+   embed       trained    0.605    [0.587, 0.627]     0.584
+          by distance (matched negatives): 1:0.512  2:0.523  3:0.535  4:0.565  5:0.582  6:0.567  7:0.583  8:0.549  9:0.541  10:0.538  11:0.587  12:0.515
+   embed     untrained    0.607    [0.588, 0.627]     0.584
+          by distance (matched negatives): 1:0.518  2:0.530  3:0.538  4:0.562  5:0.583  6:0.571  7:0.587  8:0.555  9:0.543  10:0.542  11:0.587  12:0.515
+   embed   observation    0.584    [0.577, 0.593]     0.584
+          by distance (matched negatives): 1:0.516  2:0.532  3:0.519  4:0.552  5:0.556  6:0.528  7:0.545  8:0.522  9:0.536  10:0.552  11:0.572  12:0.541
+ block 1       trained    0.642    [0.627, 0.659]     0.584
+          by distance (matched negatives): 1:0.536  2:0.553  3:0.532  4:0.604  5:0.614  6:0.564  7:0.601  8:0.558  9:0.556  10:0.540  11:0.624  12:0.586
+ block 1     untrained    0.602    [0.586, 0.621]     0.584
+          by distance (matched negatives): 1:0.516  2:0.572  3:0.520  4:0.576  5:0.580  6:0.548  7:0.573  8:0.517  9:0.551  10:0.532  11:0.586  12:0.561
+ block 2       trained    0.779    [0.753, 0.805]     0.608
+          by distance (matched negatives): 1:0.604  2:0.648  3:0.640  4:0.674  5:0.702  6:0.684  7:0.715  8:0.703  9:0.695  10:0.710  11:0.721  12:0.704
+ block 2     untrained    0.602    [0.580, 0.628]     0.584
+          by distance (matched negatives): 1:0.530  2:0.564  3:0.523  4:0.581  5:0.579  6:0.562  7:0.579  8:0.540  9:0.555  10:0.531  11:0.586  12:0.566
+ block 3       trained    0.791    [0.762, 0.817]     0.617
+          by distance (matched negatives): 1:0.606  2:0.708  3:0.683  4:0.702  5:0.722  6:0.717  7:0.719  8:0.721  9:0.721  10:0.729  11:0.760  12:0.731
+ block 3     untrained    0.598    [0.577, 0.624]     0.584
+          by distance (matched negatives): 1:0.536  2:0.563  3:0.511  4:0.582  5:0.582  6:0.549  7:0.573  8:0.538  9:0.554  10:0.535  11:0.587  12:0.561
+ block 4       trained    0.785    [0.756, 0.814]     0.619
+          by distance (matched negatives): 1:0.591  2:0.689  3:0.670  4:0.685  5:0.711  6:0.710  7:0.751  8:0.741  9:0.735  10:0.757  11:0.765  12:0.747
+ block 4     untrained    0.597    [0.574, 0.622]     0.584
+          by distance (matched negatives): 1:0.539  2:0.560  3:0.519  4:0.582  5:0.584  6:0.547  7:0.573  8:0.546  9:0.554  10:0.543  11:0.589  12:0.557
+     all       trained    0.651    [0.624, 0.690]     0.595
+          by distance (matched negatives): 1:0.544  2:0.575  3:0.574  4:0.567  5:0.582  6:0.567  7:0.611  8:0.592  9:0.600  10:0.610  11:0.637  12:0.579
+     all     untrained    0.592    [0.580, 0.606]     0.563
+          by distance (matched negatives): 1:0.507  2:0.548  3:0.540  4:0.587  5:0.584  6:0.509  7:0.505  8:0.511  9:0.545  10:0.583  11:0.603  12:0.535
+
+The trained probe must beat the untrained one at the same depth. Beating
+only the observation shows the network mixes cells, which it does before
+any training at all.

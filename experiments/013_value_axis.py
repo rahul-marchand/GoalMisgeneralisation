@@ -1,8 +1,8 @@
 """Fine-tune onto a new objective value, and keep the weight change.
 
     uv run python experiments/013_value_axis.py CHECKPOINT --value 0.7 \
-        --levels /workspace/data/valueaxis/levels/v070 \
-        --run-dir /workspace/data/valueaxis/runs/v070
+        --levels /workspace/data/levels/values/1.00-0.70@500k \
+        --run-dir /workspace/data/runs/novalue11.s1234/arms/v070
 
 ``novalue11`` never saw a value channel. Its objectives were worth the constants
 (1.0, 0.5), bound to colour, every single episode. So there is no per-episode
@@ -44,15 +44,15 @@ import dataclasses
 import json
 import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import cleanba.cleanba_impala
 import farconf
 from cleanba.cleanba_impala import WandbWriter, train
 from cleanba.config import Args
+from cleanba.network import PolicySpec
 
+from goalmisgen import provenance
 from goalmisgen.configs.presets import maze_drc33
 from goalmisgen.configs.writers import CsvWriter
 
@@ -116,6 +116,56 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def base_hides_values(checkpoint: Path) -> bool:
+    """Whether the agent being fine-tuned was trained without a value channel.
+
+    Read from the base rather than assumed. This script was written for
+    ``novalue11``, which has no value channel, and hardcoded that -- so
+    fine-tuning ``maze11``, which has one, built a four-channel network against
+    five-channel weights and died on
+    ``ScopeParamShapeError: expected (3, 3, 5, 32) but got (3, 3, 4, 32)``.
+    The observation format belongs to the agent, not to the fine-tune.
+    """
+    try:
+        payload = json.loads((checkpoint / "cfg.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return True
+    env = payload.get("cfg", payload).get("train_env", {})
+    # ``value_encoding`` is the field to read: every run records it, and it says
+    # directly whether the observation carries a value channel. The first attempt
+    # at this read ``colour_is_the_only_value_cue``, which maze11's config does
+    # not contain at all -- so the lookup returned its default and the fix
+    # silently kept the behaviour it was meant to correct.
+    encoding = env.get("value_encoding")
+    if encoding is not None:
+        return encoding == "none"
+    return bool(env.get("colour_is_the_only_value_cue", True))
+
+
+def base_net(checkpoint: Path) -> PolicySpec | None:
+    """The network the agent being fine-tuned was trained with, read from its cfg.json.
+
+    Read from the base, like the value channel: ``reset_checkpoint`` copies the
+    base's weights byte for byte and writes *this* configuration beside them, so
+    a configuration naming a different network than the weights were trained
+    with would have cleanba build that network against these weights and die on
+    a parameter shape error at resume -- or, for a head of the same shape, not
+    die. The network belongs to the agent, not to the fine-tune. It is the saved
+    spec itself rather than a preset looked up by class, so a transformer of a
+    non-default size comes back at its own size. ``None`` when the base has no
+    readable configuration, in which case the caller keeps the DRC every agent
+    swept before the architecture-swap stream was.
+    """
+    try:
+        payload = json.loads((checkpoint / "cfg.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    net = payload.get("cfg", payload).get("net")
+    if net is None:
+        return None
+    return farconf.from_dict(net, PolicySpec)
+
+
 def finetune_config(args: argparse.Namespace) -> Args:
     """The base run's configuration, with the value swapped and the schedule flattened."""
     values = tuple(args.objective_values) if args.objective_values else (args.value_zero, args.value)
@@ -125,11 +175,14 @@ def finetune_config(args: argparse.Namespace) -> Args:
         max_size=args.size,
         n_objectives=len(values),
         objective_values=values,
-        hide_values=True,
+        hide_values=base_hides_values(args.checkpoint),
         total_timesteps=args.steps,
         level_dataset=args.levels,
         seed=args.seed,
     )
+    net = base_net(args.checkpoint)
+    if net is not None:
+        config.net = net
 
     # A fine-tune is short enough that an annealed rate would spend most of it
     # near zero, and each arm would anneal over its own run rather than sharing
@@ -193,8 +246,7 @@ def reset_checkpoint(base: Path, destination: Path, config: Args) -> Path:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}")
+    print(provenance.header())
 
     config = finetune_config(args)
     updates = config.total_timesteps // local_batch_size(config)

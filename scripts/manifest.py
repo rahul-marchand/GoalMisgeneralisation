@@ -58,8 +58,20 @@ def load_notes(path: Path) -> list[tuple[str, str]]:
     return [(entry["match"], " ".join(entry["note"].split())) for entry in entries]
 
 
+AMBIGUOUS: list[tuple[str, list[str]]] = []
+
+
 def note_for(relative: Path, notes: list[tuple[str, str]], run: Path | None = None) -> str:
-    """The first matching note, else whatever was written beside the checkpoints."""
+    """The first matching note, else whatever was written beside the checkpoints.
+
+    First-match-wins is the documented rule, but it makes a mis-ordered pattern
+    invisible: a per-agent glob above a per-campaign one quietly claims runs the
+    campaign note describes, and the manifest still reports nothing unexplained.
+    So every extra match is recorded and reported at the end.
+    """
+    matched = [pattern for pattern, _ in notes if fnmatch.fnmatch(str(relative), pattern)]
+    if len(matched) > 1:
+        AMBIGUOUS.append((str(relative), matched))
     for pattern, note in notes:
         if fnmatch.fnmatch(str(relative), pattern):
             return note
@@ -130,17 +142,45 @@ def runs(root: Path, notes: list[tuple[str, str]]) -> list[dict]:
     for local in sorted(root.rglob("local-files")):
         run = local.parent
         checkpoints = sorted(local.glob("cp_*"))
-        found.append(
-            {
-                "path": run.relative_to(root),
-                "checkpoints": len(checkpoints),
-                "last": checkpoints[-1].name if checkpoints else "none",
-                "size": human(directory_size(run)),
-                "note": note_for(run.relative_to(root), notes, run),
-                **run_config(run),
-            }
-        )
+        entry = {
+            "path": run.relative_to(root),
+            "checkpoints": len(checkpoints),
+            "last": checkpoints[-1].name if checkpoints else "none",
+            "size": human(directory_size(run)),
+            "note": note_for(run.relative_to(root), notes, run),
+            **run_config(run),
+        }
+        found.append(rung_entry(run, entry) if local.is_symlink() else entry)
     return found
+
+
+def rung_entry(run: Path, entry: dict) -> dict:
+    """Correct a ladder rung's row, which the parent run's checkpoints would fill.
+
+    A rung of the base-checkpoint ladder is an agent view of one earlier
+    checkpoint: its ``local-files`` is a symlink to the run it came from, so
+    globbing it finds *every* checkpoint that run ever wrote and its ``cfg.json``
+    reports what that run was aiming at. Left alone, each rung of a 150M run
+    reads as a 150M run with 32 checkpoints -- ten rows saying the same wrong
+    thing, and none of them saying where in training the rung stands, which is
+    the only reason the rung exists.
+
+    ``BASE.json`` has the answer, and is the same file the sweep driver and the
+    analysis resolve the rung by. See ``goalmisgen/ladder.py``, whose docstring
+    warns about exactly this: anything reading a rung's checkpoints instead of
+    its marker describes the parent.
+    """
+    marker = run / "BASE.json"
+    if not marker.is_file():
+        return entry
+    payload = json.loads(marker.read_text())
+    checkpoint = Path(payload["checkpoint"]).name
+    return {
+        **entry,
+        "checkpoints": payload.get("checkpoints_saved", 1),
+        "last": checkpoint,
+        "steps": payload.get("steps", entry.get("steps")),
+    }
 
 
 def main() -> None:
@@ -217,6 +257,19 @@ def main() -> None:
 
     args.out.write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}  ({len(all_datasets)} datasets, {len(all_runs)} runs, {unexplained} unexplained)")
+    if AMBIGUOUS:
+        # Grouped by which patterns collided, not per path: one mis-ordered glob
+        # produces hundreds of identical reports, and a list that long is ignored.
+        overlaps: dict[tuple[str, ...], int] = {}
+        for _, patterns in AMBIGUOUS:
+            overlaps[tuple(patterns)] = overlaps.get(tuple(patterns), 0) + 1
+        print(f"\n{len(AMBIGUOUS)} path(s) match more than one RUNS.toml entry, in {len(overlaps)} pattern")
+        print("group(s). fnmatch's * crosses '/', so an agent glob also catches that agent's")
+        print("arms. The first listed pattern wins; check it is the one you meant:")
+        for patterns, count in sorted(overlaps.items(), key=lambda kv: -kv[1]):
+            print(f"  {count:>4}x  wins: {patterns[0]}")
+            for shadowed in patterns[1:]:
+                print(f"         shadowed: {shadowed}")
 
 
 if __name__ == "__main__":

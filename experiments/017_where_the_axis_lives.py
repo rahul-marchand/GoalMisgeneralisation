@@ -1,8 +1,8 @@
 """What is actually moving: the shared part, and where the value axis sits.
 
     uv run python experiments/017_where_the_axis_lives.py \
-        --base /workspace/data/runs/novalue11/local-files/cp_140206080 \
-        --arms /workspace/data/valueaxis/runs --prefix v --base-value 0.5
+        --base /workspace/data/runs/novalue11.s1234/local-files/cp_140206080 \
+        --arms /workspace/data/runs/novalue11.s1234/arms --prefix v --base-value 0.5
 
 Two questions the behavioural work leaves open.
 
@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -47,8 +46,10 @@ import jax
 import numpy as np
 from cleanba.cleanba_impala import load_train_state
 
+from goalmisgen import provenance
 from goalmisgen.analysis.weights import cosine, fit_axis_and_drift
 from goalmisgen.configs.env import MazeConfig
+from goalmisgen.volume import parse_arm_dirname, sweep_index
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,7 +70,9 @@ def parse_args() -> argparse.Namespace:
 def leaf_paths(params) -> list[tuple[str, tuple]]:
     """Every parameter array, with a readable path."""
     flat, _ = jax.tree_util.tree_flatten_with_path(params)
-    return [("/".join(str(k.key) if hasattr(k, "key") else str(k.idx) for k in path), np.asarray(value)) for path, value in flat]
+    return [
+        ("/".join(str(k.key) if hasattr(k, "key") else str(k.idx) for k in path), np.asarray(value)) for path, value in flat
+    ]
 
 
 def module_of(path: str) -> str:
@@ -87,18 +90,20 @@ def module_of(path: str) -> str:
     return path.split("/")[0]
 
 
-def sweep(root: Path, prefix: str, at: int, config) -> tuple[list[float], list[dict[str, np.ndarray]], list[str]]:
+def sweep(
+    root: Path, prefix: str, at: int, config, base_value: float
+) -> tuple[list[float], list[dict[str, np.ndarray]], list[str]]:
     values, arms, names = [], [], []
     for run in sorted(root.iterdir()):
-        match = re.fullmatch(rf"{prefix}(\d{{3}})", run.name)
-        if not match or not (run / "local-files").is_dir():
+        parsed = parse_arm_dirname(run.name)
+        if parsed is None or parsed.sweep != f"o{sweep_index(prefix)}":
             continue
         checkpoints = sorted((run / "local-files").glob("cp_*"))
         if not checkpoints:
             continue
         _, _, _, state, _ = load_train_state(checkpoints[at], env_cfg=config)
         arms.append(dict(leaf_paths(state.params)))
-        values.append(int(match.group(1)) / 100)
+        values.append(base_value + parsed.offset)
         names.append(run.name)
     return values, arms, names
 
@@ -121,8 +126,7 @@ def profile(direction: dict[str, np.ndarray]) -> dict[str, float]:
 
 def main() -> None:
     args = parse_args()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"commit {commit or 'unknown'}\nargv   {' '.join(sys.argv[1:])}\n")
+    print(provenance.header() + "\n")
 
     config = MazeConfig(
         max_episode_steps=120,
@@ -144,7 +148,7 @@ def main() -> None:
     counts = {path: value.size for path, value in base.items()}
     print(f"base {args.base.name}  {sum(counts.values()):,} parameters in {len(counts)} arrays\n")
 
-    values, arms, names = sweep(args.arms, args.prefix, args.at, config)
+    values, arms, names = sweep(args.arms, args.prefix, args.at, config, args.base_value)
     if len(values) < 4:
         sys.exit(f"need at least four arms, found {len(values)}")
     diffs = [{path: arm[path] - base[path] for path in base} for arm in arms]
@@ -205,9 +209,14 @@ def main() -> None:
     for half in halves:
         if len(half) >= 3:
             a, _ = fit_axis_and_drift(offsets[keep][half], flat[keep][half])
-            half_profiles.append(profile({p: v for p, v in zip(keys, np.split(a, np.cumsum([base[k].size for k in keys])[:-1]))}))
+            half_profiles.append(
+                profile({p: v for p, v in zip(keys, np.split(a, np.cumsum([base[k].size for k in keys])[:-1]))})
+            )
 
-    print(f"  {'module':>26}{'params':>10}{'axis':>9}{'shared':>9}{'vs params':>11}{'vs shared':>11}" + ("{:>16}".format("halves agree") if len(half_profiles) == 2 else ""))
+    print(
+        f"  {'module':>26}{'params':>10}{'axis':>9}{'shared':>9}{'vs params':>11}{'vs shared':>11}"
+        + ("{:>16}".format("halves agree") if len(half_profiles) == 2 else "")
+    )
     for name in sorted(axis_profile, key=lambda n: -axis_profile[n]):
         share = sizes[name] / total_params
         common = drift_profile.get(name, 0)

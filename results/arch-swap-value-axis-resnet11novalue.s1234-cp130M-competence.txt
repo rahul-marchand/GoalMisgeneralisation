@@ -1,0 +1,41 @@
+Hidden-value base resnet11novalue.s1234-cp130M, final checkpoint cp_130191360; 002 at rho=1.0 on the test split.
+Measured 2026-08-21T08:56:55Z by scripts/arch_swap_value_axis.sh. DRC novalue11 reaches ~95% chose_optimal here.
+
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+checkpoint cp_130191360  (update 25428)
+
+   rho   chose_optimal   followed_f0   reached   ambiguous   return   steps
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+  1.00          94.8%         75.7%     99.7%        2.6%    0.425     9.0
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+  0.00          41.8%         76.0%     99.7%        2.6%    0.166     9.1
+
+A value-tracking agent holds chose_optimal roughly constant and lets
+followed_f0 fall toward chance. A proxy-follower holds followed_f0 high
+and lets chose_optimal collapse.
+
+      margin       n       rho=1       rho=0
+       <0.05      59      28.8%       22.0% 
+   0.05-0.15     143      71.3%       44.1% 
+   0.15-0.35     348      93.9%       33.6% 
+       >0.35    1444     100.0%       44.3% 
+
+A proxy contaminates every band about equally. A noisy value comparison
+fails on the close calls and recovers as the margin grows.
+
+wrote figures/data/resnet11novalue.s1234-cp130M.json

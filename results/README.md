@@ -235,3 +235,100 @@ though a step cost 0.061 rather than 0.05 and so gives up on the further
 objective too early; a small write along the axis appears to correct exactly that
 bias. The axis is not only readable and writable but usable to make the agent
 *better* than training left it.
+## Architecture swap (stream arch-swap, 2026-08-20)
+
+Does Experiment 1 survive swapping the DRC(3,3) for a non-recurrent ResNet
+(cleanba's GuezResNet, input rescaled by 255) and a ViT-style transformer
+(`goalmisgen.nets.transformer`), with env, dataset, IMPALA training and eval
+protocol fixed? One seed per architecture; read the numbers as n=1.
+
+- `arch-swap-<agent>.txt` — 002 (test split, 2048 episodes at rho 1.0/0.5/0.0)
+  and 003 (t=0 plan probe, per layer, fitted at rho=1.0 and scored at 1.0 and
+  0.0, against the untrained network of the same shape and the observation) on
+  the final 150M checkpoint of `resnet11.s1234`, `resnet11clean.s1234`,
+  `vit11.s1234`, `vit11clean.s1234`. Written by `scripts/arch_swap_measure.sh`;
+  the 002 JSON lands in `figures/data/<agent>.json` beside the DRC's.
+- `arch-swap-early-warning-<agent>.txt` — the same two measurements at every
+  saved checkpoint (512 episodes), `scripts/early_warning.sh` with
+  `AGENTS`/`OUT` overridden; `arch-swap-early-warning-drc.txt` is the DRC pair
+  (`maze11.s1234`, `clean11fv.s1234`, checkpoints up to 40M) measured the same
+  way so the three architectures are compared on one protocol.
+  `scripts/early_warning_report.py` turns these into `figures/fig_early_warning.*`.
+- `figures/fig_arch_swap_dynamics.*` — `scripts/arch_swap_report.py` over the
+  six runs' `metrics.csv` (in-training eval returns at rho 1.0/0.5/0.0 and the
+  rho=1.0 − rho=0.0 gap against steps).
+
+What to make of it (n=1): the ResNet reproduces the DRC's behavioural result —
+competent (98.8% reach, 92.2% chose_optimal at rho=1.0) and misgeneralising
+(51.5% at rho=0.0; the control is flat at 95.6/95.7/95.9%) — but its gap is
+present as soon as it is competent (both by ~4–5M steps), not ~20M after
+competence as the DRC's. The transformer is less competent after 150M (82.0%
+chose_optimal, 91.6% reach at rho=1.0) and its *reach* also degrades under
+the swept rho (79.6% at rho=0.0), so its gap mixes goal misgeneralisation with
+a capability failure. The t=0 plan probe beats the untrained network for all
+three (DRC 0.967 vs 0.523, ResNet 0.930 vs 0.658, transformer 0.721 vs 0.629),
+and on the early-warning protocol the probe gap (AUC at rho=1.0 − at rho=0.0)
+stays at zero throughout training for *every* architecture, the DRC included:
+the probe reads the executed route equally well whichever objective was chosen,
+so this measure does not see the proxy before behaviour does.
+
+### The value axis on the swapped-in architectures (redirect 2026-08-20/21)
+
+Experiment 2's pipeline run unchanged on a hidden-value base of each
+architecture: `scripts/arch_swap_value_axis.sh` = 001 `--hide-values` →
+002 → `scripts/value_axis_sweep.py` (the wide grid, o0 and o1, 400k steps
+an arm, 4 checkpoints, lr 1e-4, the base's own net from its cfg.json) → 014
+×3 → 015 `--skip-behaviour`, with the flags the DRC's `wide-novalue11.*`
+results were made with. One seed per architecture.
+
+- `arch-swap-value-axis-<base>-competence.txt` — 002 on the base (test
+  split, 2048 episodes, rho 1.0 and 0.0, `--hide-values`; the chain's first
+  call lacked that flag and crashed, these are the by-hand reruns).
+  `vit11novalue.s1234` at 250M: 78.8% chose_optimal, 86.5% reached at
+  rho=1.0 (DRC novalue11 ~95% / 100%), 58.4% / 86.1% at rho=0.0.
+  `resnet11novalue.s1234` at its final checkpoint cp_149995520: **5.9%
+  reached** — the run collapsed between 130M and 140M (training return
+  +0.35 → −3.9, in-training eval success 1.00 → 0.04) and the chain took
+  the final checkpoint as the base. `resnet11novalue.s1234-cp130M` is the
+  last healthy checkpoint (130.2M): 94.8% chose_optimal, 99.7% reached at
+  rho=1.0, 41.8% at rho=0.0 — the DRC's level.
+- `arch-swap-value-axis-<base>-{o0,o0-heldout,o1,value-or-gap}.txt` — 014
+  on each sweep (leave-one-out writes on o0, extrapolation on o1) and 015.
+  **`vit11novalue.s1234`:** the arms learned graded, monotonic exchange
+  rates (o0: 1.1 steps at v=0.55 → 5.4 at v=1.45; o1: 5.0 at v=0.05 → 1.0
+  at v=0.95; base 3.0; the DRC's o0 arms span 1.1 → 15 on the same grid), a
+  compressed range on a base that is itself less value-sensitive. Writing
+  `base + offset·axis` reproduces every arm: in-sample and leave-one-out
+  (mean |error| 0.23 steps, max 0.6, against that 4.4-step range; the DRC's
+  wide sweeps give 1.19 / 2.32 steps for s1234 / s5678 against ~14), the
+  norm-matched random directions leave the base at 3.0, and extrapolating
+  the o1 axis to unseen values 1.0–1.5 runs the rate down to 0.0. The
+  weight-space fit is weak (held-out R² ≈ 0, the null arm |Δθ| 9.19 is
+  half common drift, split-half reliabilities 0.41 / 0.37 against the DRC's
+  0.75–0.83) but the behavioural writes are the test that matters.
+  `cos(axis_0, axis_1) = −0.449` raw, permutation null sd 0.131, p = 0.0005,
+  disattenuated −1.15 (broken, i.e. at the −1 floor): consistent with one
+  knob, as for the DRC (−0.760 / −0.844 raw → −1.00 / −1.03).
+  **`resnet11novalue.s1234` (collapsed base):** every arm's |Δθ| is
+  0.02–0.15 (null arm 0.099), every arm's exchange rate sits inside the
+  base's interval at 6% reach, LOO writes reproduce nothing, and the +0.727
+  between the two "axes" is the cosine of two noise fits — not a two-register
+  result; a non-result. **`resnet11novalue.s1234-cp130M` (the healthy
+  checkpoint, 94.8% / 99.7%):** the arms learn graded exchange rates at
+  nearly the DRC's range (o0: base 7.6, arms 1.3 at v=0.57 → 12.9 at
+  v=1.40; o1: 14.1 at v=0.06 → 1.5 at v=0.90; DRC 7.7, 1.1 → 15); |Δθ|
+  3.4–4.6 per arm, null 4.20 of which 0.22 common drift. Writing the axis
+  reproduces them in sample and leave-one-out (mean |error| 0.87 steps,
+  max 2.4, over ~11.6 steps, excluding o0 v=1.44, an arm that collapsed
+  within its 400k fine-tune steps to 6% reach — the ResNet's instability
+  again; 3–4 of the 50 arms degraded, the rest reach 94–100%), random
+  directions leave the base at 7.6, extrapolating o1 to unseen 1.0–1.5
+  runs 2.6 → 0.6. `cos(axis_0, axis_1) = −0.497` raw, reliabilities 0.38 /
+  0.34, null sd 0.143, p = 0.0005, disattenuated −1.38 (at the floor). So
+  the one-knob, writable value axis is the task's, not the DRC's: it
+  reproduces on both swapped-in architectures (n=1 each), with the
+  architecture changing the reliability of the fit (DRC 0.75–0.83, ResNet
+  ~0.36, ViT ~0.39 at 400k-step arms) and the arms' range, not the
+  structure.
+- `figures/data/{resnet11novalue,vit11novalue}.s1234.json` — the 002 JSON of
+  each base (the ResNet's is the collapsed checkpoint).

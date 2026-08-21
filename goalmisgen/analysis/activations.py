@@ -1,10 +1,13 @@
-"""Recording what a DRC agent is thinking, alongside what it then does.
+"""Recording what an agent is thinking, alongside what it then does.
 
 The DRC's carry *is* its working state: three ConvLSTM layers, each holding a
 32-channel vector for every maze cell. That spatial structure is what makes a
 per-cell linear probe meaningful — the same readout is applied at every
 position, so a probe that works is finding something the network represents
-*about that cell*, not a global summary.
+*about that cell*, not a global summary. A ResNet's feature maps and a
+transformer's per-token residual stream have the same structure, and
+:mod:`goalmisgen.nets.readers` hands all three over in the same shape, so
+nothing here is specific to the DRC any more.
 
 Activations are captured **before the agent moves**. A plan that only appears
 once the agent is halfway there is not a plan; the claim worth testing is that
@@ -21,6 +24,7 @@ import numpy as np
 
 from goalmisgen.envs.observation import AGENT_CHANNEL, WALL_CHANNEL
 from goalmisgen.envs.solver import distance_field
+from goalmisgen.nets.readers import state_reader_for
 
 
 @dataclasses.dataclass
@@ -36,6 +40,10 @@ class Rollout:
     Captured alongside ``features`` rather than in a separate pass because the
     two come from one forward pass; collecting them apart would cost a second
     rollout and risk the two describing different episodes.
+
+    A network that carries nothing between steps has no cell state; for those
+    this holds the same array as ``features``, so code that reads shapes keeps
+    working and code that writes into a carry has nothing to write to.
     """
 
     observation: np.ndarray
@@ -165,7 +173,10 @@ def collect_rollouts(
 
     ``steps_to_think`` is the number of *extra* passes over the initial
     observation before acting, on top of the one the agent always makes. Each
-    pass runs the DRC's three internal ticks.
+    pass runs the DRC's three internal ticks. A network with no state between
+    steps computes the same thing on every pass, so for it thinking passes —
+    the agent's and the probe's alike — change nothing, and steering has no
+    carry to write into and is refused.
 
     The two ``probe_`` arguments change *what is probed* without changing what
     the agent does, which is what makes them controls:
@@ -180,6 +191,11 @@ def collect_rollouts(
     labels move with the features and any change in accuracy is unattributable.
     """
     get_action = jax.jit(partial(policy.apply, method=policy.get_action), static_argnames="temperature")
+    # The same call with the per-cell state of the pass returned alongside it.
+    # Which grids those are depends on the architecture; the reader knows.
+    reader = state_reader_for(policy)
+    if steer_delta is not None and not reader.has_cell_state:
+        raise ValueError("steering writes into the recurrent cell state, and this network has none")
     key = jax.random.PRNGKey(seed)
 
     rollouts: list[Rollout] = []
@@ -194,7 +210,7 @@ def collect_rollouts(
         # Probe *after* the network has processed the observation at least once.
         # initialize_carry returns zeros, so capturing before this would probe an
         # empty state - which shows up as an AUC of exactly 0.500.
-        carry, first_action, _, key = get_action(params, carry, observations, starts, key, temperature=0.0)
+        carry, first_action, _, key, state = reader.step(params, carry, observations, starts, key, temperature=0.0)
 
         # Everything below feeds the probe only. `key` is deliberately not
         # advanced and `carry` is not reassigned, so the actions the agent goes
@@ -205,7 +221,9 @@ def collect_rollouts(
             probe_carry = carry
         else:
             probe_carry = policy.apply(probe_params, key, envs.observation_space.shape, method=policy.initialize_carry)
-            probe_carry, _, _, _ = get_action(features_params, probe_carry, observations, starts, key, temperature=0.0)
+            probe_carry, _, _, _, state = reader.step(
+                features_params, probe_carry, observations, starts, key, temperature=0.0
+            )
         # Applied *before* the extra passes, so probe_steps_to_think measures
         # how much of the displacement survives them. Steering the arithmetic is
         # easy; showing the shift outlives nine gated recurrent updates is what
@@ -214,11 +232,13 @@ def collect_rollouts(
             from goalmisgen.analysis.steering import apply_to_carry
 
             probe_carry = apply_to_carry(probe_carry, steer_delta)
+            state = reader.state_of_carry(probe_carry)
 
         for _ in range(probe_steps_to_think):
-            probe_carry, _, _, _ = get_action(features_params, probe_carry, observations, starts, key, temperature=0.0)
+            probe_carry, _, _, _, state = reader.step(
+                features_params, probe_carry, observations, starts, key, temperature=0.0
+            )
 
-        initial_carry = jax.tree_util.tree_map(np.asarray, probe_carry)
         initial_obs = np.asarray(observations)
 
         # NCHW from the wrapper; probes want the spatial axes last.
@@ -283,10 +303,11 @@ def collect_rollouts(
             final = finals[index]
             if final is None or len(rollouts) >= n_episodes:
                 continue
+            features, cell_state = state.stacked(index)
             rollouts.append(
                 Rollout(
-                    features=stack_layers(initial_carry, index, "h"),
-                    cell_state=stack_layers(initial_carry, index, "c"),
+                    features=features,
+                    cell_state=cell_state,
                     observation=np.moveaxis(initial_obs[index], 0, -1),
                     visited=visited[index],
                     visit_step=visit_step[index],

@@ -1,0 +1,263 @@
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.num_envs to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.num_envs` for environment variables.[0m
+  logger.warn(
+script 014_value_axis_analysis.py
+commit 6b50d42
+argv   --base /workspace/data/runs/resnet11novalue.s1234-cp130M/local-files/cp_130191360 --arms /workspace/data/runs/resnet11novalue.s1234-cp130M/arms --levels /workspace/data/levels/values/1.00-0.50@500k --prefix o1 --base-value 0.5 --arm-steps 400000 --at -1 --extrapolate 1.00 1.05 1.10 1.20 1.30 1.50
+
+base cp_130191360  (update 25428, 1,234,405 parameters)
+
+arms
+  v=0.05  cp_399360  (update 78)  |delta| 4.268
+  v=0.06  cp_399360  (update 78)  |delta| 4.238
+  v=0.07  cp_399360  (update 78)  |delta| 4.328
+  v=0.08  cp_399360  (update 78)  |delta| 4.326
+  v=0.09  cp_399360  (update 78)  |delta| 4.374
+  v=0.10  cp_399360  (update 78)  |delta| 4.496
+  v=0.11  cp_399360  (update 78)  |delta| 4.106
+  v=0.12  cp_399360  (update 78)  |delta| 4.467
+  v=0.20  cp_399360  (update 78)  |delta| 4.203
+  v=0.30  cp_399360  (update 78)  |delta| 4.11
+  v=0.40  cp_399360  (update 78)  |delta| 3.992
+  v=0.45  cp_399360  (update 78)  |delta| 4.229
+  v=0.50  cp_399360  (update 78)  |delta| 4.008
+  v=0.55  cp_399360  (update 78)  |delta| 4.179
+  v=0.60  cp_399360  (update 78)  |delta| 3.917
+  v=0.70  cp_399360  (update 78)  |delta| 3.857
+  v=0.80  cp_399360  (update 78)  |delta| 4.274
+  v=0.88  cp_399360  (update 78)  |delta| 4.266
+  v=0.89  cp_399360  (update 78)  |delta| 4.067
+  v=0.90  cp_399360  (update 78)  |delta| 4.139
+  v=0.91  cp_399360  (update 78)  |delta| 4.196
+  v=0.92  cp_399360  (update 78)  |delta| 4.318
+  v=0.93  cp_399360  (update 78)  |delta| 4.171
+  v=0.94  cp_399360  (update 78)  |delta| 4.262
+  v=0.95  cp_399360  (update 78)  |delta| 4.279
+
+common component |drift| 1.371   axis per unit value |axis| 3.393
+null arm |delta| 4.008, and 0.184 of it is that same common direction
+
+
+=== collinear? cosine between arms, raw ===
+
+            0.05    0.06    0.07    0.08    0.09    0.10    0.11    0.12    0.20    0.30    0.40    0.45    0.55    0.60    0.70    0.80    0.88    0.89    0.90    0.91    0.92    0.93    0.94    0.95
+  0.05     1.000   0.092   0.082   0.086   0.082   0.076   0.100   0.105   0.107   0.076   0.064   0.076   0.060   0.024   0.045   0.033   0.011   0.011   0.033   0.000   0.041   0.000   0.028   0.023
+  0.06     0.092   1.000   0.123   0.144   0.141   0.136   0.146   0.104   0.125   0.077   0.100   0.067   0.064   0.067   0.054   0.020   0.025   0.017   0.022   0.046  -0.009   0.036   0.017  -0.013
+  0.07     0.082   0.123   1.000   0.113   0.099   0.079   0.114   0.090   0.131   0.078   0.035   0.089   0.092   0.038   0.037   0.022  -0.018  -0.019  -0.004   0.018   0.010   0.003   0.010   0.011
+  0.08     0.086   0.144   0.113   1.000   0.111   0.102   0.127   0.109   0.097   0.075   0.053   0.066   0.050   0.056   0.043   0.019   0.009   0.010   0.025   0.026   0.009   0.036   0.021   0.001
+  0.09     0.082   0.141   0.099   0.111   1.000   0.108   0.128   0.093   0.113   0.062   0.078   0.059   0.056   0.025   0.026   0.012  -0.003   0.003   0.004   0.012   0.004   0.014   0.020   0.005
+  0.10     0.076   0.136   0.079   0.102   0.108   1.000   0.115   0.094   0.110   0.109   0.088   0.068   0.069   0.035   0.042   0.006   0.024   0.035   0.028   0.020   0.017   0.023   0.039   0.033
+  0.11     0.100   0.146   0.114   0.127   0.128   0.115   1.000   0.104   0.126   0.105   0.059   0.052   0.063   0.041   0.049   0.013   0.004   0.007   0.018   0.025   0.002   0.032   0.029   0.019
+  0.12     0.105   0.104   0.090   0.109   0.093   0.094   0.104   1.000   0.121   0.082   0.055   0.068   0.038   0.033   0.052   0.042   0.012   0.010   0.029   0.032   0.017   0.015   0.019   0.008
+  0.20     0.107   0.125   0.131   0.097   0.113   0.110   0.126   0.121   1.000   0.107   0.086   0.086   0.078   0.023   0.043   0.027   0.033   0.031   0.022   0.014   0.037   0.008   0.036   0.024
+  0.30     0.076   0.077   0.078   0.075   0.062   0.109   0.105   0.082   0.107   1.000   0.060   0.097   0.032   0.035   0.055   0.005   0.020   0.043   0.009   0.045   0.013   0.044   0.023   0.032
+  0.40     0.064   0.100   0.035   0.053   0.078   0.088   0.059   0.055   0.086   0.060   1.000   0.052   0.054   0.041   0.039   0.049   0.048   0.063   0.069   0.028   0.044   0.061   0.061   0.047
+  0.45     0.076   0.067   0.089   0.066   0.059   0.068   0.052   0.068   0.086   0.097   0.052   1.000   0.064   0.034   0.102   0.029   0.039   0.047   0.041   0.082   0.027   0.039   0.040   0.068
+  0.55     0.060   0.064   0.092   0.050   0.056   0.069   0.063   0.038   0.078   0.032   0.054   0.064   1.000   0.041   0.060   0.064   0.056   0.080   0.048   0.052   0.078   0.062   0.072   0.070
+  0.60     0.024   0.067   0.038   0.056   0.025   0.035   0.041   0.033   0.023   0.035   0.041   0.034   0.041   1.000   0.099   0.082   0.086   0.075   0.062   0.118   0.076   0.092   0.071   0.076
+  0.70     0.045   0.054   0.037   0.043   0.026   0.042   0.049   0.052   0.043   0.055   0.039   0.102   0.060   0.099   1.000   0.095   0.113   0.120   0.122   0.177   0.103   0.138   0.115   0.104
+  0.80     0.033   0.020   0.022   0.019   0.012   0.006   0.013   0.042   0.027   0.005   0.049   0.029   0.064   0.082   0.095   1.000   0.127   0.111   0.117   0.124   0.141   0.108   0.119   0.124
+  0.88     0.011   0.025  -0.018   0.009  -0.003   0.024   0.004   0.012   0.033   0.020   0.048   0.039   0.056   0.086   0.113   0.127   1.000   0.145   0.153   0.142   0.167   0.144   0.185   0.152
+  0.89     0.011   0.017  -0.019   0.010   0.003   0.035   0.007   0.010   0.031   0.043   0.063   0.047   0.080   0.075   0.120   0.111   0.145   1.000   0.156   0.167   0.165   0.171   0.159   0.172
+  0.90     0.033   0.022  -0.004   0.025   0.004   0.028   0.018   0.029   0.022   0.009   0.069   0.041   0.048   0.062   0.122   0.117   0.153   0.156   1.000   0.154   0.153   0.153   0.169   0.150
+  0.91     0.000   0.046   0.018   0.026   0.012   0.020   0.025   0.032   0.014   0.045   0.028   0.082   0.052   0.118   0.177   0.124   0.142   0.167   0.154   1.000   0.141   0.189   0.159   0.169
+  0.92     0.041  -0.009   0.010   0.009   0.004   0.017   0.002   0.017   0.037   0.013   0.044   0.027   0.078   0.076   0.103   0.141   0.167   0.165   0.153   0.141   1.000   0.155   0.176   0.173
+  0.93     0.000   0.036   0.003   0.036   0.014   0.023   0.032   0.015   0.008   0.044   0.061   0.039   0.062   0.092   0.138   0.108   0.144   0.171   0.153   0.189   0.155   1.000   0.168   0.163
+  0.94     0.028   0.017   0.010   0.021   0.020   0.039   0.029   0.019   0.036   0.023   0.061   0.040   0.072   0.071   0.115   0.119   0.185   0.159   0.169   0.159   0.176   0.168   1.000   0.180
+  0.95     0.023  -0.013   0.011   0.001   0.005   0.033   0.019   0.008   0.024   0.032   0.047   0.068   0.070   0.076   0.104   0.124   0.152   0.172   0.150   0.169   0.173   0.163   0.180   1.000
+
+=== and with the common component removed ===
+
+            0.05    0.06    0.07    0.08    0.09    0.10    0.11    0.12    0.20    0.30    0.40    0.45    0.55    0.60    0.70    0.80    0.88    0.89    0.90    0.91    0.92    0.93    0.94    0.95
+  0.05     1.000  -0.007  -0.002  -0.005  -0.003  -0.021   0.009   0.017   0.011  -0.008  -0.022  -0.014  -0.032  -0.064  -0.064  -0.066  -0.099  -0.102  -0.076  -0.124  -0.070  -0.119  -0.093  -0.092
+  0.06    -0.007   1.000   0.029   0.045   0.047   0.031   0.044   0.001   0.015  -0.022   0.001  -0.040  -0.043  -0.034  -0.072  -0.097  -0.101  -0.113  -0.106  -0.090  -0.143  -0.096  -0.122  -0.150
+  0.07    -0.002   0.029   1.000   0.025   0.015  -0.017   0.025   0.001   0.039  -0.006  -0.053   0.000   0.004  -0.048  -0.072  -0.078  -0.131  -0.135  -0.117  -0.104  -0.104  -0.115  -0.112  -0.105
+  0.08    -0.005   0.045   0.025   1.000   0.022   0.001   0.033   0.015  -0.006  -0.016  -0.041  -0.032  -0.050  -0.036  -0.075  -0.089  -0.109  -0.111  -0.093  -0.102  -0.113  -0.086  -0.108  -0.124
+  0.09    -0.003   0.047   0.015   0.022   1.000   0.014   0.039   0.003   0.017  -0.024  -0.008  -0.033  -0.037  -0.064  -0.086  -0.091  -0.116  -0.112  -0.109  -0.112  -0.112  -0.104  -0.102  -0.113
+  0.10    -0.021   0.031  -0.017   0.001   0.014   1.000   0.014  -0.005   0.003   0.016  -0.009  -0.034  -0.034  -0.066  -0.081  -0.108  -0.097  -0.088  -0.095  -0.114  -0.108  -0.106  -0.092  -0.092
+  0.11     0.009   0.044   0.025   0.033   0.039   0.014   1.000   0.007   0.023   0.016  -0.036  -0.049  -0.037  -0.054  -0.070  -0.098  -0.117  -0.117  -0.102  -0.106  -0.124  -0.094  -0.102  -0.106
+  0.12     0.017   0.001   0.001   0.015   0.003  -0.005   0.007   1.000   0.021  -0.008  -0.038  -0.029  -0.062  -0.060  -0.063  -0.062  -0.104  -0.109  -0.086  -0.093  -0.102  -0.108  -0.108  -0.115
+  0.20     0.011   0.015   0.039  -0.006   0.017   0.003   0.023   0.021   1.000   0.011  -0.013  -0.017  -0.027  -0.081  -0.083  -0.088  -0.091  -0.097  -0.105  -0.125  -0.090  -0.128  -0.100  -0.107
+  0.30    -0.008  -0.022  -0.006  -0.016  -0.024   0.016   0.016  -0.008   0.011   1.000  -0.025   0.009  -0.061  -0.050  -0.052  -0.096  -0.089  -0.066  -0.103  -0.073  -0.101  -0.071  -0.099  -0.082
+  0.40    -0.022   0.001  -0.053  -0.041  -0.008  -0.009  -0.036  -0.038  -0.013  -0.025   1.000  -0.041  -0.038  -0.044  -0.071  -0.049  -0.059  -0.045  -0.037  -0.094  -0.068  -0.053  -0.057  -0.067
+  0.45    -0.014  -0.040   0.000  -0.032  -0.033  -0.034  -0.049  -0.029  -0.017   0.009  -0.041   1.000  -0.032  -0.059  -0.007  -0.076  -0.074  -0.068  -0.074  -0.037  -0.092  -0.081  -0.086  -0.048
+  0.55    -0.032  -0.043   0.004  -0.050  -0.037  -0.034  -0.037  -0.062  -0.027  -0.061  -0.038  -0.032   1.000  -0.051  -0.054  -0.038  -0.055  -0.031  -0.066  -0.073  -0.035  -0.056  -0.049  -0.045
+  0.60    -0.064  -0.034  -0.048  -0.036  -0.064  -0.066  -0.054  -0.060  -0.081  -0.050  -0.044  -0.059  -0.051   1.000  -0.003  -0.012  -0.015  -0.030  -0.043   0.008  -0.031  -0.016  -0.045  -0.033
+  0.70    -0.064  -0.072  -0.072  -0.075  -0.086  -0.081  -0.070  -0.063  -0.083  -0.052  -0.071  -0.007  -0.054  -0.003   1.000  -0.020  -0.008  -0.004  -0.000   0.052  -0.024   0.012  -0.019  -0.025
+  0.80    -0.066  -0.097  -0.078  -0.089  -0.091  -0.108  -0.098  -0.062  -0.088  -0.096  -0.049  -0.076  -0.038  -0.012  -0.020   1.000   0.020  -0.001   0.008   0.006   0.032  -0.009   0.000   0.011
+  0.88    -0.099  -0.101  -0.131  -0.109  -0.116  -0.097  -0.117  -0.104  -0.091  -0.089  -0.059  -0.074  -0.055  -0.015  -0.008   0.020   1.000   0.029   0.040   0.018   0.054   0.024   0.067   0.034
+  0.89    -0.102  -0.113  -0.135  -0.111  -0.112  -0.088  -0.117  -0.109  -0.097  -0.066  -0.045  -0.068  -0.031  -0.030  -0.004  -0.001   0.029   1.000   0.040   0.042   0.048   0.051   0.033   0.055
+  0.90    -0.076  -0.106  -0.117  -0.093  -0.109  -0.095  -0.102  -0.086  -0.105  -0.103  -0.037  -0.074  -0.066  -0.043  -0.000   0.008   0.040   0.040   1.000   0.029   0.036   0.032   0.046   0.031
+  0.91    -0.124  -0.090  -0.104  -0.102  -0.112  -0.114  -0.106  -0.093  -0.125  -0.073  -0.094  -0.037  -0.073   0.008   0.052   0.006   0.018   0.042   0.029   1.000   0.013   0.064   0.026   0.043
+  0.92    -0.070  -0.143  -0.104  -0.113  -0.112  -0.108  -0.124  -0.102  -0.090  -0.101  -0.068  -0.092  -0.035  -0.031  -0.024   0.032   0.054   0.048   0.036   0.013   1.000   0.032   0.053   0.055
+  0.93    -0.119  -0.096  -0.115  -0.086  -0.104  -0.106  -0.094  -0.108  -0.128  -0.071  -0.053  -0.081  -0.056  -0.016   0.012  -0.009   0.024   0.051   0.032   0.064   0.032   1.000   0.040   0.040
+  0.94    -0.093  -0.122  -0.112  -0.108  -0.102  -0.092  -0.102  -0.108  -0.100  -0.099  -0.057  -0.086  -0.049  -0.045  -0.019   0.000   0.067   0.033   0.046   0.026   0.053   0.040   1.000   0.056
+  0.95    -0.092  -0.150  -0.105  -0.124  -0.113  -0.092  -0.106  -0.115  -0.107  -0.082  -0.067  -0.048  -0.045  -0.033  -0.025   0.011   0.034   0.055   0.031   0.043   0.055   0.040   0.056   1.000
+
+The raw matrix is positive everywhere, including between arms on opposite
+sides of the base, which is the signature of a direction that means no more
+than 'was fine-tuned'. Once that is removed, arms on the same side should
+agree and arms on opposite sides should oppose. Ordering matters as much as
+sign: neighbouring values should look more alike than distant ones.
+
+=== graded and predictive? ===
+
+    value  offset   |delta|  |residual|  held-out R^2  held-out cos  implied offset
+     0.05   -0.45     4.268       4.085        -0.051        -0.116           -0.14
+     0.06   -0.44     4.238       3.994        -0.000        -0.183           -0.22
+     0.07   -0.43     4.328       4.142        -0.007        -0.161           -0.20
+     0.08   -0.42     4.326       4.113        -0.009        -0.156           -0.19
+     0.09   -0.41     4.374       4.181         0.004        -0.167           -0.21
+     0.10   -0.40     4.496       4.256        -0.013        -0.135           -0.17
+     0.11   -0.39     4.106       3.896         0.006        -0.174           -0.20
+     0.12   -0.38     4.467       4.251        -0.005        -0.138           -0.18
+     0.20   -0.30     4.203       3.965         0.019        -0.163           -0.20
+     0.30   -0.20      4.11       3.937         0.008        -0.108           -0.13
+     0.40   -0.10     3.992       3.822         0.001        -0.046           -0.05
+     0.45   -0.05     4.229       4.026         0.003        -0.058           -0.07
+     0.55    0.05     4.179       3.979        -0.003        -0.020           -0.02
+     0.60    0.10     3.917       3.758         0.000         0.046           +0.05
+     0.70    0.20     3.857       3.611         0.002         0.096           +0.11
+     0.80    0.30     4.274       4.051         0.004         0.130           +0.16
+     0.88    0.38     4.266       4.009         0.026         0.198           +0.24
+     0.89    0.39     4.067        3.81         0.021         0.200           +0.23
+     0.90    0.40     4.139       3.883         0.005         0.178           +0.21
+     0.91    0.41     4.196       3.897         0.013         0.192           +0.23
+     0.92    0.42     4.318       4.045         0.021         0.202           +0.25
+     0.93    0.43     4.171        3.89         0.006         0.191           +0.22
+     0.94    0.44     4.262        3.96         0.009         0.196           +0.23
+     0.95    0.45     4.279       3.999         0.015         0.206           +0.25
+     null    0.00     4.008        3.99             —        -0.027           -0.03
+
+The implied offset is the axis read backwards, fitted without this arm. It
+should track the offset the arm was trained at, and the null arm's should sit
+near zero. All of them landing on the same number is the fit reporting the
+common component rather than the value.
+
+
+=== what the arms themselves do ===
+
+                                   steps    95% interval    reached
+                 base, untouched     7.6  [  7.4,   7.9]      99.7%
+               v=0.05 fine-tuned    11.4  [ 11.0,  11.7]      97.1%
+               v=0.06 fine-tuned    14.1  [ 13.7,  14.6]      98.9%
+               v=0.07 fine-tuned    13.9  [ 13.4,  14.3]      98.3%
+               v=0.08 fine-tuned    12.2  [ 11.8,  12.6]      99.3%
+               v=0.09 fine-tuned    11.7  [ 11.4,  12.2]      98.1%
+               v=0.10 fine-tuned    11.4  [ 11.0,  11.8]      97.3%
+               v=0.11 fine-tuned    13.2  [ 12.7,  13.7]      90.8%
+               v=0.12 fine-tuned    11.8  [ 11.5,  12.3]      98.5%
+               v=0.20 fine-tuned    11.1  [ 10.7,  11.5]      65.6%
+               v=0.30 fine-tuned     9.9  [  9.6,  10.2]      99.6%
+               v=0.40 fine-tuned     8.2  [  7.9,   8.5]      98.3%
+               v=0.45 fine-tuned     8.4  [  8.2,   8.7]      99.4%
+               v=0.50 fine-tuned     8.4  [  8.1,   8.7]      99.2%
+               v=0.55 fine-tuned     7.7  [  7.5,   8.0]      99.8%
+               v=0.60 fine-tuned     6.3  [  6.0,   6.6]      98.9%
+               v=0.70 fine-tuned     4.9  [  4.6,   5.1]      95.0%
+               v=0.80 fine-tuned     4.1  [  3.9,   4.4]      99.4%
+               v=0.88 fine-tuned     3.1  [  2.9,   3.3]      99.5%
+               v=0.89 fine-tuned     2.0  [  1.7,   2.2]      98.5%
+               v=0.90 fine-tuned     1.5  [  1.3,   1.7]      89.0%
+               v=0.91 fine-tuned     2.1  [  1.7,   2.3]      99.5%
+               v=0.92 fine-tuned     1.5  [  1.0,   2.1]      22.7%
+               v=0.93 fine-tuned     2.7  [  2.5,   2.9]      99.6%
+               v=0.94 fine-tuned     1.9  [  1.7,   2.1]      97.9%
+               v=0.95 fine-tuned     2.1  [  1.9,   2.3]      99.5%
+
+
+=== writable? pushing the base weights along the axis ===
+
+                                   steps    95% interval    reached
+           v=0.05 written (grid)    12.8  [ 12.4,  13.3]      97.6%
+           v=0.06 written (grid)    12.6  [ 12.2,  13.0]      97.7%
+           v=0.07 written (grid)    12.5  [ 12.1,  12.9]      97.8%
+           v=0.08 written (grid)    12.4  [ 12.0,  12.7]      98.0%
+           v=0.09 written (grid)    12.2  [ 11.8,  12.5]      98.3%
+           v=0.10 written (grid)    12.1  [ 11.8,  12.4]      98.6%
+           v=0.11 written (grid)    12.0  [ 11.7,  12.3]      98.8%
+           v=0.12 written (grid)    11.9  [ 11.5,  12.2]      98.9%
+           v=0.20 written (grid)    11.1  [ 10.9,  11.5]      99.6%
+           v=0.30 written (grid)     9.8  [  9.5,  10.0]      99.5%
+           v=0.40 written (grid)     8.7  [  8.4,   8.9]      99.6%
+           v=0.45 written (grid)     8.1  [  7.9,   8.4]      99.6%
+           v=0.55 written (grid)     6.9  [  6.7,   7.2]      99.6%
+           v=0.60 written (grid)     6.5  [  6.2,   6.7]      99.7%
+           v=0.70 written (grid)     5.5  [  5.3,   5.7]      99.6%
+           v=0.80 written (grid)     4.5  [  4.2,   4.7]      99.4%
+           v=0.88 written (grid)     3.9  [  3.6,   4.1]      99.3%
+           v=0.89 written (grid)     3.8  [  3.5,   4.0]      99.2%
+           v=0.90 written (grid)     3.6  [  3.4,   3.9]      99.2%
+           v=0.91 written (grid)     3.5  [  3.3,   3.7]      98.9%
+           v=0.92 written (grid)     3.4  [  3.2,   3.6]      99.0%
+           v=0.93 written (grid)     3.3  [  3.1,   3.6]      99.0%
+           v=0.94 written (grid)     3.2  [  3.0,   3.5]      99.0%
+           v=0.95 written (grid)     3.1  [  2.9,   3.3]      98.9%
+         v=1.00 written (unseen)     2.6  [  2.4,   2.9]      98.7%
+         v=1.05 written (unseen)     2.2  [  2.0,   2.4]      98.2%
+         v=1.10 written (unseen)     1.8  [  1.6,   2.1]      98.0%
+         v=1.20 written (unseen)     1.2  [  1.0,   1.4]      97.2%
+         v=1.30 written (unseen)     0.9  [  0.7,   1.2]      96.5%
+         v=1.50 written (unseen)     0.6  [  0.4,   0.8]      89.1%
+          random, matched to 0.3     7.6  [  7.4,   7.8]      99.5%
+          random, matched to 0.5     7.6  [  7.4,   7.9]      99.5%
+
+
+=== calibrated? against the task's own exchange rate ===
+
+     value   task says   fine-tuned   written
+      0.05        19.0         11.4      12.8
+      0.06        18.8         14.1      12.6
+      0.07        18.6         13.9      12.5
+      0.08        18.4         12.2      12.4
+      0.09        18.2         11.7      12.2
+      0.10        18.0         11.4      12.1
+      0.11        17.8         13.2      12.0
+      0.12        17.6         11.8      11.9
+      0.20        16.0         11.1      11.1
+      0.30        14.0          9.9       9.8
+      0.40        12.0          8.2       8.7
+      0.45        11.0          8.4       8.1
+      0.55         9.0          7.7       6.9
+      0.60         8.0          6.3       6.5
+      0.70         6.0          4.9       5.5
+      0.80         4.0          4.1       4.5
+      0.88         2.4          3.1       3.9
+      0.89         2.2          2.0       3.8
+      0.90         2.0          1.5       3.6
+      0.91         1.8          2.1       3.5
+      0.92         1.6          1.5       3.4
+      0.93         1.4          2.7       3.3
+      0.94         1.2          1.9       3.2
+      0.95         1.0          2.1       3.1
+      1.00         0.0            —       2.6
+      1.05        -1.0            —       2.2
+      1.10        -2.0            —       1.8
+      1.20        -4.0            —       1.2
+      1.30        -6.0            —       0.9
+      1.50       -10.0            —       0.6
+
+The fine-tuned column is what an arm actually learned; the written column is
+what the axis reproduces without training. They agree only if the axis is
+carrying the value, and the slope is what to read rather than the absolute
+number: the base agent already undervalues distance by about a fifth, and
+every arm inherits that.

@@ -1,0 +1,75 @@
+{
+  "checkpoint": "/workspace/data/runs/vit11novalue.s1234/local-files/cp_249999360",
+  "update": 48828,
+  "episodes": 2048,
+  "levels": "/workspace/data/levels/values/1.00-0.50@1M",
+  "split": "test",
+  "size": [
+    11,
+    11
+  ],
+  "randomise_values": false,
+  "seed": 0,
+  "arms": [
+    {
+      "rho": 1.0,
+      "episodes": 2048,
+      "reached_objective": 0.86474609375,
+      "chose_optimal": 0.7884393063583816,
+      "followed_feature_zero": 0.5979672501411631,
+      "ambiguous": 0.023150762281197064,
+      "mean_return": -0.4260498046875,
+      "mean_steps": 22.33935546875,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          59,
+          143,
+          348,
+          1444
+        ],
+        "chose_optimal": [
+          0.26,
+          0.49572649572649574,
+          0.5387205387205387,
+          0.8949447077409163
+        ]
+      }
+    },
+    {
+      "rho": 0.0,
+      "episodes": 2048,
+      "reached_objective": 0.861328125,
+      "chose_optimal": 0.5840605002908668,
+      "followed_feature_zero": 0.6122448979591837,
+      "ambiguous": 0.025510204081632654,
+      "mean_return": -0.539697265625,
+      "mean_steps": 22.7470703125,
+      "margin": {
+        "bins": [
+          "<0.05",
+          "0.05-0.15",
+          "0.15-0.35",
+          ">0.35"
+        ],
+        "n": [
+          59,
+          143,
+          348,
+          1444
+        ],
+        "chose_optimal": [
+          0.23214285714285715,
+          0.4375,
+          0.3865814696485623,
+          0.6661211129296236
+        ]
+      }
+    }
+  ]
+}

@@ -38,6 +38,7 @@ share a maze and a route, so the cell-level interval is roughly 1.6x too narrow.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 from pathlib import Path
 
 import jax
@@ -46,7 +47,7 @@ from cleanba.cleanba_impala import load_train_state
 from goalmisgen.analysis import auc_interval, collect_rollouts, probe, probe_by_distance
 from goalmisgen.analysis.probes import ProbeSource
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.configs.presets import maze_drc33
+from goalmisgen.nets.readers import state_reader_for
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,7 +59,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-episodes", type=int, default=256)
     parser.add_argument("--test-episodes", type=int, default=128)
     parser.add_argument("--num-envs", type=int, default=32)
-    parser.add_argument("--correlation", type=float, default=1.0)
+    parser.add_argument("--correlation", type=float, default=1.0, help="Correlation the probe is fitted at.")
+    parser.add_argument(
+        "--test-correlations",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Correlations the fitted probe is scored at; defaults to the fitting one. Scoring "
+        "at rho=0.0 a probe fitted at rho=1.0 asks whether the route is still readable "
+        "once the proxy is reversed - the representational twin of the behavioural gap.",
+    )
     parser.add_argument(
         "--think",
         type=int,
@@ -81,19 +91,26 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip the untrained-network control, which costs a second set of rollouts.",
     )
+    parser.add_argument(
+        "--per-layer",
+        action="store_true",
+        help="Also score each layer's share of the state on its own. Which layer holds the "
+        "route is what a cross-architecture comparison turns on: a DRC's actor reads only "
+        "its last layer, a transformer's readout sees the final residual stream.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
 
-    def env_config(seed: int) -> MazeConfig:
+    def env_config(seed: int, correlation: float | None = None) -> MazeConfig:
         settings = dict(
             max_episode_steps=120,
             num_envs=args.num_envs,
             min_size=args.size,
             max_size=args.size,
-            feature_value_correlation=args.correlation,
+            feature_value_correlation=args.correlation if correlation is None else correlation,
             randomise_values=args.randomise_values,
             level_dataset=args.levels,
             asynchronous=False,
@@ -103,26 +120,28 @@ def main() -> None:
             settings["dataset_split"] = args.split
         return MazeConfig(**settings)  # type: ignore[arg-type]
 
-    policy, _, _, train_state, update = load_train_state(args.checkpoint, env_cfg=env_config(0))
+    policy, _, run_args, train_state, update = load_train_state(args.checkpoint, env_cfg=env_config(0))
+    reader = state_reader_for(policy)
     print(f"checkpoint {args.checkpoint.name}  (update {update})")
     print(
-        f"{args.size}x{args.size}, rho={args.correlation}, "
+        f"{type(run_args.net).__name__}, {args.size}x{args.size}, rho={args.correlation}, "
         f"{args.train_episodes} train / {args.test_episodes} test episodes\n"
     )
 
     # An untrained network of the same shape. This, not the observation, is the
     # baseline that decides whether training put the route there: a random
     # convolutional tower already has a receptive field, and that alone beats a
-    # pointwise readout of the observation.
+    # pointwise readout of the observation. Built from the checkpoint's own
+    # network spec, so it is the same architecture whatever that is.
     untrained = None
     if not args.no_untrained:
-        _, _, untrained = maze_drc33(min_size=args.size, max_size=args.size).net.init_params(
-            env_config(0).make(), jax.random.PRNGKey(12345)
-        )
+        _, _, untrained = run_args.net.init_params(env_config(0).make(), jax.random.PRNGKey(12345))
 
-    def rollouts(seed: int, episodes: int, probe_think: int, params):
+    test_correlations = args.test_correlations or [args.correlation]
+
+    def rollouts(seed: int, episodes: int, probe_think: int, params, correlation: float | None = None):
         return collect_rollouts(
-            env_config(seed).make(),
+            env_config(seed, correlation).make(),
             policy,
             train_state.params,
             episodes,
@@ -131,7 +150,7 @@ def main() -> None:
             probe_steps_to_think=probe_think,
         )
 
-    print(f"{'think':>6}{'probe':>16}{'AUC':>9}{'95% CI':>16}{'bal.acc':>10}{'episodes':>10}")
+    print(f"{'think':>6}{'test rho':>9}{'probe':>20}{'AUC':>9}{'95% CI':>16}{'bal.acc':>10}{'episodes':>10}")
     for think in args.think:
         arms: list[tuple[str, ProbeSource, object]] = [
             ("trained", "features", None),
@@ -141,25 +160,52 @@ def main() -> None:
             arms.insert(1, ("untrained", "features", untrained))
 
         for label, source, params in arms:
-            # Disjoint seeds so the probe is scored on levels it was not fitted on.
+            # Fitted once at the training correlation; scored at each test
+            # correlation on disjoint seeds, so the probe never sees the levels
+            # it is scored on and every scoring arm reads the same probe.
             train = rollouts(0, args.train_episodes, think, params)
-            test = rollouts(9999, args.test_episodes, think, params)
+            for test_rho in test_correlations:
+                test = rollouts(9999, args.test_episodes, think, params, test_rho)
 
-            r = probe(train, test, source=source)
-            low, high = auc_interval(train, test, source=source)
-            interval = f"[{low:.3f}, {high:.3f}]"
-            print(f"{think:>6}{label:>16}{r.auc:>9.3f}{interval:>16}{r.balanced_accuracy:>10.3f}{len(test):>10,}")
+                r = probe(train, test, source=source)
+                low, high = auc_interval(train, test, source=source)
+                interval = f"[{low:.3f}, {high:.3f}]"
+                print(
+                    f"{think:>6}{test_rho:>9.2f}{label:>20}{r.auc:>9.3f}{interval:>16}"
+                    f"{r.balanced_accuracy:>10.3f}{len(test):>10,}"
+                )
 
-            if args.by_distance:
-                bands = probe_by_distance(train, test, source=source)
-                shown = "  ".join(f"{b.step}:{b.auc:.3f}" for b in bands)
-                print(f"        by distance (matched negatives): {shown}")
+                if args.by_distance:
+                    bands = probe_by_distance(train, test, source=source)
+                    shown = "  ".join(f"{b.step}:{b.auc:.3f}" for b in bands)
+                    print(f"        by distance (matched negatives): {shown}")
+
+                if args.per_layer and source == "features":
+                    for index, name in enumerate(reader.layer_names):
+                        r = probe(only_layer(train, index, reader.n_layers), only_layer(test, index, reader.n_layers))
+                        print(
+                            f"{'':>6}{test_rho:>9.2f}{name:>20}{r.auc:>9.3f}{'':>16}"
+                            f"{r.balanced_accuracy:>10.3f}{'':>10}  (layer only)"
+                        )
 
     print(
         "\nThe trained probe must beat the *untrained* one. Beating only the\n"
         "observation shows the network has a receptive field, which it has\n"
         "before any training at all."
     )
+
+
+def only_layer(rollouts, index: int, n_layers: int):
+    """The same rollouts with one layer's share of the per-cell state.
+
+    Layers are concatenated on the channel axis with equal widths, so a layer
+    is a contiguous slice; nothing else about the episode changes.
+    """
+    out = []
+    for r in rollouts:
+        width = r.features.shape[-1] // n_layers
+        out.append(dataclasses.replace(r, features=r.features[..., index * width : (index + 1) * width]))
+    return out
 
 
 if __name__ == "__main__":

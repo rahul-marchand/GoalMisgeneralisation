@@ -400,3 +400,131 @@ were deleted; the directory should not exist. See the 2026-08-16 amendment in
 Preregistration.md.
 """
 
+
+[[entry]]
+match = "runs/resnet11.s1234"
+note = """
+maze11 with the network swapped: cleanba's GuezResNet (nine 32-channel 3x3
+stages, no state between steps; input rescaled by 255 through
+goalmisgen.nets.scaled, see runs/resnet11.s1234.unscaled-dead) in place of the
+DRC(3,3), everything else the DRC's to the last hyperparameter. 11x11, rho=1.0, fixed values (1.0, 0.5),
+value channel present, same 1M-level dataset. Asks whether competence, the
+misgeneralisation gap, the t=0 plan probe and "proxy after competence" are the
+task's or the DRC's. Stream arch-swap, 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/resnet11clean.s1234"
+note = """
+clean11fv with the network swapped for the ResNet: rho=0.5, colour uninformative.
+The single-variable control for resnet11, as clean11fv is for maze11.
+"""
+
+[[entry]]
+match = "runs/vit11.s1234"
+note = """
+maze11 with the network swapped for a ViT-style transformer of ours
+(goalmisgen.nets.transformer: one token per cell, learned 2-D position
+embedding, 4 pre-LN blocks, d_model 64, 4 heads, same flattened Dense(256)
+readout as the DRC and the ResNet; input rescaled by 255 to undo cleanba's
+uint8 division, see the module docstring). rho=1.0, otherwise maze11.
+"""
+
+[[entry]]
+match = "runs/vit11clean.s1234"
+note = """
+clean11fv with the network swapped for the transformer: rho=0.5. The
+single-variable control for vit11.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234"
+note = """
+novalue11 with the network swapped for the rescaled GuezResNet (the resnet11
+net): 11x11, rho=1.0, values (1.0, 0.5), no value channel, colour the only
+value cue, the same 1M-level dataset, 150M steps. The hidden-value base for
+the ResNet value-axis sweeps (013/014/015 under arms/), which ask whether the
+value axis, its writability and cos(axis_0, axis_1) = -1 are the task's or the
+DRC's. Stream arch-swap, redirect 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234"
+note = """
+novalue11 with the network swapped for the vit11 transformer (4 layers,
+d_model 64, 4 heads), 250M steps instead of 150M: vit11 was still climbing at
+150M with the value channel present (82% chose_optimal against 92-96% for the
+DRC and ResNet), and the pipeline has to fit ~9 h on one 4090. The larger
+maze_transformer_large (6 layers, d_model 128, 8 heads) was launched first and
+ran at ~3.4k SPS against this net's ~12.4k on the same card, which would have
+put 200M steps at 16 h; it was stopped before its first checkpoint
+(logs/arch-swap/train-vit11novalue.s1234.vitl300M-aborted.log) and this run
+took its name. A converged small transformer over an unconverged large one.
+Hidden values, rho=1.0, values (1.0, 0.5), the same dataset. The base for the
+transformer value-axis sweeps. Stream arch-swap, redirect 2026-08-20.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234-cp130M"
+note = """
+Not a training run: resnet11novalue.s1234's checkpoint cp_130191360 (130.2M
+steps) copied out with its own BASE.json, so the value-axis sweep driver can
+treat it as a base. resnet11novalue.s1234 collapsed between its 130M and 140M
+checkpoints (training return +0.35 -> -3.9, eval success 1.00 -> 0.04, and it
+never recovered; resnet11.s1234 with the value channel shows a milder dip at
+120M that it does recover from), and scripts/arch_swap_value_axis.sh took the
+final checkpoint cp_149995520 as the base, so the first ResNet sweep
+(runs/resnet11novalue.s1234/arms) fine-tuned a collapsed agent (reach 6%).
+cp_130191360 is the last healthy checkpoint: 002 at rho=1.0 gives 94.8%
+chose_optimal, 99.7% reached, the DRC novalue11's level. The sweeps under
+arms/ here are the ResNet value-axis result; the ones under
+runs/resnet11novalue.s1234/arms are kept as the record of what a sweep on a
+non-competent base looks like (|delta| ~0.1, no behaviour, cos +0.73 between
+two noise axes). Stream arch-swap, 2026-08-21.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234/arms/o*@400k"
+note = """
+The wide value grid fine-tuned from resnet11novalue.s1234's *collapsed* final
+checkpoint cp_149995520 (see runs/resnet11novalue.s1234-cp130M): the arms
+start from an agent that reaches 6% of objectives, so none of them learned a
+value (every arm's exchange rate sits inside the base's interval) and the
+014/015 numbers on them (results/arch-swap-value-axis-resnet11novalue.s1234-*)
+are fits to noise. 400k steps, 4 checkpoints, lr 1e-4, DRC hyperparameters.
+Superseded by runs/resnet11novalue.s1234-cp130M/arms.
+"""
+
+[[entry]]
+match = "runs/resnet11novalue.s1234-cp130M/arms/o*@400k"
+note = """
+The ResNet value-axis sweeps proper: the wide grid (25 arms an objective,
+o0 and o1) from the pre-collapse ResNet base, 400k steps and 4 checkpoints an
+arm, 013 with the DRC fine-tune hyperparameters (lr 1e-4 constant) and the
+base's own net spec. Analysed by 014/015 into
+results/arch-swap-value-axis-resnet11novalue.s1234-cp130M-*. Stream arch-swap.
+"""
+
+[[entry]]
+match = "runs/vit11novalue.s1234/arms/o*@400k"
+note = """
+The transformer value-axis sweeps: the wide grid (25 arms an objective, o0
+and o1) from vit11novalue.s1234 at 250M, 400k steps and 4 checkpoints an arm,
+013 with the DRC fine-tune hyperparameters and the base's own TransformerSpec.
+Analysed by 014/015 into results/arch-swap-value-axis-vit11novalue.s1234-*.
+The base reaches 86% of objectives and chooses the better one 79% of the time
+at rho=1.0 (DRC novalue11: 100% / ~95%), so its exchange rates span a
+compressed range (1.1-5.4 steps against the DRC's 1.1-15 on the same grid).
+Stream arch-swap.
+"""
+
+[[entry]]
+match = "runs/resnet11.s1234.unscaled-dead"
+note = """
+The first resnet11 launch, stopped at ~30M steps: cleanba's GuezResNet on the
+raw 1/255-scaled observations. Entropy stayed at ln 4 and the value loss at
+its initial level from 2M to 30M steps while the DRC took off at 15M and the
+transformer at 12M, so the network never learned anything. Kept for its
+metrics.csv as the evidence behind goalmisgen.nets.scaled; the resnet11 that
+stands in the results is the relaunch with the input rescaled by 255.
+"""

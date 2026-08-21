@@ -1,0 +1,118 @@
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/__init__.py:53: UserWarning: [33mWARN: `gymnasium.vector.make(...)` is deprecated and will be replaced by `gymnasium.make_vec(...)` in v1.0[0m
+  gym.logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.single_action_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.single_action_space` for environment variables.[0m
+  logger.warn(
+/workspace/code/arch-swap/.venv/lib/python3.11/site-packages/gymnasium/vector/vector_env.py:389: UserWarning: [33mWARN: env.observation_space to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.observation_space` for environment variables.[0m
+  logger.warn(
+script 015_value_or_gap.py
+commit 6b50d42
+argv   --base /workspace/data/runs/resnet11novalue.s1234-cp130M/local-files/cp_130191360 --arms /workspace/data/runs/resnet11novalue.s1234-cp130M/arms --levels /workspace/data/levels/values/1.00-0.50@500k --arm-steps 400000 --skip-behaviour
+
+base cp_130191360  (1,234,405 parameters)
+
+colour 1 swept, colour 0 held at 1.0
+  o1-0.45  value 0.05  offset -0.45  |delta| 4.268
+  o1-0.44  value 0.06  offset -0.44  |delta| 4.238
+  o1-0.43  value 0.07  offset -0.43  |delta| 4.328
+  o1-0.42  value 0.08  offset -0.42  |delta| 4.326
+  o1-0.41  value 0.09  offset -0.41  |delta| 4.374
+  o1-0.40  value 0.10  offset -0.40  |delta| 4.496
+  o1-0.39  value 0.11  offset -0.39  |delta| 4.106
+  o1-0.38  value 0.12  offset -0.38  |delta| 4.467
+  o1-0.30  value 0.20  offset -0.30  |delta| 4.203
+  o1-0.20  value 0.30  offset -0.20  |delta| 4.11
+  o1-0.10  value 0.40  offset -0.10  |delta| 3.992
+  o1-0.05  value 0.45  offset -0.05  |delta| 4.229
+  o1+0.00  value 0.50  offset +0.00  |delta| 4.008
+  o1+0.05  value 0.55  offset +0.05  |delta| 4.179
+  o1+0.10  value 0.60  offset +0.10  |delta| 3.917
+  o1+0.20  value 0.70  offset +0.20  |delta| 3.857
+  o1+0.30  value 0.80  offset +0.30  |delta| 4.274
+  o1+0.38  value 0.88  offset +0.38  |delta| 4.266
+  o1+0.39  value 0.89  offset +0.39  |delta| 4.067
+  o1+0.40  value 0.90  offset +0.40  |delta| 4.139
+  o1+0.41  value 0.91  offset +0.41  |delta| 4.196
+  o1+0.42  value 0.92  offset +0.42  |delta| 4.318
+  o1+0.43  value 0.93  offset +0.43  |delta| 4.171
+  o1+0.44  value 0.94  offset +0.44  |delta| 4.262
+  o1+0.45  value 0.95  offset +0.45  |delta| 4.279
+
+colour 0 swept, colour 1 held at 0.5
+  o0-0.45  value 0.55  offset -0.45  |delta| 4.579
+  o0-0.44  value 0.56  offset -0.44  |delta| 4.23
+  o0-0.43  value 0.57  offset -0.43  |delta| 4.294
+  o0-0.42  value 0.58  offset -0.42  |delta| 4.296
+  o0-0.41  value 0.59  offset -0.41  |delta| 4.186
+  o0-0.40  value 0.60  offset -0.40  |delta| 4.307
+  o0-0.39  value 0.61  offset -0.39  |delta| 4.515
+  o0-0.38  value 0.62  offset -0.38  |delta| 4.299
+  o0-0.30  value 0.70  offset -0.30  |delta| 4.262
+  o0-0.20  value 0.80  offset -0.20  |delta| 4.186
+  o0-0.10  value 0.90  offset -0.10  |delta| 4.085
+  o0-0.05  value 0.95  offset -0.05  |delta| 3.928
+  o0+0.00  value 1.00  offset +0.00  |delta| 4.201
+  o0+0.05  value 1.05  offset +0.05  |delta| 4.213
+  o0+0.10  value 1.10  offset +0.10  |delta| 3.945
+  o0+0.20  value 1.20  offset +0.20  |delta| 4.461
+  o0+0.30  value 1.30  offset +0.30  |delta| 3.747
+  o0+0.38  value 1.38  offset +0.38  |delta| 3.807
+  o0+0.39  value 1.39  offset +0.39  |delta| 4.167
+  o0+0.40  value 1.40  offset +0.40  |delta| 4.058
+  o0+0.41  value 1.41  offset +0.41  |delta| 3.967
+  o0+0.42  value 1.42  offset +0.42  |delta| 4.228
+  o0+0.43  value 1.43  offset +0.43  |delta| 4.615
+  o0+0.44  value 1.44  offset +0.44  |delta| 3.386
+  o0+0.45  value 1.45  offset +0.45  |delta| 3.868
+
+
+=== the two axes ===
+
+  |axis_1|  (per unit of colour 1's value)  3.393
+  |axis_0|  (per unit of colour 0's value)  3.22
+  |drift_1| 1.371    |drift_0| 1.368
+
+  cos(axis_0, axis_1) = -0.497
+
+  about -1  one knob: raising either objective's value moves the same direction
+            in opposite senses, so what 014 found is the gap, or equivalently a
+            threshold on the difference in distances, and not a value
+  about  0  two knobs, one per objective, which is what a value slot means
+
+
+=== the same gap, reached by moving either colour ===
+
+     gap  colour 1 at  colour 0 at  cos of diffs
+     0.1         0.90         0.60         0.062
+     0.2         0.80         0.70         0.053
+     0.3         0.70         0.80         0.036
+     0.4         0.60         0.90        -0.012
+     0.6         0.40         1.10         0.002
+     0.7         0.30         1.20         0.040
+
+  Under one knob these arms are the same agent reached two ways, so their
+  diffs should agree once each sweep's common component is removed.
+
+=== how much of each axis is signal? ===
+
+  split-half reliability of axis_1  +0.379
+  split-half reliability of axis_0  +0.341
+
+=== is the cosine more than these diffs would give anyway? ===
+
+  observed cos(axis_0, axis_1)     -0.497
+  null over 2000 shuffles         mean -0.003, sd 0.143
+  null 5th percentile              -0.231
+  p(null at least this negative)   0.0005
+
+  One knob predicts a cosine at -1 and this p-value small. Two value
+  registers predict an observation sitting inside the null. Nothing here
+  assumes how the noise scales.
+
+  secondary: cos corrected for attenuation  -1.380
+  ...which is outside the range a cosine can take, so the correction has broken down.

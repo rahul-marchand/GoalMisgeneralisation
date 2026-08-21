@@ -83,8 +83,8 @@ if done_file "${out}"; then say "competence present"; else
         echo "Hidden-value base ${AGENT}, final checkpoint ${final##*/}; 002 at rho=1.0 on the test split."
         echo "Measured $(stamp) by scripts/arch_swap_value_axis.sh. DRC novalue11 reaches ~95% chose_optimal here."
         echo
-        "${EVAL_ENV[@]}" uv run python experiments/002_measure_proxy.py "${final}" --levels "${LEVELS}" --episodes 2048 --correlations 1.0 \
-            --json "figures/data/${AGENT}.json"
+        "${EVAL_ENV[@]}" uv run python experiments/002_measure_proxy.py "${final}" --levels "${LEVELS}" --episodes 2048 --correlations 1.0 0.0 \
+            --hide-values --json "figures/data/${AGENT}.json"
     } > "${out}" 2>&1 || say "!! 002 failed, see ${out}"
 fi
 

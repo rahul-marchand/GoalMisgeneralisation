@@ -142,17 +142,45 @@ def runs(root: Path, notes: list[tuple[str, str]]) -> list[dict]:
     for local in sorted(root.rglob("local-files")):
         run = local.parent
         checkpoints = sorted(local.glob("cp_*"))
-        found.append(
-            {
-                "path": run.relative_to(root),
-                "checkpoints": len(checkpoints),
-                "last": checkpoints[-1].name if checkpoints else "none",
-                "size": human(directory_size(run)),
-                "note": note_for(run.relative_to(root), notes, run),
-                **run_config(run),
-            }
-        )
+        entry = {
+            "path": run.relative_to(root),
+            "checkpoints": len(checkpoints),
+            "last": checkpoints[-1].name if checkpoints else "none",
+            "size": human(directory_size(run)),
+            "note": note_for(run.relative_to(root), notes, run),
+            **run_config(run),
+        }
+        found.append(rung_entry(run, entry) if local.is_symlink() else entry)
     return found
+
+
+def rung_entry(run: Path, entry: dict) -> dict:
+    """Correct a ladder rung's row, which the parent run's checkpoints would fill.
+
+    A rung of the base-checkpoint ladder is an agent view of one earlier
+    checkpoint: its ``local-files`` is a symlink to the run it came from, so
+    globbing it finds *every* checkpoint that run ever wrote and its ``cfg.json``
+    reports what that run was aiming at. Left alone, each rung of a 150M run
+    reads as a 150M run with 32 checkpoints -- ten rows saying the same wrong
+    thing, and none of them saying where in training the rung stands, which is
+    the only reason the rung exists.
+
+    ``BASE.json`` has the answer, and is the same file the sweep driver and the
+    analysis resolve the rung by. See ``goalmisgen/ladder.py``, whose docstring
+    warns about exactly this: anything reading a rung's checkpoints instead of
+    its marker describes the parent.
+    """
+    marker = run / "BASE.json"
+    if not marker.is_file():
+        return entry
+    payload = json.loads(marker.read_text())
+    checkpoint = Path(payload["checkpoint"]).name
+    return {
+        **entry,
+        "checkpoints": payload.get("checkpoints_saved", 1),
+        "last": checkpoint,
+        "steps": payload.get("steps", entry.get("steps")),
+    }
 
 
 def main() -> None:

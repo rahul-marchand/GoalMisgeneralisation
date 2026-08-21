@@ -312,3 +312,41 @@ def test_a_null_arm_whose_sweep_cannot_be_told_is_refused() -> None:
     """Better to report it than to guess which drift measurement it is."""
     with pytest.raises(ValueError, match="does not say which sweep"):
         migrate.arm_name((1.0, 0.5), (1.0, 0.5), 750_000, None)
+
+
+def test_a_ladder_rung_is_described_by_its_marker_not_the_parents_checkpoints(tmp_path: Path) -> None:
+    """A rung's local-files is a symlink to the run it came from.
+
+    Globbing it finds every checkpoint that run wrote, and its cfg.json reports
+    what that run was aiming at, so an unguarded manifest gives each rung of a
+    150M run 32 checkpoints and 150M steps -- and never says where in training
+    the rung actually stands, which is the only thing distinguishing it.
+    """
+    import json as _json
+
+    from scripts.manifest import runs as manifest_runs
+
+    parent = tmp_path / "runs" / "novalue11.s1234"
+    for name in ("cp_020029440", "cp_140206080"):
+        (parent / "local-files" / name).mkdir(parents=True)
+        (parent / "local-files" / name / "cfg.json").write_text(
+            _json.dumps(
+                {"cfg": {"train_env": {"objective_values": [1.0, 0.5], "n_objectives": 2}, "total_timesteps": 150_000_000}}
+            )
+        )
+
+    rung = tmp_path / "runs" / "novalue11.s1234.at20029440"
+    rung.mkdir(parents=True)
+    (rung / "local-files").symlink_to(Path("..") / "novalue11.s1234" / "local-files")
+    (rung / "BASE.json").write_text(
+        _json.dumps(
+            {"checkpoint": "local-files/cp_020029440", "values": [1.0, 0.5], "steps": 20_029_440, "checkpoints_saved": 1}
+        )
+    )
+
+    rows = {str(r["path"]): r for r in manifest_runs(tmp_path, [])}
+
+    assert rows["runs/novalue11.s1234"]["checkpoints"] == 2
+    assert rows["runs/novalue11.s1234.at20029440"]["checkpoints"] == 1
+    assert rows["runs/novalue11.s1234.at20029440"]["last"] == "cp_020029440"
+    assert rows["runs/novalue11.s1234.at20029440"]["steps"] == 20_029_440

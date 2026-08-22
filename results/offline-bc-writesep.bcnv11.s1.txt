@@ -1,0 +1,357 @@
+script 032_bc_write_the_distance.py
+commit 2386042
+argv   /workspace/data/offline/runs/bcnv11.s1 --demos /workspace/data/offline/demos/test.rho100 --episodes 2048 --json /workspace/data/offline/results/offline-bc-writesep.bcnv11.s1.json
+
+bcnv11.s1 @ step 30,000; test.rho100 (rho=1.0); 1024 fitted / 2048 measured; values hidden
+
+unedited: reached 97.4%  optimal 92.8%  followed f0 81.7%  legal 97.4%  matched expert 89.2%  return 0.394  steps 9.8  indifference 11.3
+
+==============================================================================
+depth 0  (embedding)
+
+gap: |one cell| = 7182.3007 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->+3834.89  -2->+1912.48  +2->-1957.25  +4->-3879.68  (cells of decoded shift; equal to alpha means the edit survives)
+
+f0: |one cell| = 47.6721 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->+69.34  -2->+26.11  +2->-34.69  +4->-78.22  (cells of decoded shift; equal to alpha means the edit survives)
+
+f1: |one cell| = 48875.2569 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->+31403.11  -2->+15711.50  +2->-15674.67  +4->-31366.27  (cells of decoded shift; equal to alpha means the edit survives)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    11.28     [10.48,11.99]                       97.4%
+     gap     write   -4.0      nan         [nan,nan]     nan        4.0     0.0% 100.0%
+     gap     write   -2.0      nan         [nan,nan]     nan        2.0     0.0% 100.0%
+     gap     write    2.0     9.64      [8.17,11.15]   -1.64       -2.0    56.9%  43.8%
+     gap     write    4.0     9.70      [8.13,11.16]   -1.58       -4.0    57.0%  43.8%
+     gap  opposite   -4.0     9.70      [8.13,11.16]   -1.58       -4.0    57.0%  43.8%
+     gap  opposite   -2.0     9.64      [8.17,11.15]   -1.64       -2.0    56.9%  43.8%
+     gap  opposite    2.0      nan         [nan,nan]     nan        2.0     0.0% 100.0%
+     gap  opposite    4.0      nan         [nan,nan]     nan        4.0     0.0% 100.0%
+     gap    random   -4.0    10.61      [9.06,13.00]   -0.67        0.0    56.0%  40.7%
+     gap    random   -2.0    10.61      [9.06,13.00]   -0.67        0.0    56.0%  40.7%
+     gap    random    2.0     9.77      [8.24,11.82]   -1.51        0.0    52.1%  39.2%
+     gap    random    4.0     9.76      [8.21,11.60]   -1.52        0.0    52.1%  39.2%
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f0      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f0     write   -4.0    10.40      [8.92,12.43]   -0.88        4.0    55.7%  42.7%
+      f0     write   -2.0    10.42      [8.85,12.41]   -0.86        2.0    55.6%  42.6%
+      f0     write    2.0      nan         [nan,nan]     nan       -2.0     0.0% 100.0%
+      f0     write    4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+      f0  opposite   -4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+      f0  opposite   -2.0      nan         [nan,nan]     nan       -2.0     0.0% 100.0%
+      f0  opposite    2.0    10.42      [8.85,12.41]   -0.86        2.0    55.6%  42.6%
+      f0  opposite    4.0    10.40      [8.92,12.43]   -0.88        4.0    55.7%  42.7%
+      f0    random   -4.0    10.38      [8.65,13.00]   -0.89        0.0    56.5%  40.8%
+      f0    random   -2.0     8.91      [7.58,10.79]   -2.37        0.0    56.0%  42.7%
+      f0    random    2.0     9.79      [8.32,12.01]   -1.49        0.0    51.8%  39.7%
+      f0    random    4.0     9.84      [8.27,11.94]   -1.43        0.0    52.1%  39.2%
+      f0     other   -4.0     9.87      [8.22,11.58]   -1.41        4.0    55.7%  43.1%
+      f0     other   -2.0     9.83      [8.20,11.23]   -1.45        2.0    55.7%  43.1%
+      f0     other    2.0    10.12      [4.17,22.32]   -1.16       -2.0    14.0%  85.1%
+      f0     other    4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f1      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f1     write   -4.0     9.92      [8.31,11.62]   -1.36        4.0    55.7%  43.1%
+      f1     write   -2.0     9.92      [8.31,11.62]   -1.36        2.0    55.7%  43.1%
+      f1     write    2.0      nan         [nan,nan]     nan       -2.0     0.0% 100.0%
+      f1     write    4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+      f1  opposite   -4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+      f1  opposite   -2.0      nan         [nan,nan]     nan       -2.0     0.0% 100.0%
+      f1  opposite    2.0     9.92      [8.31,11.62]   -1.36        2.0    55.7%  43.1%
+      f1  opposite    4.0     9.92      [8.31,11.62]   -1.36        4.0    55.7%  43.1%
+      f1    random   -4.0    10.56      [8.78,12.73]   -0.71        0.0    56.0%  40.7%
+      f1    random   -2.0    10.61      [9.06,13.00]   -0.67        0.0    56.0%  40.7%
+      f1    random    2.0     9.83      [8.25,11.93]   -1.45        0.0    52.2%  39.3%
+      f1    random    4.0     9.77      [8.24,11.82]   -1.51        0.0    52.1%  39.2%
+      f1     other   -4.0    10.38      [8.92,12.69]   -0.90        4.0    55.6%  42.6%
+      f1     other   -2.0    10.38      [8.92,12.69]   -0.90        2.0    55.6%  42.6%
+      f1     other    2.0      nan         [nan,nan]     nan       -2.0     0.0% 100.0%
+      f1     other    4.0      nan         [nan,nan]     nan       -4.0     0.0% 100.0%
+
+==============================================================================
+depth 1  (after block 1)
+
+gap: |one cell| = 0.0116 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.02  -2->-0.01  +2->+0.01  +4->+0.02  (cells of decoded shift; equal to alpha means the edit survives)
+
+f0: |one cell| = 0.0353 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->+0.04  -2->+0.02  +2->-0.02  +4->-0.04  (cells of decoded shift; equal to alpha means the edit survives)
+
+f1: |one cell| = 0.0144 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.01  -2->-0.01  +2->+0.01  +4->+0.01  (cells of decoded shift; equal to alpha means the edit survives)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    11.28     [10.48,11.99]                       97.4%
+     gap     write   -4.0    11.28     [10.54,11.99]    0.00        4.0    97.5%  97.5%
+     gap     write   -2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+     gap     write    2.0    11.28     [10.54,11.99]    0.00       -2.0    97.5%  97.5%
+     gap     write    4.0    11.26     [10.52,11.96]   -0.02       -4.0    97.5%  97.5%
+     gap  opposite   -4.0    11.26     [10.52,11.96]   -0.02       -4.0    97.5%  97.5%
+     gap  opposite   -2.0    11.28     [10.54,11.99]    0.00       -2.0    97.5%  97.5%
+     gap  opposite    2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+     gap  opposite    4.0    11.28     [10.54,11.99]    0.00        4.0    97.5%  97.5%
+     gap    random   -4.0    11.26     [10.47,11.96]   -0.02        0.0    97.4%  97.4%
+     gap    random   -2.0    11.25     [10.47,11.96]   -0.03        0.0    97.4%  97.4%
+     gap    random    2.0    11.29     [10.63,11.99]    0.01        0.0    97.5%  97.5%
+     gap    random    4.0    11.26     [10.60,11.93]   -0.02        0.0    97.5%  97.5%
+
+slope -0.002 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f0      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f0     write   -4.0    11.17     [10.41,11.86]   -0.11        4.0    97.5%  97.5%
+      f0     write   -2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+      f0     write    2.0    11.25     [10.47,12.07]   -0.03       -2.0    97.4%  97.4%
+      f0     write    4.0    11.23     [10.55,11.96]   -0.05       -4.0    97.3%  97.3%
+      f0  opposite   -4.0    11.23     [10.55,11.96]   -0.05       -4.0    97.3%  97.3%
+      f0  opposite   -2.0    11.25     [10.47,12.07]   -0.03       -2.0    97.4%  97.4%
+      f0  opposite    2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+      f0  opposite    4.0    11.17     [10.41,11.86]   -0.11        4.0    97.5%  97.5%
+      f0    random   -4.0    11.23     [10.56,11.94]   -0.05        0.0    97.4%  97.4%
+      f0    random   -2.0    11.28     [10.59,11.97]   -0.00        0.0    97.4%  97.4%
+      f0    random    2.0    11.29     [10.50,11.91]    0.01        0.0    97.5%  97.5%
+      f0    random    4.0    11.23     [10.55,11.93]   -0.05        0.0    97.5%  97.5%
+      f0     other   -4.0    11.26     [10.48,11.95]   -0.02        4.0    97.5%  97.5%
+      f0     other   -2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+      f0     other    2.0    11.24     [10.44,12.05]   -0.04       -2.0    97.4%  97.4%
+      f0     other    4.0    11.24     [10.54,11.94]   -0.04       -4.0    97.4%  97.4%
+
+slope +0.004 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f1      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f1     write   -4.0    11.28     [10.54,11.99]    0.00        4.0    97.5%  97.5%
+      f1     write   -2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+      f1     write    2.0    11.28     [10.49,11.90]    0.00       -2.0    97.5%  97.5%
+      f1     write    4.0    11.26     [10.50,11.91]   -0.02       -4.0    97.5%  97.5%
+      f1  opposite   -4.0    11.26     [10.50,11.91]   -0.02       -4.0    97.5%  97.5%
+      f1  opposite   -2.0    11.28     [10.49,11.90]    0.00       -2.0    97.5%  97.5%
+      f1  opposite    2.0    11.28     [10.54,11.99]    0.00        2.0    97.5%  97.5%
+      f1  opposite    4.0    11.28     [10.54,11.99]    0.00        4.0    97.5%  97.5%
+      f1    random   -4.0    11.25     [10.48,12.05]   -0.03        0.0    97.4%  97.4%
+      f1    random   -2.0    11.28     [10.48,11.99]    0.00        0.0    97.4%  97.4%
+      f1    random    2.0    11.29     [10.63,11.99]    0.01        0.0    97.5%  97.5%
+      f1    random    4.0    11.26     [10.60,11.93]   -0.02        0.0    97.5%  97.5%
+      f1     other   -4.0    11.22     [10.43,11.93]   -0.06        4.0    97.4%  97.4%
+      f1     other   -2.0    11.28     [10.48,11.99]    0.00        2.0    97.4%  97.4%
+      f1     other    2.0    11.28     [10.49,11.90]    0.01       -2.0    97.5%  97.5%
+      f1     other    4.0    11.25     [10.47,12.07]   -0.03       -4.0    97.4%  97.4%
+
+slope -0.002 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+==============================================================================
+depth 2  (after block 2)
+
+gap: |one cell| = 0.0931 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.30  -2->-0.15  +2->+0.15  +4->+0.30  (cells of decoded shift; equal to alpha means the edit survives)
+
+f0: |one cell| = 0.0556 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.16  -2->-0.08  +2->+0.08  +4->+0.16  (cells of decoded shift; equal to alpha means the edit survives)
+
+f1: |one cell| = 0.1407 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.26  -2->-0.13  +2->+0.13  +4->+0.26  (cells of decoded shift; equal to alpha means the edit survives)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    11.28     [10.48,11.99]                       97.4%
+     gap     write   -4.0    11.22     [10.53,11.89]   -0.06        4.0    97.5%  97.5%
+     gap     write   -2.0    11.28     [10.62,11.97]    0.00        2.0    97.5%  97.5%
+     gap     write    2.0    11.25     [10.49,12.06]   -0.03       -2.0    97.4%  97.4%
+     gap     write    4.0    11.22     [10.47,11.99]   -0.06       -4.0    97.4%  97.4%
+     gap  opposite   -4.0    11.22     [10.47,11.99]   -0.06       -4.0    97.4%  97.4%
+     gap  opposite   -2.0    11.25     [10.49,12.06]   -0.03       -2.0    97.4%  97.4%
+     gap  opposite    2.0    11.28     [10.62,11.97]    0.00        2.0    97.5%  97.5%
+     gap  opposite    4.0    11.22     [10.53,11.89]   -0.06        4.0    97.5%  97.5%
+     gap    random   -4.0    11.17     [10.33,11.97]   -0.11        0.0    97.4%  97.4%
+     gap    random   -2.0    11.21     [10.37,11.99]   -0.07        0.0    97.4%  97.4%
+     gap    random    2.0    11.32     [10.55,12.00]    0.04        0.0    97.4%  97.4%
+     gap    random    4.0    11.33     [10.55,12.04]    0.05        0.0    97.5%  97.5%
+
+slope -0.001 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f0      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f0     write   -4.0    11.25     [10.47,11.90]   -0.03        4.0    97.5%  97.5%
+      f0     write   -2.0    11.26     [10.47,11.90]   -0.02        2.0    97.5%  97.5%
+      f0     write    2.0    11.28     [10.50,12.06]   -0.00       -2.0    97.4%  97.4%
+      f0     write    4.0    11.24     [10.43,12.06]   -0.04       -4.0    97.4%  97.4%
+      f0  opposite   -4.0    11.24     [10.43,12.06]   -0.04       -4.0    97.4%  97.4%
+      f0  opposite   -2.0    11.28     [10.50,12.06]   -0.00       -2.0    97.4%  97.4%
+      f0  opposite    2.0    11.26     [10.47,11.90]   -0.02        2.0    97.5%  97.5%
+      f0  opposite    4.0    11.25     [10.47,11.90]   -0.03        4.0    97.5%  97.5%
+      f0    random   -4.0    11.21     [10.40,12.00]   -0.06        0.0    97.4%  97.4%
+      f0    random   -2.0    11.27     [10.43,12.04]   -0.01        0.0    97.4%  97.4%
+      f0    random    2.0    11.30     [10.50,12.01]    0.02        0.0    97.4%  97.4%
+      f0    random    4.0    11.32     [10.55,12.00]    0.04        0.0    97.4%  97.4%
+      f0     other   -4.0    11.26     [10.53,11.90]   -0.02        4.0    97.5%  97.5%
+      f0     other   -2.0    11.23     [10.47,11.88]   -0.04        2.0    97.5%  97.5%
+      f0     other    2.0    11.28     [10.59,12.03]   -0.00       -2.0    97.5%  97.5%
+      f0     other    4.0    11.25     [10.57,11.99]   -0.03       -4.0    97.5%  97.5%
+
+slope -0.000 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f1      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f1     write   -4.0    11.22     [10.47,11.84]   -0.06        4.0    97.5%  97.5%
+      f1     write   -2.0    11.21     [10.47,11.83]   -0.07        2.0    97.5%  97.5%
+      f1     write    2.0    11.27     [10.58,12.01]   -0.01       -2.0    97.5%  97.5%
+      f1     write    4.0    11.25     [10.47,11.95]   -0.03       -4.0    97.5%  97.5%
+      f1  opposite   -4.0    11.25     [10.47,11.95]   -0.03       -4.0    97.5%  97.5%
+      f1  opposite   -2.0    11.27     [10.58,12.01]   -0.01       -2.0    97.5%  97.5%
+      f1  opposite    2.0    11.21     [10.47,11.83]   -0.07        2.0    97.5%  97.5%
+      f1  opposite    4.0    11.22     [10.47,11.84]   -0.06        4.0    97.5%  97.5%
+      f1    random   -4.0    11.18     [10.35,11.88]   -0.10        0.0    97.5%  97.5%
+      f1    random   -2.0    11.23     [10.40,12.03]   -0.05        0.0    97.4%  97.4%
+      f1    random    2.0    11.34     [10.57,12.03]    0.06        0.0    97.5%  97.5%
+      f1    random    4.0    11.39     [10.61,12.05]    0.11        0.0    97.5%  97.5%
+      f1     other   -4.0    11.28     [10.68,12.05]    0.00        4.0    97.5%  97.5%
+      f1     other   -2.0    11.25     [10.47,11.90]   -0.03        2.0    97.5%  97.5%
+      f1     other    2.0    11.24     [10.43,12.06]   -0.04       -2.0    97.4%  97.4%
+      f1     other    4.0    11.26     [10.55,12.02]   -0.02       -4.0    97.4%  97.4%
+
+slope +0.007 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+==============================================================================
+depth 3  (after block 3)
+
+gap: |one cell| = 0.1974 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-1.29  -2->-0.65  +2->+0.65  +4->+1.31  (cells of decoded shift; equal to alpha means the edit survives)
+
+f0: |one cell| = 0.2771 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-2.00  -2->-1.00  +2->+1.01  +4->+2.03  (cells of decoded shift; equal to alpha means the edit survives)
+
+f1: |one cell| = 0.0883 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+   carried to the top: -4->-0.36  -2->-0.18  +2->+0.18  +4->+0.36  (cells of decoded shift; equal to alpha means the edit survives)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    11.28     [10.48,11.99]                       97.4%
+     gap     write   -4.0    11.37     [10.75,11.90]    0.09        4.0    97.5%  97.5%
+     gap     write   -2.0    11.27     [10.64,11.95]   -0.01        2.0    97.4%  97.4%
+     gap     write    2.0    11.22     [10.56,11.91]   -0.06       -2.0    97.5%  97.5%
+     gap     write    4.0    11.20     [10.47,11.85]   -0.08       -4.0    97.5%  97.5%
+     gap  opposite   -4.0    11.20     [10.47,11.85]   -0.08       -4.0    97.5%  97.5%
+     gap  opposite   -2.0    11.22     [10.56,11.91]   -0.06       -2.0    97.5%  97.5%
+     gap  opposite    2.0    11.27     [10.64,11.95]   -0.01        2.0    97.4%  97.4%
+     gap  opposite    4.0    11.37     [10.75,11.90]    0.09        4.0    97.5%  97.5%
+     gap    random   -4.0    11.05     [10.46,11.77]   -0.23        0.0    97.4%  97.4%
+     gap    random   -2.0    11.19     [10.34,11.87]   -0.09        0.0    97.5%  97.5%
+     gap    random    2.0    11.39     [10.63,12.07]    0.11        0.0    97.5%  97.5%
+     gap    random    4.0    11.19     [10.44,11.91]   -0.09        0.0    97.4%  97.4%
+
+slope -0.020 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f0      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f0     write   -4.0    11.34     [10.47,12.22]    0.06        4.0    97.5%  97.5%
+      f0     write   -2.0    11.32     [10.56,12.19]    0.04        2.0    97.5%  97.5%
+      f0     write    2.0    11.22     [10.46,11.84]   -0.06       -2.0    97.5%  97.5%
+      f0     write    4.0    11.18     [10.45,11.83]   -0.09       -4.0    97.5%  97.5%
+      f0  opposite   -4.0    11.18     [10.45,11.83]   -0.09       -4.0    97.5%  97.5%
+      f0  opposite   -2.0    11.22     [10.46,11.84]   -0.06       -2.0    97.5%  97.5%
+      f0  opposite    2.0    11.32     [10.56,12.19]    0.04        2.0    97.5%  97.5%
+      f0  opposite    4.0    11.34     [10.47,12.22]    0.06        4.0    97.5%  97.5%
+      f0    random   -4.0    11.05     [10.45,11.67]   -0.23        0.0    97.5%  97.5%
+      f0    random   -2.0    11.12     [10.39,11.76]   -0.16        0.0    97.4%  97.4%
+      f0    random    2.0    11.39     [10.63,12.07]    0.11        0.0    97.5%  97.5%
+      f0    random    4.0    11.27     [10.52,12.06]   -0.01        0.0    97.3%  97.3%
+      f0     other   -4.0    11.20     [10.41,11.98]   -0.08        4.0    97.4%  97.4%
+      f0     other   -2.0    11.22     [10.43,11.92]   -0.06        2.0    97.5%  97.5%
+      f0     other    2.0    11.27     [10.60,11.97]   -0.01       -2.0    97.5%  97.5%
+      f0     other    4.0    11.33     [10.66,12.07]    0.05       -4.0    97.6%  97.6%
+
+slope -0.020 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f1      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f1     write   -4.0    11.22     [10.43,11.92]   -0.06        4.0    97.5%  97.5%
+      f1     write   -2.0    11.22     [10.43,11.92]   -0.06        2.0    97.5%  97.5%
+      f1     write    2.0    11.27     [10.65,11.95]   -0.01       -2.0    97.4%  97.4%
+      f1     write    4.0    11.27     [10.60,11.97]   -0.01       -4.0    97.5%  97.5%
+      f1  opposite   -4.0    11.27     [10.60,11.97]   -0.01       -4.0    97.5%  97.5%
+      f1  opposite   -2.0    11.27     [10.65,11.95]   -0.01       -2.0    97.4%  97.4%
+      f1  opposite    2.0    11.22     [10.43,11.92]   -0.06        2.0    97.5%  97.5%
+      f1  opposite    4.0    11.22     [10.43,11.92]   -0.06        4.0    97.5%  97.5%
+      f1    random   -4.0    11.19     [10.34,11.87]   -0.09        0.0    97.5%  97.5%
+      f1    random   -2.0    11.25     [10.56,11.88]   -0.03        0.0    97.4%  97.4%
+      f1    random    2.0    11.30     [10.53,11.98]    0.03        0.0    97.4%  97.4%
+      f1    random    4.0    11.39     [10.59,12.13]    0.11        0.0    97.4%  97.4%
+      f1     other   -4.0    11.32     [10.55,12.03]    0.04        4.0    97.4%  97.4%
+      f1     other   -2.0    11.32     [10.55,12.03]    0.04        2.0    97.4%  97.4%
+      f1     other    2.0    11.31     [10.65,12.00]    0.03       -2.0    97.5%  97.5%
+      f1     other    4.0    11.29     [10.44,11.97]    0.02       -4.0    97.5%  97.5%
+
+slope +0.007 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+==============================================================================
+depth 4  (after block 4)
+The head reads SEP directly, so a write here reaches the first action and nothing else:
+no attention layer follows to carry it into the rest of the route.
+
+gap: |one cell| = 0.2391 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+f0: |one cell| = 0.1625 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+f1: |one cell| = 0.2927 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    11.28     [10.48,11.99]                       97.4%
+     gap     write   -4.0    11.31     [10.64,11.96]    0.03        4.0    97.5%  97.5%
+     gap     write   -2.0    11.28     [10.62,11.97]    0.00        2.0    97.5%  97.5%
+     gap     write    2.0    11.26     [10.47,11.96]   -0.02       -2.0    97.4%  97.4%
+     gap     write    4.0    11.26     [10.47,11.96]   -0.02       -4.0    97.4%  97.4%
+     gap  opposite   -4.0    11.26     [10.47,11.96]   -0.02       -4.0    97.4%  97.4%
+     gap  opposite   -2.0    11.26     [10.47,11.96]   -0.02       -2.0    97.4%  97.4%
+     gap  opposite    2.0    11.28     [10.62,11.97]    0.00        2.0    97.5%  97.5%
+     gap  opposite    4.0    11.31     [10.64,11.96]    0.03        4.0    97.5%  97.5%
+     gap    random   -4.0    11.27     [10.55,11.96]   -0.01        0.0    97.4%  97.4%
+     gap    random   -2.0    11.26     [10.54,12.03]   -0.02        0.0    97.4%  97.4%
+     gap    random    2.0    11.27     [10.52,11.94]   -0.01        0.0    97.5%  97.5%
+     gap    random    4.0    11.24     [10.51,11.85]   -0.04        0.0    97.5%  97.5%
+
+slope -0.006 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f0      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f0     write   -4.0    11.28     [10.48,11.99]    0.00        4.0    97.4%  97.4%
+      f0     write   -2.0    11.28     [10.48,11.99]    0.00        2.0    97.4%  97.4%
+      f0     write    2.0    11.28     [10.48,11.99]    0.00       -2.0    97.4%  97.4%
+      f0     write    4.0    11.28     [10.48,11.99]    0.00       -4.0    97.4%  97.4%
+      f0  opposite   -4.0    11.28     [10.48,11.99]    0.00       -4.0    97.4%  97.4%
+      f0  opposite   -2.0    11.28     [10.48,11.99]    0.00       -2.0    97.4%  97.4%
+      f0  opposite    2.0    11.28     [10.48,11.99]    0.00        2.0    97.4%  97.4%
+      f0  opposite    4.0    11.28     [10.48,11.99]    0.00        4.0    97.4%  97.4%
+      f0    random   -4.0    11.26     [10.54,11.96]   -0.02        0.0    97.4%  97.4%
+      f0    random   -2.0    11.20     [10.43,11.94]   -0.08        0.0    97.4%  97.4%
+      f0    random    2.0    11.26     [10.51,11.93]   -0.02        0.0    97.5%  97.5%
+      f0    random    4.0    11.24     [10.50,11.93]   -0.03        0.0    97.5%  97.5%
+      f0     other   -4.0    11.26     [10.47,11.96]   -0.02        4.0    97.4%  97.4%
+      f0     other   -2.0    11.28     [10.48,11.99]    0.00        2.0    97.4%  97.4%
+      f0     other    2.0    11.28     [10.54,11.99]    0.00       -2.0    97.5%  97.5%
+      f0     other    4.0    11.28     [10.63,11.97]    0.01       -4.0    97.5%  97.5%
+
+slope +0.000 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+      f1      none    0.0    11.28     [10.48,11.99]                       97.4%
+      f1     write   -4.0    11.26     [10.47,11.96]   -0.02        4.0    97.4%  97.4%
+      f1     write   -2.0    11.26     [10.47,11.96]   -0.02        2.0    97.4%  97.4%
+      f1     write    2.0    11.28     [10.62,11.97]    0.00       -2.0    97.5%  97.5%
+      f1     write    4.0    11.30     [10.63,11.99]    0.02       -4.0    97.5%  97.5%
+      f1  opposite   -4.0    11.30     [10.63,11.99]    0.02       -4.0    97.5%  97.5%
+      f1  opposite   -2.0    11.28     [10.62,11.97]    0.00       -2.0    97.5%  97.5%
+      f1  opposite    2.0    11.26     [10.47,11.96]   -0.02        2.0    97.4%  97.4%
+      f1  opposite    4.0    11.26     [10.47,11.96]   -0.02        4.0    97.4%  97.4%
+      f1    random   -4.0    11.22     [10.49,11.93]   -0.06        0.0    97.4%  97.4%
+      f1    random   -2.0    11.26     [10.54,11.96]   -0.02        0.0    97.4%  97.4%
+      f1    random    2.0    11.27     [10.52,11.94]   -0.01        0.0    97.5%  97.5%
+      f1    random    4.0    11.32     [10.60,11.98]    0.04        0.0    97.5%  97.5%
+      f1     other   -4.0    11.28     [10.62,11.97]    0.00        4.0    97.5%  97.5%
+      f1     other   -2.0    11.28     [10.48,11.99]    0.00        2.0    97.4%  97.4%
+      f1     other    2.0    11.28     [10.48,11.99]    0.00       -2.0    97.4%  97.4%
+      f1     other    4.0    11.24     [10.43,11.95]   -0.04       -4.0    97.4%  97.4%
+
+slope +0.005 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+wrote /workspace/data/offline/results/offline-bc-writesep.bcnv11.s1.json

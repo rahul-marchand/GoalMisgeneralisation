@@ -1,0 +1,34 @@
+script 030_bc_rewrite_the_plan.py
+commit 002c081
+argv   /workspace/data/offline/runs/bc11.rho050.s1 --demos /workspace/data/offline/demos/test.rho050 --depths 3 --arms random shuffled --alphas 0.0 0.2 --seed 1
+
+bc11.rho050.s1 @ step 30,000; test.rho050 (rho=0.5); 512 fitted / 1024 measured; 4 blocks, d_model 128; values shown
+
+unedited: reached 99.0%  optimal 93.8%  followed f0 49.6%  legal 99.1%  matched expert 91.6%  return 0.421  steps 9.5  indifference 10.5
+24 of 1024 levels dropped as ties
+cells written  random 20.1  shuffled 20.1
+
+==============================================================================
+depth 3  (after block 3)
+probe: accuracy 0.823  route cells 0.141  majority 0.813  min margin 1.252
+typical per-cell residual norm 21.745; alpha below is a multiple of it
+
+  alpha  write-back  propagation   (of the random edit)
+   0.20       0.993        0.734
+write-back is the probe at this depth reading the class written; propagation is the probe at
+the top reading it after the edit was made here, against 0.248 with no edit at all.
+An alpha low on either is not testing the hypothesis: the network is handed a vector the
+readout does not call the plan, or one that does not survive to where it could be used.
+
+       arm  alpha  switched          95% CI  reached  legal    eos  indiff  steps
+      none   0.00      6.2%   [0.047,0.077]    99.0%  99.1%  99.9%   10.57    9.4
+    random   0.20      6.2%   [0.047,0.078]    97.8%  98.3% 100.0%   10.16    9.4
+
+  shuffled   0.20      6.8%   [0.052,0.083]    99.0%  99.0% 100.0%   10.82    9.5
+
+'switched' is the fraction of routes ending at the objective an optimal agent would NOT take,
+among those ending at an objective at all. The alpha=0 row is the model's own error rate.
+
+       arm  alpha  vs unedited            95% CI   vs self            95% CI
+    random   0.20         0.1%   [-0.010,+0.012]
+  shuffled   0.20         0.6%   [-0.004,+0.017]

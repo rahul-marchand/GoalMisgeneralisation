@@ -1,0 +1,32 @@
+script 025_bc_probe_plan.py
+commit 024dbeb
+argv   /workspace/data/offline/runs/bcnv11.s1 --demos /workspace/data/offline/demos/test.rho100 --untaken --by-distance
+
+bcnv11.s1 @ step 30,000; test.rho100 (rho=1.0); 512 train / 256 test episodes
+
+Traceback (most recent call last):
+  File "/workspace/gm-plan/experiments/025_bc_probe_plan.py", line 129, in <module>
+    main()
+  File "/workspace/gm-plan/experiments/025_bc_probe_plan.py", line 82, in main
+    decoded_train = greedy_decode(model, params, demos.observations(train_idx))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/gm-plan/goalmisgen/offline/decode.py", line 74, in greedy_decode
+    token = np.asarray(next_token(params, obs, jnp.asarray(actions), position, write))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/gm-plan/goalmisgen/offline/decode.py", line 104, in next_token
+    logits, _ = model.apply(params, observations, actions, edit, edit_depth)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/gm-plan/goalmisgen/offline/model.py", line 196, in __call__
+    cells = observations.reshape(batch, cfg.n_cells, cfg.n_channels)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/jax/_src/numpy/array_methods.py", line 1042, in meth
+    return getattr(self.aval, name).fun(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/jax/_src/numpy/array_methods.py", line 305, in _reshape
+    newshape = _compute_newshape(self, args[0] if len(args) == 1 else args)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/GoalMisgeneralisation/.venv/lib/python3.11/site-packages/jax/_src/numpy/array_methods.py", line 466, in _compute_newshape
+    raise TypeError(f"cannot reshape array of shape {arr.shape} (size {arr.size}) "
+TypeError: cannot reshape array of shape (512, 11, 11, 5) (size 309760) into shape (512, 121, 4) (size 247808)
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.

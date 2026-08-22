@@ -1,0 +1,157 @@
+script 031_bc_outcome_keyed_distance.py
+commit 7483d9e
+argv   /workspace/data/offline/runs/bcnv11.s1 --demos /workspace/data/offline/demos/test.rho100 --sites sep --json /workspace/data/offline/results/offline-bc-distance-sep.bcnv11.s1.json
+
+bcnv11.s1 @ step 30,000; test.rho100 (rho=1.0); 1024 fitted / 1024 scored; 4 blocks, d_model 128; values hidden
+
+==============================================================================
+depth 0  (embed)
+
+    target                               arm       R2            95% CI  partial    MAE   slope  dim      n
+     d->f0                          residual   -0.000   [-0.005,-0.000]    0.000   6.83    0.00  128  1,024
+     d->f0                         untrained   -0.000   [-0.005,-0.000]    0.000   6.83    0.00  128  1,024
+     d->f0                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f0                              null    0.298     [0.249,0.349]    0.120   5.43    1.03    2  1,024
+     d->f0                          shuffled   -1.031   [-1.203,-0.887]   -0.006   9.25   -0.02    1  1,024
+          RIG INVALID - an untrained network of the same shape reads it as well (-0.000 against -0.000): this is the architecture, not the training; the null reads better than the residual (0.298 against -0.000): this site carries less than free-space geometry. No number in this block means anything.
+
+     d->f1                          residual   -0.000   [-0.005,-0.000]    0.000   6.53    0.00  128  1,024
+     d->f1                         untrained   -0.000   [-0.005,-0.000]    0.000   6.53    0.00  128  1,024
+     d->f1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f1                              null    0.264     [0.200,0.312]    0.048   5.28    0.94    2  1,024
+     d->f1                          shuffled   -1.017   [-1.171,-0.868]    0.013   8.98   -0.01    1  1,024
+          RIG INVALID - an untrained network of the same shape reads it as well (-0.000 against -0.000): this is the architecture, not the training; the null reads better than the residual (0.264 against -0.000): this site carries less than free-space geometry. No number in this block means anything.
+
+     d0-d1                          residual   -0.000   [-0.005,-0.000]    0.000   8.85    0.00  128  1,024
+     d0-d1                         untrained   -0.000   [-0.005,-0.000]    0.000   8.85    0.00  128  1,024
+     d0-d1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d0-d1                              null    0.324     [0.277,0.366]    0.171   6.86    1.10    2  1,024
+     d0-d1                          shuffled   -0.963   [-1.137,-0.800]    0.011  12.80    0.02    1  1,024
+          RIG INVALID - an untrained network of the same shape reads it as well (-0.000 against -0.000): this is the architecture, not the training; the null reads better than the residual (0.324 against -0.000): this site carries less than free-space geometry. No number in this block means anything.
+
+own 6.44 cells of error, other 6.75, difference +0.30 [-0.03, +0.62]
+Positive means the objective it went to is held more precisely than the one it passed up:
+a target chosen first and measured second. An interval spanning zero says both distances
+are there before the choice, which is what a value-against-distance trade needs.
+
+==============================================================================
+depth 1  (block1)
+
+    target                               arm       R2            95% CI  partial    MAE   slope  dim      n
+     d->f0                          residual    0.106     [0.070,0.136]    0.060   6.39    0.96  128  1,024
+     d->f0                         untrained    0.000    [-0.004,0.001]    0.024   6.82    0.86  128  1,024
+     d->f0                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f0                              null    0.298     [0.249,0.349]    0.120   5.43    1.03    2  1,024
+     d->f0                          shuffled   -1.031   [-1.203,-0.887]   -0.006   9.25   -0.02    1  1,024
+          RIG INVALID - the null reads better than the residual (0.298 against 0.106): this site carries less than free-space geometry. No number in this block means anything.
+
+     d->f1                          residual    0.029    [-0.008,0.061]   -0.031   6.27    0.64  128  1,024
+     d->f1                         untrained    0.000    [-0.004,0.002]    0.019   6.53    5.27  128  1,024
+     d->f1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f1                              null    0.264     [0.200,0.312]    0.048   5.28    0.94    2  1,024
+     d->f1                          shuffled   -1.017   [-1.171,-0.868]    0.013   8.98   -0.01    1  1,024
+          RIG INVALID - the null reads better than the residual (0.264 against 0.029): this site carries less than free-space geometry. No number in this block means anything.
+
+     d0-d1                          residual    0.119     [0.082,0.156]    0.100   8.20    0.97  128  1,024
+     d0-d1                         untrained   -0.000    [-0.005,0.001]    0.012   8.86    0.25  128  1,024
+     d0-d1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d0-d1                              null    0.324     [0.277,0.366]    0.171   6.86    1.10    2  1,024
+     d0-d1                          shuffled   -0.963   [-1.137,-0.800]    0.011  12.80    0.02    1  1,024
+          RIG INVALID - the null reads better than the residual (0.324 against 0.119): this site carries less than free-space geometry. No number in this block means anything.
+
+own 5.94 cells of error, other 6.58, difference +0.64 [+0.31, +0.96]
+Positive means the objective it went to is held more precisely than the one it passed up:
+a target chosen first and measured second. An interval spanning zero says both distances
+are there before the choice, which is what a value-against-distance trade needs.
+
+==============================================================================
+depth 2  (block2)
+
+    target                               arm       R2            95% CI  partial    MAE   slope  dim      n
+     d->f0                          residual    0.300     [0.248,0.349]    0.224   5.38    0.93  128  1,024
+     d->f0                         untrained   -0.003    [-0.011,0.002]    0.013   6.82    0.08  128  1,024
+     d->f0                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f0                              null    0.298     [0.249,0.349]    0.120   5.43    1.03    2  1,024
+     d->f0                          shuffled   -1.031   [-1.203,-0.887]   -0.006   9.25   -0.02    1  1,024
+          controls ok (oracle passes, null and shuffled fail)
+
+     d->f1                          residual    0.013    [-0.010,0.036]   -0.056   6.45    0.64  128  1,024
+     d->f1                         untrained    0.000    [-0.004,0.001]   -0.002   6.53    5.55  128  1,024
+     d->f1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f1                              null    0.264     [0.200,0.312]    0.048   5.28    0.94    2  1,024
+     d->f1                          shuffled   -1.017   [-1.171,-0.868]    0.013   8.98   -0.01    1  1,024
+          RIG INVALID - the null reads better than the residual (0.264 against 0.013): this site carries less than free-space geometry. No number in this block means anything.
+
+     d0-d1                          residual    0.177     [0.142,0.210]    0.109   8.03    1.06  128  1,024
+     d0-d1                         untrained   -0.005    [-0.014,0.001]    0.001   8.89   -0.29  128  1,024
+     d0-d1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d0-d1                              null    0.324     [0.277,0.366]    0.171   6.86    1.10    2  1,024
+     d0-d1                          shuffled   -0.963   [-1.137,-0.800]    0.011  12.80    0.02    1  1,024
+          RIG INVALID - the null reads better than the residual (0.324 against 0.177): this site carries less than free-space geometry. No number in this block means anything.
+
+own 5.18 cells of error, other 6.53, difference +1.35 [+1.04, +1.71]
+Positive means the objective it went to is held more precisely than the one it passed up:
+a target chosen first and measured second. An interval spanning zero says both distances
+are there before the choice, which is what a value-against-distance trade needs.
+
+==============================================================================
+depth 3  (block3)
+
+    target                               arm       R2            95% CI  partial    MAE   slope  dim      n
+     d->f0                          residual    0.424     [0.375,0.475]    0.416   4.78    1.01  128  1,024
+     d->f0                         untrained   -0.002    [-0.011,0.003]    0.012   6.82    0.24  128  1,024
+     d->f0                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f0                              null    0.298     [0.249,0.349]    0.120   5.43    1.03    2  1,024
+     d->f0                          shuffled   -1.031   [-1.203,-0.887]   -0.006   9.25   -0.02    1  1,024
+          controls ok (oracle passes, null and shuffled fail)
+
+     d->f1                          residual    0.033    [-0.012,0.074]    0.032   6.28    0.61  128  1,024
+     d->f1                         untrained    0.000    [-0.004,0.001]   -0.017   6.53    5.11  128  1,024
+     d->f1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f1                              null    0.264     [0.200,0.312]    0.048   5.28    0.94    2  1,024
+     d->f1                          shuffled   -1.017   [-1.171,-0.868]    0.013   8.98   -0.01    1  1,024
+          RIG INVALID - the null reads better than the residual (0.264 against 0.033): this site carries less than free-space geometry. No number in this block means anything.
+
+     d0-d1                          residual    0.254     [0.206,0.293]    0.220   7.62    1.01  128  1,024
+     d0-d1                         untrained   -0.004    [-0.013,0.001]    0.006   8.89   -0.17  128  1,024
+     d0-d1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d0-d1                              null    0.324     [0.277,0.366]    0.171   6.86    1.10    2  1,024
+     d0-d1                          shuffled   -0.963   [-1.137,-0.800]    0.011  12.80    0.02    1  1,024
+          RIG INVALID - the null reads better than the residual (0.324 against 0.254): this site carries less than free-space geometry. No number in this block means anything.
+
+own 4.55 cells of error, other 6.39, difference +1.84 [+1.50, +2.20]
+Positive means the objective it went to is held more precisely than the one it passed up:
+a target chosen first and measured second. An interval spanning zero says both distances
+are there before the choice, which is what a value-against-distance trade needs.
+
+==============================================================================
+depth 4  (block4)
+
+    target                               arm       R2            95% CI  partial    MAE   slope  dim      n
+     d->f0                          residual    0.530     [0.487,0.568]    0.573   4.19    0.96  128  1,024
+     d->f0                         untrained   -0.001    [-0.010,0.005]    0.008   6.82    0.38  128  1,024
+     d->f0                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f0                              null    0.298     [0.249,0.349]    0.120   5.43    1.03    2  1,024
+     d->f0                          shuffled   -1.031   [-1.203,-0.887]   -0.006   9.25   -0.02    1  1,024
+          controls ok (oracle passes, null and shuffled fail)
+
+     d->f1                          residual    0.185     [0.144,0.234]    0.118   5.70    0.94  128  1,024
+     d->f1                         untrained   -0.000    [-0.004,0.001]   -0.022   6.53    3.52  128  1,024
+     d->f1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d->f1                              null    0.264     [0.200,0.312]    0.048   5.28    0.94    2  1,024
+     d->f1                          shuffled   -1.017   [-1.171,-0.868]    0.013   8.98   -0.01    1  1,024
+          RIG INVALID - the null reads better than the residual (0.264 against 0.185): this site carries less than free-space geometry. No number in this block means anything.
+
+     d0-d1                          residual    0.355     [0.310,0.397]    0.376   6.97    1.03  128  1,024
+     d0-d1                         untrained   -0.004    [-0.013,0.002]    0.004   8.89   -0.11  128  1,024
+     d0-d1                            oracle    1.000     [1.000,1.000]    1.000   0.00    1.00    1  1,024
+     d0-d1                              null    0.324     [0.277,0.366]    0.171   6.86    1.10    2  1,024
+     d0-d1                          shuffled   -0.963   [-1.137,-0.800]    0.011  12.80    0.02    1  1,024
+          controls ok (oracle passes, null and shuffled fail)
+
+own 3.87 cells of error, other 5.96, difference +2.08 [+1.79, +2.47]
+Positive means the objective it went to is held more precisely than the one it passed up:
+a target chosen first and measured second. An interval spanning zero says both distances
+are there before the choice, which is what a value-against-distance trade needs.
+
+wrote /workspace/data/offline/results/offline-bc-distance-sep.bcnv11.s1.json

@@ -1,0 +1,77 @@
+script 032_bc_write_the_distance.py
+commit 7483d9e
+argv   /workspace/data/offline/runs/bcnv11.s1 --demos /workspace/data/offline/demos/test.rho100 --targets gap --depths 2 3 4 --episodes 1024 --json /workspace/data/offline/results/offline-bc-writesep-gap.bcnv11.s1.json
+
+bcnv11.s1 @ step 30,000; test.rho100 (rho=1.0); 1024 fitted / 1024 measured; values hidden
+
+unedited: reached 97.0%  optimal 92.2%  followed f0 80.8%  legal 97.0%  matched expert 88.5%  return 0.396  steps 9.6  indifference 10.8
+
+==============================================================================
+depth 2  (after block 2)
+
+gap: |one cell| = 0.0931 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    10.81      [9.77,11.69]                       97.0%
+     gap     write   -4.0    10.78      [9.83,11.60]   -0.03        4.0    97.2%  97.2%
+     gap     write   -2.0    10.81      [9.93,11.64]    0.00        2.0    97.2%  97.2%
+     gap     write    2.0    10.73      [9.74,11.61]   -0.08       -2.0    97.0%  97.0%
+     gap     write    4.0    10.73      [9.74,11.61]   -0.08       -4.0    97.0%  97.0%
+     gap  opposite   -4.0    10.73      [9.74,11.61]   -0.08       -4.0    97.0%  97.0%
+     gap  opposite   -2.0    10.73      [9.74,11.61]   -0.08       -2.0    97.0%  97.0%
+     gap  opposite    2.0    10.81      [9.93,11.64]    0.00        2.0    97.2%  97.2%
+     gap  opposite    4.0    10.78      [9.83,11.60]   -0.03        4.0    97.2%  97.2%
+     gap    random   -4.0    10.75      [9.83,11.52]   -0.06        0.0    97.1%  97.1%
+     gap    random   -2.0    10.76      [9.95,11.58]   -0.05        0.0    97.1%  97.1%
+     gap    random    2.0    10.78      [9.79,11.64]   -0.03        0.0    97.0%  97.0%
+     gap    random    4.0    10.77      [9.78,11.65]   -0.05        0.0    97.0%  97.0%
+
+slope -0.009 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+==============================================================================
+depth 3  (after block 3)
+
+gap: |one cell| = 0.1974 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    10.81      [9.77,11.69]                       97.0%
+     gap     write   -4.0    10.85     [10.03,11.78]    0.04        4.0    97.0%  97.0%
+     gap     write   -2.0    10.91     [10.06,11.89]    0.10        2.0    97.0%  97.0%
+     gap     write    2.0    10.76      [9.83,11.62]   -0.05       -2.0    97.2%  97.2%
+     gap     write    4.0    10.81      [9.95,11.66]    0.00       -4.0    97.1%  97.1%
+     gap  opposite   -4.0    10.81      [9.95,11.66]    0.00       -4.0    97.1%  97.1%
+     gap  opposite   -2.0    10.76      [9.83,11.62]   -0.05       -2.0    97.2%  97.2%
+     gap  opposite    2.0    10.91     [10.06,11.89]    0.10        2.0    97.0%  97.0%
+     gap  opposite    4.0    10.85     [10.03,11.78]    0.04        4.0    97.0%  97.0%
+     gap    random   -4.0    10.60      [9.72,11.66]   -0.21        0.0    97.1%  97.1%
+     gap    random   -2.0    10.72      [9.83,11.72]   -0.09        0.0    97.2%  97.2%
+     gap    random    2.0    10.82      [9.83,11.69]    0.01        0.0    97.0%  97.0%
+     gap    random    4.0    10.61      [9.72,11.50]   -0.21        0.0    97.0%  97.0%
+
+slope -0.012 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+==============================================================================
+depth 4  (after block 4)
+The head reads SEP directly, so a write here reaches the first action and nothing else:
+no attention layer follows to carry it into the rest of the route.
+
+gap: |one cell| = 0.2391 of activation; re-decoding a steered vector moves it by +1.000 cells (must be +1.000)
+
+  target       arm  alpha   indiff            95% CI   moved  predicted  reached  legal
+     gap      none    0.0    10.81      [9.77,11.69]                       97.0%
+     gap     write   -4.0    10.84      [9.95,11.75]    0.03        4.0    97.2%  97.2%
+     gap     write   -2.0    10.81      [9.93,11.64]    0.00        2.0    97.2%  97.2%
+     gap     write    2.0    10.77      [9.76,11.66]   -0.04       -2.0    97.0%  97.0%
+     gap     write    4.0    10.77      [9.76,11.66]   -0.04       -4.0    97.0%  97.0%
+     gap  opposite   -4.0    10.77      [9.76,11.66]   -0.04       -4.0    97.0%  97.0%
+     gap  opposite   -2.0    10.77      [9.76,11.66]   -0.04       -2.0    97.0%  97.0%
+     gap  opposite    2.0    10.81      [9.93,11.64]    0.00        2.0    97.2%  97.2%
+     gap  opposite    4.0    10.84      [9.95,11.75]    0.03        4.0    97.2%  97.2%
+     gap    random   -4.0    10.89      [9.85,11.79]    0.08        0.0    97.0%  97.0%
+     gap    random   -2.0    10.88      [9.82,11.79]    0.07        0.0    97.0%  97.0%
+     gap    random    2.0    10.78      [9.92,11.78]   -0.04        0.0    97.2%  97.2%
+     gap    random    4.0    10.79      [9.92,11.78]   -0.02        0.0    97.2%  97.2%
+
+slope -0.009 cells of exchange rate per cell written (-1 = the decoded distance is the compared quantity; 0 = decodable and ignored)
+
+wrote /workspace/data/offline/results/offline-bc-writesep-gap.bcnv11.s1.json

@@ -101,8 +101,10 @@ def parse_args() -> argparse.Namespace:
         "--alphas",
         type=float,
         nargs="+",
-        default=[0.0, 0.25, 0.5, 1.0, 2.0, 4.0],
-        help="Norm of the written vector, as a multiple of the typical per-cell residual norm at that depth.",
+        default=[0.0, 0.02, 0.05, 0.1, 0.2, 0.4, 0.8],
+        help="Norm of the written vector, as a multiple of the typical per-cell residual norm at that depth. "
+        "The band is far lower than the DRC's: at a fifth of the residual's own norm the probe already reads "
+        "the written class back perfectly, and at the residual's full norm the decoder is walking into walls.",
     )
     parser.add_argument("--arms", type=str, nargs="+", default=list(ARMS), choices=list(ARMS))
     parser.add_argument("--patch", action="store_true", help="Also run the counterfactual patch ceiling.")

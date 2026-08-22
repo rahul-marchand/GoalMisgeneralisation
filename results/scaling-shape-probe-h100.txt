@@ -1,0 +1,47 @@
+script scripts/shape_probe.py --all --batch 1024 --steps 10
+where  RunPod H100 80GB HBM3 (secure), jax 0.4.34, 2026-08-22
+
+What the width/depth grid actually costs, measured rather than estimated. The
+campaign's plan in Preregistration-scaling.md was costed from arithmetic; these
+are the numbers that replace it.
+
+device NVIDIA H100 80GB HBM3 (gpu), batch 1024, remat True
+
+      d   L        params   ms/step   peak GB   TFLOP/s   base h
+    128   4       806,661      50.7       3.7      22.5     0.42
+    256   4     3,186,181     100.4       7.5      40.6     0.84
+    512   4    12,663,813     222.5      15.1      69.0     1.85
+    128   8     1,599,749     100.8       4.1      22.5     0.84
+    256   8     6,345,221     200.3       8.3      40.5     1.67
+    512   8    25,273,349     456.4      16.9      67.1     3.80
+    128  16     3,185,925     199.0       4.9      22.7     1.66
+    256  16    12,663,301     395.3       9.9      41.0     3.29
+    512  16    50,492,421     879.7      20.5      69.6     7.33
+
+  nine bases, sequential            21.7 h on one H100
+  plus arms at roughly 0.4x         30.4 h
+
+Three things this settles.
+
+1. REMAT IS REQUIRED, AND CHEAPER THAN BUDGETED. With it off, (512,16) at batch
+   1024 does not fit in 80 GB at all -- it OOMs, which is the memory estimate
+   confirmed from the other side. Where it does fit, remat costs 22% at (128,4)
+   (41.5 -> 50.7 ms) and 6.8% at (512,4) (208.4 -> 222.5 ms), against the 33%
+   the plan assumed. Peak memory falls by about 3.3x at both.
+
+2. BATCH SIZE DOES NOT CHANGE EFFICIENCY. 20.9, 22.4 and 23.1 TFLOP/s at batch
+   256, 1024 and 4096 for (128,4); 66.0 and 69.4 at 256 and 1024 for (512,16).
+   The workload was never launch-bound, so the argument that a larger batch
+   would buy MFU was wrong. Batch 1024 is kept because fewer, larger steps cost
+   nothing, not because it is faster.
+
+3. THROUGHPUT IS SET BY WIDTH ALONE. 22.5 TFLOP/s at every depth for d=128,
+   40.5 for d=256, 69 for d=512. Depth buys proportional time and no efficiency.
+   Even the widest cell reaches 7% of the card's ~990 TFLOP/s peak: with 186
+   tokens and an unfused attention the GEMMs are too narrow to fill an H100, and
+   no scheduling change fixes that.
+
+The consequence for the campaign is that the nine bases plus arms are about 30
+GPU-hours, not the 5 the plan assumed -- roughly $100 at $3.29/hr rather than
+$30. Cost is what it is whatever the card count, since it buys FLOPs; extra
+cards buy wall-clock down to the (512,16) base's own 7.3 h, which is the floor.

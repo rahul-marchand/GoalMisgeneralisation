@@ -362,4 +362,16 @@ the early-warning CSVs and each run's `eval.csv` are in `figures/data/bc/`.
 - `offline-bc-value-or-gap-<base>.txt` (`028`): `cos(axis_0, axis_1)` for that
   base, with split-half reliabilities and a permutation null.
 
+- `offline-bc-rewrite.<run>.txt` (`030`): the causal half of Experiment 1, which
+  the BC stream had not had. A directional plan is written into the per-cell
+  residual at one depth and the route decoded under it, six arms against the
+  DRC's, with `--patch` giving the counterfactual ceiling. Two diagnostics come
+  before the behaviour: `write-back`, the probe at the site reading the class
+  written, and `propagation`, the probe at the top reading it after an edit made
+  lower down. Depth `n_layers` is run as a control whose null is arithmetic -
+  the head reads from SEP onward with no attention after it - and it comes back
+  exact to the digit, which is what says the harness is sound.
+- `offline-bc-patch-objectives.<run>.txt` (`030 --patch-cells objectives`): the
+  same ceiling restricted to the two cells the objectives sit on.
+
 What they say is summarised in the offline-bc handoff and below as it lands.

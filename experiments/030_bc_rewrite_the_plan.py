@@ -77,7 +77,7 @@ from goalmisgen.offline import rewrite
 from goalmisgen.offline.decode import greedy_decode, replay_all, summarise_routes
 from goalmisgen.offline.demos import DemoSet
 from goalmisgen.offline.probe import capture, cell_residuals
-from goalmisgen.offline.train import list_checkpoints, load_checkpoint
+from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 
 ARMS = ("plan", "route", "erase", "self", "shuffled", "random")
 
@@ -108,6 +108,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--arms", type=str, nargs="+", default=list(ARMS), choices=list(ARMS))
     parser.add_argument("--patch", action="store_true", help="Also run the counterfactual patch ceiling.")
+    parser.add_argument(
+        "--counterfactual",
+        choices=("auto", "values", "features"),
+        default="auto",
+        help="What the patch changes about the level it is taken from. 'auto' swaps the values, or the "
+        "colours when the model was trained without a value channel and cannot see a value change.",
+    )
     parser.add_argument(
         "--patch-cells",
         choices=("all", "objectives"),
@@ -266,9 +273,20 @@ def build_edits(arm: str, observations, outcomes, targets, seed: int) -> list[di
     return built
 
 
-def run_patch(model, params, demos, indices, observations, targets, depth, args) -> dict:
-    """The ceiling: replace the residual with the one the swapped-value maze makes."""
-    counterfactual = rewrite.swapped_values(demos).observations(indices)
+def counterfactual_demos(demos: DemoSet, args, hide_values: bool) -> tuple[DemoSet, str]:
+    """The level the patch is taken from, and what was changed to make it."""
+    kind = args.counterfactual
+    if kind == "auto":
+        kind = "features" if hide_values else "values"
+    if kind == "values":
+        return rewrite.swapped_values(demos), "values"
+    return rewrite.swapped_features(demos), "colours"
+
+
+def run_patch(model, params, demos, indices, observations, targets, depth, args, hide_values: bool) -> dict:
+    """The ceiling: replace the residual with the one the counterfactual maze makes."""
+    source, kind = counterfactual_demos(demos, args, hide_values)
+    counterfactual = source.observations(indices)
     before = cell_residuals(model, params, observations)[depth]
     after = cell_residuals(model, params, counterfactual)[depth]
     cells = None
@@ -282,7 +300,7 @@ def run_patch(model, params, demos, indices, observations, targets, depth, args)
     )
     interval = f"[{entry['switched_ci'][0]:.3f},{entry['switched_ci'][1]:.3f}]"
     print(
-        f"\npatch ({args.patch_cells} cells): switched {entry['switched']:.1%} {interval}  "
+        f"\npatch ({kind} swapped, {args.patch_cells} cells): switched {entry['switched']:.1%} {interval}  "
         f"reached {entry['reached']:.1%}  legal {entry['legal']:.1%}  indifference {entry['indifference']:.2f}"
     )
     print(
@@ -304,7 +322,8 @@ def main() -> None:
     step, directory = checkpoints[-1] if args.step is None else next(c for c in checkpoints if c[0] == args.step)
     model, params = load_checkpoint(directory)
     cfg = model.config
-    demos = DemoSet.load(args.demos)
+    hide_values = bool(load_run_config(args.run)["demos"].get("hide_values", False))
+    demos = DemoSet.load(args.demos, hide_values=hide_values)
     depths = list(args.depths) if args.depths else list(range(cfg.n_layers + 1))
     rng = np.random.default_rng(args.seed)
 
@@ -313,7 +332,8 @@ def main() -> None:
     observations = demos.observations(measure_indices)
     print(
         f"{args.run.name} @ step {step:,}; {args.demos.name} (rho={demos.rho}); "
-        f"{args.fit_episodes} fitted / {args.episodes} measured; {cfg.n_layers} blocks, d_model {cfg.d_model}"
+        f"{args.fit_episodes} fitted / {args.episodes} measured; {cfg.n_layers} blocks, d_model {cfg.d_model}; "
+        f"values {'hidden' if hide_values else 'shown'}"
     )
 
     # ---- the baseline the switch rate is a departure from --------------------
@@ -470,7 +490,7 @@ def main() -> None:
         }
         if args.patch:
             results["depths"][str(depth)]["patch"] = run_patch(
-                model, params, demos, measure_indices, observations, targets, depth, args
+                model, params, demos, measure_indices, observations, targets, depth, args, hide_values
             )
 
     if args.json:

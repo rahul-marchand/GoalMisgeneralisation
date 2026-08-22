@@ -70,6 +70,16 @@ class ScalarResult:
     name: str
     r2: float
     interval: tuple[float, float]
+    partial_r: float
+    """Correlation with the truth *within* a stratum of the free-space confound.
+
+    The headline, for the reason ``005`` makes it the headline of the field
+    table. Manhattan distance alone explains a third of the variance in a true
+    field without solving anything, so a raw R2 rewards a probe for rediscovering
+    geometry. Stratified, only maze-aware structure survives - and a residual
+    whose raw R2 sits *below* the null's is a site that carries less than the
+    free-space number, however respectable its own R2 looks."""
+
     mae: float
     """Mean absolute error in cells, which is the number to read: an R² can be
     respectable while the errors are larger than the distances being compared."""
@@ -81,7 +91,7 @@ class ScalarResult:
     def __str__(self) -> str:
         return (
             f"{self.name:>34}{self.r2:>9.3f}{f'[{self.interval[0]:.3f},{self.interval[1]:.3f}]':>18}"
-            f"{self.mae:>7.2f}{self.slope:>8.2f}{self.depth:>5}{self.n:>7,}"
+            f"{self.partial_r:>9.3f}{self.mae:>7.2f}{self.slope:>8.2f}{self.depth:>5}{self.n:>7,}"
         )
 
 
@@ -137,6 +147,7 @@ def scalar_probe(
     train_y: np.ndarray,
     test_x: np.ndarray,
     test_y: np.ndarray,
+    confound: np.ndarray | None = None,
     l2: float | None = None,
     seed: int = 0,
 ) -> ScalarResult:
@@ -156,10 +167,12 @@ def scalar_probe(
         lambda rows: metrics.r2(truth[rows], prediction[rows]), episodes, seed=seed
     )
     slope, _ = metrics.affine_fit(truth, prediction)
+    stratum = np.zeros(len(truth), dtype=np.int64) if confound is None else confound[test_ok].astype(np.int64)
     return ScalarResult(
         name=name,
         r2=metrics.r2(truth, prediction),
         interval=interval,
+        partial_r=metrics.stratified_correlation(prediction, truth, stratum),
         mae=float(np.mean(np.abs(truth - prediction))),
         slope=slope,
         n=int(test_ok.sum()),

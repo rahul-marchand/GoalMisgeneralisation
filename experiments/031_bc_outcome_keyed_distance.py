@@ -62,7 +62,7 @@ from goalmisgen.offline import summary
 from goalmisgen.offline.decode import greedy_decode
 from goalmisgen.offline.demos import DemoSet
 from goalmisgen.offline.probe import capture
-from goalmisgen.offline.train import list_checkpoints, load_checkpoint
+from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 
 N_FEATURES = 2
 TAU = 4.0
@@ -117,13 +117,25 @@ def check_rig(scores: dict) -> str:
 
 
 def check_scalar_rig(scores: dict) -> str:
-    """The same judgement for the SEP probes, in their own units."""
+    """The same judgement for the SEP probes, on the same statistic.
+
+    Judged on ``partial_r`` rather than R2, and the extra clause is the one this
+    site needs: the free-space null reads the distance to about R2 0.28 without
+    solving any maze, so an arm below that has not shown a maze-aware quantity
+    however far above zero it sits. Saying so here rather than leaving it to a
+    reader is the same rule ``005``'s ``check_rig`` follows.
+    """
     problems = []
     if scores["oracle"].r2 < 0.9:
         problems.append(f"positive control failed ({scores['oracle'].r2:.3f})")
     for name in ("null", "shuffled"):
-        if scores[name].r2 > 0.5:
-            problems.append(f"{name} control reads too well ({scores[name].r2:.3f})")
+        if abs(scores[name].partial_r) > 0.2:
+            problems.append(f"{name} control survived stratification ({scores[name].partial_r:.3f})")
+    if scores["residual"].r2 < scores["null"].r2:
+        problems.append(
+            f"the null reads better than the residual ({scores['null'].r2:.3f} against "
+            f"{scores['residual'].r2:.3f}): this site carries less than free-space geometry"
+        )
     if problems:
         return "RIG INVALID - " + "; ".join(problems) + ". No number in this block means anything."
     return "controls ok (oracle passes, null and shuffled fail)"
@@ -162,7 +174,7 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
     fit_x = summary.sep_residuals(model, params, demos.observations(fit_indices))[depth]
     score_x = summary.sep_residuals(model, params, demos.observations(score_indices))[depth]
 
-    print(f"\n{'target':>10}{'arm':>34}{'R2':>9}{'95% CI':>18}{'MAE':>7}{'slope':>8}{'dim':>5}{'n':>7}")
+    print(f"\n{'target':>10}{'arm':>34}{'R2':>9}{'95% CI':>18}{'partial':>9}{'MAE':>7}{'slope':>8}{'dim':>5}{'n':>7}")
     predictions, truths = {}, {}
     for feature in range(N_FEATURES):
         fit_y = np.array([agent_distance(r, feature) for r in fit_rollouts], dtype=float)
@@ -183,9 +195,10 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
             "null": (null_fit, null_score),
             "shuffled": (np.nan_to_num(oracle_fit), np.nan_to_num(shuffled_score)),
         }
+        stratum = null_score[:, 0]
         scores = {}
         for name, (train_x, test_x) in arms.items():
-            result = summary.scalar_probe(name, train_x, fit_y, test_x, score_y, seed=seed)
+            result = summary.scalar_probe(name, train_x, fit_y, test_x, score_y, confound=stratum, seed=seed)
             scores[name] = result
             print(f"{f'd->f{feature}':>10}{result}")
 
@@ -193,7 +206,8 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
         predictions[feature] = apply_linear(score_x, weights, mean, std)
         truths[feature] = score_y
         results.setdefault("sep", {})[f"f{feature}"] = {
-            name: {"r2": r.r2, "mae": r.mae, "slope": r.slope} for name, r in scores.items()
+            name: {"r2": r.r2, "partial_r": r.partial_r, "mae": r.mae, "slope": r.slope}
+            for name, r in scores.items()
         }
         print(f"{'':>10}{check_scalar_rig(scores)}\n")
 
@@ -249,14 +263,16 @@ def main() -> None:
     step, directory = checkpoints[-1] if args.step is None else next(c for c in checkpoints if c[0] == args.step)
     model, params = load_checkpoint(directory)
     cfg = model.config
-    demos = DemoSet.load(args.demos)
+    hide_values = bool(load_run_config(args.run)["demos"].get("hide_values", False))
+    demos = DemoSet.load(args.demos, hide_values=hide_values)
     depths = list(args.depths) if args.depths else list(range(cfg.n_layers + 1))
 
     fit_indices = np.arange(args.train_episodes)
     score_indices = np.arange(args.train_episodes, args.train_episodes + args.test_episodes)
     print(
         f"{args.run.name} @ step {step:,}; {args.demos.name} (rho={demos.rho}); "
-        f"{args.train_episodes} fitted / {args.test_episodes} scored; {cfg.n_layers} blocks, d_model {cfg.d_model}"
+        f"{args.train_episodes} fitted / {args.test_episodes} scored; {cfg.n_layers} blocks, "
+        f"d_model {cfg.d_model}; values {'hidden' if hide_values else 'shown'}"
     )
     # Decode once: the routes label nothing here, but `reached_feature_id` is
     # what keys own against other, and it must be the model's own outcome.

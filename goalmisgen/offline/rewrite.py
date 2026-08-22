@@ -263,6 +263,23 @@ def swapped_values(demos: DemoSet) -> DemoSet:
     return dataclasses.replace(demos, values=np.asarray(demos.values)[:, ::-1].copy())
 
 
+def swapped_features(demos: DemoSet) -> DemoSet:
+    """The same levels with the objectives' *colours* exchanged.
+
+    The counterfactual for a model trained without the value channel. There,
+    swapping values is a no-op the model cannot see - the values are learned
+    constants, which is the whole point of ``bcnv11`` - so the only way to tell
+    it that the other objective is the valuable one is to move the colour.
+
+    Which also makes the two counterfactuals ask different questions, and the
+    difference is worth stating. Swapping values on a model that reads them asks
+    "if this objective were worth more, would the plan change". Swapping colours
+    asks "if the cue said so", which on a proxy-trained model is the
+    misgeneralisation itself rather than a control for it.
+    """
+    return dataclasses.replace(demos, feature_ids=np.asarray(demos.feature_ids)[:, ::-1].copy())
+
+
 def patch_edit(
     baseline: np.ndarray,
     counterfactual: np.ndarray,

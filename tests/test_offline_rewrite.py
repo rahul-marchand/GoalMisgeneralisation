@@ -309,3 +309,36 @@ def test_patch_can_be_restricted_to_the_objective_cells(demos, model_and_params)
         assert mask.sum() == 2
         np.testing.assert_array_equal(grid[index][~mask], 0.0)
         assert np.abs(grid[index][mask]).sum() > 0
+
+
+def test_swapped_features_moves_the_colour_not_the_value(demos):
+    """The counterfactual for a model that cannot see a value.
+
+    ``bcnv11`` is trained without the value channel, so swapping values changes
+    nothing it reads. Moving the colour is the only way to say "the other one is
+    the valuable objective" to a model whose values are learned constants.
+    """
+    swapped = rewrite.swapped_features(demos)
+    indices = np.arange(6)
+    before, after = demos.observations(indices), swapped.observations(indices)
+    for channel in (0, 1, demos.n_channels - 1):
+        np.testing.assert_array_equal(before[..., channel], after[..., channel])
+    np.testing.assert_array_equal(before[..., 2], after[..., 3])
+    np.testing.assert_array_equal(before[..., 3], after[..., 2])
+    for index in indices:
+        original = demos.level(int(index)).objectives
+        moved = swapped.level(int(index)).objectives
+        assert [o.value for o in original] == [o.value for o in moved]
+        assert [o.feature_id for o in original] == [1 - o.feature_id for o in moved]
+
+
+def test_a_hidden_value_demo_set_cannot_see_a_value_swap(demos):
+    """Which is why ``030`` picks the counterfactual from the model, not the flag."""
+    hidden = demos.with_hidden_values()
+    indices = np.arange(4)
+    np.testing.assert_array_equal(
+        hidden.observations(indices), rewrite.swapped_values(hidden).observations(indices)
+    )
+    assert not np.array_equal(
+        hidden.observations(indices), rewrite.swapped_features(hidden).observations(indices)
+    )

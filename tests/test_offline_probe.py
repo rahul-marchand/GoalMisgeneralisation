@@ -85,3 +85,40 @@ def test_relabel_walks_to_the_named_objective(demos, model_and_params):
         np.testing.assert_array_equal(o.features, r.features)
     with pytest.raises(ValueError):
         relabel(rollouts, "nearest")
+
+
+def test_decode_chunk_shrinks_as_the_model_widens() -> None:
+    """Decode memory is the attention matrix, so batch x heads is what to hold fixed.
+
+    A fixed chunk ran the wide cells of the scaling grid out of memory during
+    evaluation on a 24 GB card, after training had fitted comfortably.
+    """
+    from goalmisgen.offline.decode import DECODE_HEAD_BATCHES, decode_batch_size
+    from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
+
+    for d_model in (128, 256, 512):
+        model = RoutePrefixLM(ModelConfig(d_model=d_model, n_layers=4, n_heads=d_model // 32))
+        assert decode_batch_size(model) * model.config.n_heads == DECODE_HEAD_BATCHES
+
+
+def test_chunking_does_not_change_what_is_decoded() -> None:
+    """The chunk is how the work is divided, never how much of it happens."""
+    import jax
+    import numpy as np
+
+    from goalmisgen.offline.decode import greedy_decode
+    from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
+    from goalmisgen.offline.train import initial_params
+
+    config = ModelConfig(size=7, n_channels=5, max_actions=8, d_model=32, n_layers=2, n_heads=2)
+    model = RoutePrefixLM(config)
+    params = initial_params(model, jax.random.PRNGKey(0))["params"]
+    observations = np.asarray(
+        np.random.default_rng(0).random((20, config.size, config.size, config.n_channels)), dtype=np.float32
+    )
+
+    whole = greedy_decode(model, {"params": params}, observations, batch_size=64)
+    split = greedy_decode(model, {"params": params}, observations, batch_size=3)
+
+    np.testing.assert_array_equal(whole.actions, split.actions)
+    np.testing.assert_array_equal(whole.lengths, split.lengths)

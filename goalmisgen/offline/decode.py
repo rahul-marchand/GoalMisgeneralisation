@@ -38,14 +38,40 @@ class Decoded:
     emitted_eos: np.ndarray  # (B,) bool
 
 
-def greedy_decode(model: RoutePrefixLM, params, observations: np.ndarray, batch_size: int = 1024) -> Decoded:
+DECODE_HEAD_BATCHES = 4096
+"""Cap on ``batch x n_heads`` for one decode chunk. See :func:`decode_batch_size`."""
+
+
+def decode_batch_size(model: RoutePrefixLM) -> int:
+    """How many routes to decode at once, for a model of this width.
+
+    A fixed chunk is the wrong unit. Decoding materialises the attention matrix,
+    ``batch x heads x length x length``, and that is the whole memory bill -- so
+    a chunk that is comfortable for a four-head model is four times too large
+    for a sixteen-head one. Holding ``batch x heads`` constant makes the cost
+    independent of the model's width instead.
+
+    This is not hypothetical tidying. A fixed 1024 ran the 12M and 50M cells of
+    the scaling grid out of memory on a 24 GB card *during evaluation*, after
+    training itself had fitted comfortably: the probe that sized the campaign
+    measured training and never measured a decode.
+    """
+    return max(32, DECODE_HEAD_BATCHES // model.config.n_heads)
+
+
+def greedy_decode(model: RoutePrefixLM, params, observations: np.ndarray, batch_size: int | None = None) -> Decoded:
     """Argmax one token at a time until every route has ended.
 
     Recomputes the full sequence at every step rather than caching keys and
     values: the sequences are under two hundred tokens and the model is tiny,
     so the cache would be more code than the time it saves.
+
+    ``batch_size`` is only how the work is chunked, never how much of it there
+    is: every observation passed in is decoded, and the result does not depend
+    on it. It defaults to :func:`decode_batch_size`.
     """
     cfg = model.config
+    batch_size = decode_batch_size(model) if batch_size is None else batch_size
     next_token = _next_token(cfg)
 
     out_actions, out_lengths, out_eos = [], [], []

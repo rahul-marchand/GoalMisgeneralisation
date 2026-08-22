@@ -105,3 +105,42 @@ def test_own_and_other_skips_episodes_that_reached_nothing():
     predictions = {0: np.array([3.0, 4.0]), 1: np.array([5.0, 6.0])}
     own, other, _ = summary.own_and_other(predictions, truths, np.array([-1, 0]))
     assert own == 0.0 and other == 0.0
+
+
+def test_a_sep_edit_touches_only_the_sep_position(demos, model_and_params):
+    """The write ``032`` makes: one vector at the end-of-input token, nothing at the cells."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+    module = __import__("032_bc_write_the_distance")
+
+    direction = np.arange(TINY.d_model, dtype=float)
+    grid = module.sep_edit(direction, alpha=2.0, n_episodes=3, n_cells=TINY.n_cells)
+    assert grid.shape == (3, TINY.n_cells + 1, TINY.d_model)
+    np.testing.assert_array_equal(grid[:, : TINY.n_cells], 0.0)
+    np.testing.assert_allclose(grid[:, TINY.n_cells], np.tile(2.0 * direction, (3, 1)))
+
+
+def test_a_calibrated_write_moves_the_decoded_distance_by_what_it_says(demos, model_and_params):
+    """The arithmetic the whole of ``032`` rests on, end to end on real residuals.
+
+    A probe's weight vector is not a direction in the space the activations live
+    in - it is fitted on standardised inputs - and getting that wrong produces a
+    plausible slope rather than a crash, which is why ``steering.verify`` exists
+    and why this test reads the write back through the probe itself.
+    """
+    from goalmisgen.analysis import steering
+    from goalmisgen.analysis.probes import apply_linear
+
+    model, params = model_and_params
+    observations = demos.observations(np.arange(40))
+    sep = summary.sep_residuals(model, params, observations)[1]
+    rng = np.random.default_rng(0)
+    truth = sep @ rng.normal(size=TINY.d_model) * 0.1 + 7.0
+
+    weights, mean, std = summary.fit_scalar(sep, truth)
+    direction = steering.from_probe("d", weights, std)
+    before = apply_linear(sep, weights, mean, std)
+    after = apply_linear(sep + 3.0 * direction.delta, weights, mean, std)
+    np.testing.assert_allclose(after - before, 3.0, atol=1e-6)

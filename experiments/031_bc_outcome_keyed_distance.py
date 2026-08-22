@@ -53,6 +53,7 @@ import json
 import operator
 from pathlib import Path
 
+import jax
 import numpy as np
 
 from goalmisgen import provenance
@@ -62,7 +63,7 @@ from goalmisgen.offline import summary
 from goalmisgen.offline.decode import greedy_decode
 from goalmisgen.offline.demos import DemoSet
 from goalmisgen.offline.probe import capture
-from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
+from goalmisgen.offline.train import initial_params, list_checkpoints, load_checkpoint, load_run_config
 
 N_FEATURES = 2
 TAU = 4.0
@@ -79,7 +80,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-episodes", type=int, default=1024)
     parser.add_argument("--depths", type=int, nargs="*", default=None, help="Default every depth.")
     parser.add_argument("--sites", nargs="+", choices=("cells", "sep"), default=["cells", "sep"])
-    parser.add_argument("--no-untrained", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--json", type=Path, default=None)
     return parser.parse_args()
@@ -92,6 +92,24 @@ def agent_distance(rollout, feature_id: int) -> float:
     :func:`~goalmisgen.offline.summary.scalar_probe` drops rather than fills.
     """
     return targets.objective_distance(rollout, feature_id, N_FEATURES)
+
+
+def label_of(feature) -> str:
+    return "d0-d1" if feature == "gap" else f"d->f{feature}"
+
+
+def distance_target(rollouts, feature) -> np.ndarray:
+    """One number per episode: a distance, or the difference the choice turns on.
+
+    ``inf`` - an objective the other one walls off - becomes ``nan`` so the
+    probe drops the episode instead of learning a fill value.
+    """
+    if feature == "gap":
+        first = distance_target(rollouts, 0)
+        return first - distance_target(rollouts, 1)
+    values = np.array([agent_distance(r, feature) for r in rollouts], dtype=float)
+    values[~np.isfinite(values)] = np.nan
+    return values
 
 
 def check_rig(scores: dict) -> str:
@@ -131,6 +149,11 @@ def check_scalar_rig(scores: dict) -> str:
     for name in ("null", "shuffled"):
         if abs(scores[name].partial_r) > 0.2:
             problems.append(f"{name} control survived stratification ({scores[name].partial_r:.3f})")
+    if "untrained" in scores and scores["residual"].r2 <= scores["untrained"].r2:
+        problems.append(
+            f"an untrained network of the same shape reads it as well ({scores['untrained'].r2:.3f} "
+            f"against {scores['residual'].r2:.3f}): this is the architecture, not the training"
+        )
     if scores["residual"].r2 < scores["null"].r2:
         problems.append(
             f"the null reads better than the residual ({scores['null'].r2:.3f} against "
@@ -169,18 +192,27 @@ def cells_site(fit_rollouts, score_rollouts, label: str, results: dict) -> None:
         }
 
 
-def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, score_rollouts, depth, results, seed) -> None:
-    """The scalar probe at the end-of-input token, plus the own/other split."""
+def sep_site(
+    model, params, untrained, demos, fit_indices, score_indices, fit_rollouts, score_rollouts, depth, results, seed
+) -> None:
+    """The scalar probe at the end-of-input token, plus the own/other split.
+
+    Three targets, and the third is the one the decision actually turns on. With
+    the values fixed and hidden - which is what ``bcnv11`` is - the only thing
+    varying between episodes is geometry, so ``d->f0 - d->f1`` *is* the quantity
+    being compared against a constant. A model holding only that difference is
+    the activation-space version of the one knob Experiment 2 found in weights.
+    """
     fit_x = summary.sep_residuals(model, params, demos.observations(fit_indices))[depth]
     score_x = summary.sep_residuals(model, params, demos.observations(score_indices))[depth]
+    fit_random = summary.sep_residuals(model, untrained, demos.observations(fit_indices))[depth]
+    score_random = summary.sep_residuals(model, untrained, demos.observations(score_indices))[depth]
 
     print(f"\n{'target':>10}{'arm':>34}{'R2':>9}{'95% CI':>18}{'partial':>9}{'MAE':>7}{'slope':>8}{'dim':>5}{'n':>7}")
     predictions, truths = {}, {}
-    for feature in range(N_FEATURES):
-        fit_y = np.array([agent_distance(r, feature) for r in fit_rollouts], dtype=float)
-        score_y = np.array([agent_distance(r, feature) for r in score_rollouts], dtype=float)
-        fit_y[~np.isfinite(fit_y)] = np.nan
-        score_y[~np.isfinite(score_y)] = np.nan
+    for feature in list(range(N_FEATURES)) + ["gap"]:
+        fit_y = distance_target(fit_rollouts, feature)
+        score_y = distance_target(score_rollouts, feature)
 
         # The same three controls the field probes take, as one-vector features.
         oracle_fit, oracle_score = fit_y[:, None], score_y[:, None]
@@ -191,6 +223,7 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
 
         arms = {
             "residual": (fit_x, score_x),
+            "untrained": (fit_random, score_random),
             "oracle": (np.nan_to_num(oracle_fit), np.nan_to_num(oracle_score)),
             "null": (null_fit, null_score),
             "shuffled": (np.nan_to_num(oracle_fit), np.nan_to_num(shuffled_score)),
@@ -200,12 +233,13 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
         for name, (train_x, test_x) in arms.items():
             result = summary.scalar_probe(name, train_x, fit_y, test_x, score_y, confound=stratum, seed=seed)
             scores[name] = result
-            print(f"{f'd->f{feature}':>10}{result}")
+            print(f"{label_of(feature):>10}{result}")
 
-        weights, mean, std = summary.fit_scalar(fit_x, fit_y)
-        predictions[feature] = apply_linear(score_x, weights, mean, std)
-        truths[feature] = score_y
-        results.setdefault("sep", {})[f"f{feature}"] = {
+        if feature != "gap":
+            weights, mean, std = summary.fit_scalar(fit_x, fit_y)
+            predictions[feature] = apply_linear(score_x, weights, mean, std)
+            truths[feature] = score_y
+        results.setdefault("sep", {})[f"{feature}"] = {
             name: {"r2": r.r2, "partial_r": r.partial_r, "mae": r.mae, "slope": r.slope}
             for name, r in scores.items()
         }
@@ -225,13 +259,15 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
     results.setdefault("sep", {})["own_other"] = {"own": own, "other": other, "ci": [low, high]}
 
 
-def free_space(rollouts, feature_id: int) -> np.ndarray:
+def free_space(rollouts, feature_id) -> np.ndarray:
     """Manhattan and Chebyshev distance from the agent to the objective.
 
     The null that needs no maze solved. It is why the field probes stratify by
     the confound rather than reporting a raw correlation, and the scalar probe
     needs it for the same reason.
     """
+    if feature_id == "gap":
+        return free_space(rollouts, 0) - free_space(rollouts, 1)
     rows = []
     for rollout in rollouts:
         agent = geometry.agent_cell(rollout.observation)
@@ -267,6 +303,7 @@ def main() -> None:
     demos = DemoSet.load(args.demos, hide_values=hide_values)
     depths = list(args.depths) if args.depths else list(range(cfg.n_layers + 1))
 
+    untrained = initial_params(model, jax.random.PRNGKey(12345))
     fit_indices = np.arange(args.train_episodes)
     score_indices = np.arange(args.train_episodes, args.train_episodes + args.test_episodes)
     print(
@@ -291,7 +328,8 @@ def main() -> None:
             cells_site(fit_rollouts, score_rollouts, label, at_depth)
         if "sep" in args.sites:
             sep_site(
-                model, params, demos, fit_indices, score_indices, fit_rollouts, score_rollouts, depth, at_depth, args.seed
+                model, params, untrained, demos, fit_indices, score_indices,
+                fit_rollouts, score_rollouts, depth, at_depth, args.seed,
             )
         results["depths"][str(depth)] = at_depth
 

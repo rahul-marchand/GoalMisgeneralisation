@@ -154,14 +154,26 @@ def check_scalar_rig(scores: dict) -> str:
             f"an untrained network of the same shape reads it as well ({scores['untrained'].r2:.3f} "
             f"against {scores['residual'].r2:.3f}): this is the architecture, not the training"
         )
-    if scores["residual"].r2 < scores["null"].r2:
+    if abs(scores["residual"].partial_r) <= abs(scores["null"].partial_r):
         problems.append(
-            f"the null reads better than the residual ({scores['null'].r2:.3f} against "
-            f"{scores['residual'].r2:.3f}): this site carries less than free-space geometry"
+            f"the residual carries no more maze-aware structure than free space "
+            f"(partial {scores['residual'].partial_r:.3f} against the null's {scores['null'].partial_r:.3f})"
         )
     if problems:
         return "RIG INVALID - " + "; ".join(problems) + ". No number in this block means anything."
-    return "controls ok (oracle passes, null and shuffled fail)"
+
+    note = "controls ok (oracle passes, untrained and shuffled fail)"
+    if scores["residual"].r2 < scores["null"].r2:
+        # Not a rig failure: the stratified column is the headline, for the
+        # reason 005 makes it the headline. But a 128-dimensional probe that
+        # cannot beat two numbers of free-space geometry on raw variance is a
+        # weak read however clean its partial is, and saying so here keeps that
+        # from being lost between a table and a summary.
+        note += (
+            f"; caution: raw R2 {scores['residual'].r2:.3f} is below the free-space null's "
+            f"{scores['null'].r2:.3f}, so most of what is decodable here is geometry"
+        )
+    return note
 
 
 def cells_site(fit_rollouts, score_rollouts, label: str, results: dict) -> None:

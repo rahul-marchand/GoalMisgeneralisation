@@ -38,26 +38,40 @@ class Decoded:
     emitted_eos: np.ndarray  # (B,) bool
 
 
-def greedy_decode(model: RoutePrefixLM, params, observations: np.ndarray, batch_size: int = 1024) -> Decoded:
+def greedy_decode(
+    model: RoutePrefixLM,
+    params,
+    observations: np.ndarray,
+    batch_size: int = 1024,
+    edit: np.ndarray | None = None,
+    edit_depth: int = 0,
+) -> Decoded:
     """Argmax one token at a time until every route has ended.
 
     Recomputes the full sequence at every step rather than caching keys and
     values: the sequences are under two hundred tokens and the model is tiny,
     so the cache would be more code than the time it saves.
+
+    ``edit`` is a residual-stream write, one row per observation, applied inside
+    every one of those recomputations. That is the whole reason the intervention
+    is cheaper here than on the DRC: the prefix is recomputed identically at
+    every token and cannot see an action, so writing once is writing at every
+    step, with no equivalent of re-applying the edit before each forward pass.
     """
     cfg = model.config
-    next_token = _next_token(cfg)
+    next_token = _next_token(cfg, edit_depth)
 
     out_actions, out_lengths, out_eos = [], [], []
     for start in range(0, len(observations), batch_size):
         obs = jnp.asarray(observations[start : start + batch_size])
+        write = None if edit is None else jnp.asarray(edit[start : start + batch_size])
         batch = obs.shape[0]
         actions = np.full((batch, cfg.max_actions), NO_ACTION, dtype=np.int32)
         lengths = np.full(batch, cfg.max_actions, dtype=np.int32)
         finished = np.zeros(batch, dtype=bool)
 
         for position in range(cfg.max_actions + 1):
-            token = np.asarray(next_token(params, obs, jnp.asarray(actions), position))
+            token = np.asarray(next_token(params, obs, jnp.asarray(actions), position, write))
             ended = (token == cfg.eos) & ~finished
             lengths[ended] = position
             finished |= ended
@@ -73,18 +87,21 @@ def greedy_decode(model: RoutePrefixLM, params, observations: np.ndarray, batch_
     return Decoded(np.concatenate(out_actions), np.concatenate(out_lengths), np.concatenate(out_eos))
 
 
-@functools.lru_cache(maxsize=8)
-def _next_token(config: ModelConfig):
-    """One jitted decode step per model shape.
+@functools.lru_cache(maxsize=16)
+def _next_token(config: ModelConfig, edit_depth: int = 0):
+    """One jitted decode step per model shape and write depth.
 
     Built inside :func:`greedy_decode` it was recompiled on every call, and an
-    evaluation at every checkpoint paid the compile each time.
+    evaluation at every checkpoint paid the compile each time. The depth is part
+    of the key because it decides where the write lands in the traced graph;
+    ``edit`` itself is an argument, and passing ``None`` traces the unedited
+    network, so an ordinary evaluation compiles exactly what it did before.
     """
     model = RoutePrefixLM(config)
 
     @jax.jit
-    def next_token(params, observations, actions, position):
-        logits, _ = model.apply(params, observations, actions)
+    def next_token(params, observations, actions, position, edit=None):
+        logits, _ = model.apply(params, observations, actions, edit, edit_depth)
         return jnp.argmax(logits[:, position], axis=-1)
 
     return next_token
@@ -229,9 +246,25 @@ def summarise_routes(demos: DemoSet, indices: np.ndarray, decoded: Decoded, outc
     )
 
 
-def evaluate(model: RoutePrefixLM, params, demos: DemoSet, indices: np.ndarray) -> tuple[RouteSummary, Decoded, list[dict]]:
-    """Decode, replay and summarise one held-out set."""
-    decoded = greedy_decode(model, params, demos.observations(indices))
+def evaluate(
+    model: RoutePrefixLM,
+    params,
+    demos: DemoSet,
+    indices: np.ndarray,
+    edit: np.ndarray | None = None,
+    edit_depth: int = 0,
+    observations: np.ndarray | None = None,
+) -> tuple[RouteSummary, Decoded, list[dict]]:
+    """Decode, replay and summarise one held-out set.
+
+    ``observations`` overrides what the model reads while the levels replayed
+    stay ``demos``'s own - the counterfactual patch in ``030`` decodes one
+    maze's residuals and scores them on another's rules, and scoring against
+    the wrong level is the one way to make that measure nothing.
+    """
+    if observations is None:
+        observations = demos.observations(indices)
+    decoded = greedy_decode(model, params, observations, edit=edit, edit_depth=edit_depth)
     outcomes = replay_all(demos, indices, decoded)
     return summarise_routes(demos, indices, decoded, outcomes), decoded, outcomes
 

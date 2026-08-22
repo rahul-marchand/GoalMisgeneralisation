@@ -50,30 +50,43 @@ class CellRollout:
     level: Level
 
 
-@functools.lru_cache(maxsize=8)
-def _residuals_fn(config: ModelConfig):
+@functools.lru_cache(maxsize=16)
+def _residuals_fn(config: ModelConfig, edit_depth: int = 0):
     model = RoutePrefixLM(config)
 
     @jax.jit
-    def residuals(params, observations):
+    def residuals(params, observations, edit=None):
         actions = jnp.full((observations.shape[0], config.max_actions), NO_ACTION, dtype=jnp.int32)
-        _, streams = model.apply(params, observations, actions)
+        _, streams = model.apply(params, observations, actions, edit, edit_depth)
         return jnp.stack([s[:, : config.n_cells] for s in streams], axis=0)
 
     return residuals
 
 
-def cell_residuals(model: RoutePrefixLM, params, observations: np.ndarray, batch_size: int = 512) -> np.ndarray:
+def cell_residuals(
+    model: RoutePrefixLM,
+    params,
+    observations: np.ndarray,
+    batch_size: int = 512,
+    edit: np.ndarray | None = None,
+    edit_depth: int = 0,
+) -> np.ndarray:
     """``(n_layers + 1, B, size, size, d_model)``: embedding, then after each block.
 
     Captured with no action tokens present; the prefix cannot see them anyway,
     so this is the same grid the model decodes from.
+
+    With ``edit``, the grids are those of the *written* network - which is how
+    "does a write at block 2 still read at block 4" is asked, and that question
+    decides whether a small behavioural effect is a fact about the
+    representation or about the edit not surviving a block.
     """
     cfg = model.config
-    fn = _residuals_fn(cfg)
+    fn = _residuals_fn(cfg, edit_depth)
     chunks = []
     for start in range(0, len(observations), batch_size):
-        out = np.asarray(fn(params, jnp.asarray(observations[start : start + batch_size])))
+        write = None if edit is None else jnp.asarray(edit[start : start + batch_size])
+        out = np.asarray(fn(params, jnp.asarray(observations[start : start + batch_size]), write))
         chunks.append(out.reshape(out.shape[0], out.shape[1], cfg.size, cfg.size, cfg.d_model))
     return np.concatenate(chunks, axis=1)
 

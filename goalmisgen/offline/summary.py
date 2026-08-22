@@ -80,20 +80,55 @@ class ScalarResult:
 
     def __str__(self) -> str:
         return (
-            f"{self.name:>26}{self.r2:>9.3f}{f'[{self.interval[0]:.3f},{self.interval[1]:.3f}]':>18}"
+            f"{self.name:>34}{self.r2:>9.3f}{f'[{self.interval[0]:.3f},{self.interval[1]:.3f}]':>18}"
             f"{self.mae:>7.2f}{self.slope:>8.2f}{self.depth:>5}{self.n:>7,}"
         )
 
 
-def fit_scalar(train_x: np.ndarray, train_y: np.ndarray, l2: float = 1.0):
+def choose_l2(
+    x: np.ndarray,
+    y: np.ndarray,
+    grid=(1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3, 1e4, 1e5),
+    folds: int = 4,
+    seed: int = 0,
+) -> float:
+    """The penalty with the best held-out R2, by k-fold on the training episodes.
+
+    A scalar probe reads ``d_model`` features from a few hundred episodes, where
+    a field probe reads them from tens of thousands of cells. At a fixed penalty
+    that difference alone decides the answer: the same site scores below zero on
+    64 episodes and respectably on a thousand, and neither number is about the
+    model. Chosen here for the same reason ``fields.choose_l2`` exists.
+    """
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(len(y))
+    parts = np.array_split(order, folds)
+
+    best, best_score = grid[0], -np.inf
+    for l2 in grid:
+        scores = []
+        for index in range(folds):
+            held = parts[index]
+            kept = np.concatenate([parts[other] for other in range(folds) if other != index])
+            weights, mean, std = fit_ridge(x[kept], y[kept], l2=l2)
+            scores.append(metrics.r2(y[held], apply_linear(x[held], weights, mean, std)))
+        score = float(np.mean(scores))
+        if score > best_score:
+            best, best_score = l2, score
+    return best
+
+
+def fit_scalar(train_x: np.ndarray, train_y: np.ndarray, l2: float | None = None, seed: int = 0):
     """Ridge on the episodes whose target exists. Returns ``(w, mean, std)``.
 
     Separate from :func:`scalar_probe` because the paired own/other comparison
     needs predictions for *every* test episode, aligned by index, and a probe
-    that drops rows internally cannot hand those back.
+    that drops rows internally cannot hand those back. ``l2=None`` chooses the
+    penalty by cross-validation on the training episodes.
     """
     ok = np.isfinite(train_y)
-    return fit_ridge(train_x[ok], train_y[ok], l2=l2)
+    penalty = choose_l2(train_x[ok], train_y[ok], seed=seed) if l2 is None else l2
+    return fit_ridge(train_x[ok], train_y[ok], l2=penalty)
 
 
 def scalar_probe(
@@ -102,7 +137,7 @@ def scalar_probe(
     train_y: np.ndarray,
     test_x: np.ndarray,
     test_y: np.ndarray,
-    l2: float = 1.0,
+    l2: float | None = None,
     seed: int = 0,
 ) -> ScalarResult:
     """Ridge from one vector per episode to one number per episode.
@@ -112,7 +147,7 @@ def scalar_probe(
     number the probe can learn.
     """
     test_ok = np.isfinite(test_y)
-    weights, mean, std = fit_scalar(train_x, train_y, l2=l2)
+    weights, mean, std = fit_scalar(train_x, train_y, l2=l2, seed=seed)
     prediction = apply_linear(test_x[test_ok], weights, mean, std)
     truth = test_y[test_ok]
 

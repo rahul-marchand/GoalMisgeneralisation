@@ -75,8 +75,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("run", type=Path)
     parser.add_argument("--demos", type=Path, required=True)
     parser.add_argument("--step", type=int, default=None, help="Checkpoint step; default the last.")
-    parser.add_argument("--train-episodes", type=int, default=256)
-    parser.add_argument("--test-episodes", type=int, default=512)
+    parser.add_argument("--train-episodes", type=int, default=1024, help="A scalar probe reads d_model features from this many rows, not from tens of thousands of cells.")
+    parser.add_argument("--test-episodes", type=int, default=1024)
     parser.add_argument("--depths", type=int, nargs="*", default=None, help="Default every depth.")
     parser.add_argument("--sites", nargs="+", choices=("cells", "sep"), default=["cells", "sep"])
     parser.add_argument("--no-untrained", action="store_true")
@@ -132,7 +132,7 @@ def check_scalar_rig(scores: dict) -> str:
 def cells_site(fit_rollouts, score_rollouts, label: str, results: dict) -> None:
     """The field probe, one row per objective per arm - the DRC's table."""
     activations = Feature("residual", operator.attrgetter("features"))
-    print(f"\n{'site':>8}{'target':>10}{'arm':>26}{'partial':>9}{'within':>8}{'hard shape':>11}{'hard R2':>9}{'MAE':>7}{'n_hard':>9}")
+    print(f"\n{'site':>8}{'target':>10}{'arm':>34}{'partial':>9}{'within':>8}{'hard shape':>11}{'hard R2':>9}{'MAE':>7}{'n_hard':>9}")
 
     for feature in range(N_FEATURES):
         target = targets.DistanceToObjective(targets.fixed(feature), name=f"d->f{feature}", n_features=N_FEATURES)
@@ -146,7 +146,7 @@ def cells_site(fit_rollouts, score_rollouts, label: str, results: dict) -> None:
             result = fields.field_probe(arm.name, train, test, tau=TAU)
             scores[arm.name.split(":")[0]] = result
             print(
-                f"{label:>8}{target.name:>10}{result.name:>26}{result.partial_r:>9.3f}"
+                f"{label:>8}{target.name:>10}{result.name:>34}{result.partial_r:>9.3f}"
                 f"{result.partial_r_within_episode:>8.3f}{result.hard_shape_r2:>11.3f}"
                 f"{result.hard_r2:>9.3f}{result.mae:>7.2f}{result.n_hard:>9,}"
             )
@@ -162,7 +162,7 @@ def sep_site(model, params, demos, fit_indices, score_indices, fit_rollouts, sco
     fit_x = summary.sep_residuals(model, params, demos.observations(fit_indices))[depth]
     score_x = summary.sep_residuals(model, params, demos.observations(score_indices))[depth]
 
-    print(f"\n{'target':>10}{'arm':>26}{'R2':>9}{'95% CI':>18}{'MAE':>7}{'slope':>8}{'dim':>5}{'n':>7}")
+    print(f"\n{'target':>10}{'arm':>34}{'R2':>9}{'95% CI':>18}{'MAE':>7}{'slope':>8}{'dim':>5}{'n':>7}")
     predictions, truths = {}, {}
     for feature in range(N_FEATURES):
         fit_y = np.array([agent_distance(r, feature) for r in fit_rollouts], dtype=float)

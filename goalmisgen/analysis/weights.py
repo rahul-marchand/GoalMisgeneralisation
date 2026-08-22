@@ -23,6 +23,61 @@ from __future__ import annotations
 import numpy as np
 
 
+def gram_matrix(diffs: np.ndarray, chunk: int = 1_000_000) -> np.ndarray:
+    """``diffs @ diffs.T`` in float64, whatever dtype ``diffs`` is stored in.
+
+    Two things are wrong with letting numpy do this directly on a float32 matrix.
+    It would accumulate 50M products per entry in float32, where the rounding
+    error is large enough to matter to a cosine quoted to three places; and a
+    mixed-precision ``@`` promotes by *copying the larger operand*, which for the
+    width/depth grid is the 4.8 GB this dtype was chosen to avoid. So the
+    accumulator is float64 and each block is widened as it is read.
+    """
+    diffs = np.asarray(diffs)
+    if diffs.ndim != 2:
+        raise ValueError(f"expected an arms-by-parameters matrix, got shape {diffs.shape}")
+    if chunk < 1:
+        raise ValueError(f"chunk must be positive, got {chunk}")
+    gram = np.zeros((len(diffs), len(diffs)), dtype=np.float64)
+    for start in range(0, diffs.shape[1], chunk):
+        block = np.asarray(diffs[:, start : start + chunk], dtype=np.float64)
+        gram += block @ block.T
+    return (gram + gram.T) / 2
+
+
+def project(diffs: np.ndarray, vector: np.ndarray, chunk: int = 1_000_000) -> np.ndarray:
+    """``diffs @ vector`` in float64, chunked, for the same two reasons."""
+    diffs = np.asarray(diffs)
+    vector = np.asarray(vector)
+    if diffs.ndim != 2 or vector.ndim != 1 or diffs.shape[1] != len(vector):
+        raise ValueError(f"cannot project a {diffs.shape} matrix onto a {vector.shape} vector")
+    out = np.zeros(len(diffs), dtype=np.float64)
+    for start in range(0, diffs.shape[1], chunk):
+        stop = start + chunk
+        out += np.asarray(diffs[:, start:stop], dtype=np.float64) @ np.asarray(vector[start:stop], dtype=np.float64)
+    return out
+
+
+def _as_float(array: np.ndarray) -> np.ndarray:
+    """``np.asarray`` that promotes to float64 only when it has to.
+
+    Every function below used to force float64 on whatever it was handed. On a
+    handful of arms of a million-parameter network that costs nothing and buys
+    accuracy. On the width/depth grid it is the difference between running and
+    not: 24 arms of a 50M-parameter model is 4.8 GB in float32 and 9.7 GB in
+    float64, and each forced conversion allocates a second copy of the whole
+    arms-by-parameters matrix on top of whatever the caller is already holding.
+
+    Checkpoints are float32 on disk, so a float64 diff carries no precision the
+    data ever had -- it is a wider container for the same numbers. An already-
+    floating input therefore keeps its own dtype and an integer or object one is
+    still promoted, which leaves every existing caller (all of which pass
+    float64) reading exactly as before.
+    """
+    array = np.asarray(array)
+    return array if np.issubdtype(array.dtype, np.floating) else array.astype(np.float64)
+
+
 def fit_axis(offsets: np.ndarray, diffs: np.ndarray) -> np.ndarray:
     """Least-squares ``diff = offset * axis`` through the origin.
 
@@ -32,13 +87,13 @@ def fit_axis(offsets: np.ndarray, diffs: np.ndarray) -> np.ndarray:
     measure separately.
     """
     offsets = np.asarray(offsets, dtype=np.float64)
-    diffs = np.asarray(diffs, dtype=np.float64)
+    diffs = _as_float(diffs)
     if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
         raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
     denominator = float(offsets @ offsets)
     if denominator < 1e-12:
         raise ValueError("every arm sits at the base value, so there is no offset to fit against")
-    return (offsets @ diffs) / denominator
+    return (offsets.astype(diffs.dtype, copy=False) @ diffs) / denominator
 
 
 def fit_axis_and_drift(offsets: np.ndarray, diffs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -57,7 +112,7 @@ def fit_axis_and_drift(offsets: np.ndarray, diffs: np.ndarray) -> tuple[np.ndarr
     from how far they all moved from the base.
     """
     offsets = np.asarray(offsets, dtype=np.float64)
-    diffs = np.asarray(diffs, dtype=np.float64)
+    diffs = _as_float(diffs)
     if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
         raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
     if len(offsets) < 3:
@@ -66,7 +121,7 @@ def fit_axis_and_drift(offsets: np.ndarray, diffs: np.ndarray) -> tuple[np.ndarr
     denominator = float(centred @ centred)
     if denominator < 1e-12:
         raise ValueError("every arm sits at the same offset, so there is no slope to fit")
-    axis = (centred @ (diffs - diffs.mean(axis=0))) / denominator
+    axis = (centred.astype(diffs.dtype, copy=False) @ (diffs - diffs.mean(axis=0))) / denominator
     return axis, diffs.mean(axis=0) - offsets.mean() * axis
 
 
@@ -123,7 +178,7 @@ def permutation_cosines(
     permutation null assumes nothing about how noise scales.
     """
     offsets = np.asarray(offsets, dtype=np.float64)
-    diffs = np.asarray(diffs, dtype=np.float64)
+    diffs = _as_float(diffs)
     if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
         raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
     # Permuting the offsets does not touch the diffs, so everything that depends
@@ -141,9 +196,9 @@ def permutation_cosines(
     # network -- and two thousand of them took longer than the rest of the
     # analysis put together, per sweep.
     centred_diffs = diffs - diffs.mean(axis=0)
-    gram = centred_diffs @ centred_diffs.T
-    projected = centred_diffs @ np.asarray(reference, dtype=np.float64)
-    reference_norm = float(np.linalg.norm(reference))
+    gram = gram_matrix(centred_diffs)
+    projected = project(centred_diffs, reference)
+    reference_norm = float(np.linalg.norm(np.asarray(reference, dtype=np.float64)))
     if reference_norm < 1e-30:
         raise ValueError("a diff of zero length has no direction")
 
@@ -195,11 +250,11 @@ def permutation_norms(
     calibrated about either.
     """
     offsets = np.asarray(offsets, dtype=np.float64)
-    diffs = np.asarray(diffs, dtype=np.float64)
+    diffs = _as_float(diffs)
     if offsets.ndim != 1 or diffs.ndim != 2 or len(offsets) != len(diffs):
         raise ValueError(f"need one offset per diff, got {offsets.shape} and {diffs.shape}")
     centred_diffs = diffs - diffs.mean(axis=0)
-    gram = centred_diffs @ centred_diffs.T
+    gram = gram_matrix(centred_diffs)
     rng = np.random.default_rng(seed)
     drawn = np.empty(resamples, dtype=np.float64)
     for index in range(resamples):
@@ -210,6 +265,32 @@ def permutation_norms(
             raise ValueError("every arm sits at the same offset, so there is no slope to fit")
         drawn[index] = float(np.sqrt(max(centred @ gram @ centred, 0.0))) / denominator
     return drawn
+
+
+def mirrored_pairs(offsets: np.ndarray) -> list[tuple[int, int]]:
+    """Index pairs ``(i, j)`` whose offsets are ``+m`` and ``-m``, widest first.
+
+    The unit a balanced split is made of. Splitting *arms* rather than pairs lets
+    the common fine-tuning component leak into a half's own axis, and two halves
+    that both leaked it agree about the leak, so anything that splits a sweep in
+    half splits it here.
+
+    Rounded throughout, keys and magnitudes alike. An offset is a difference of
+    two floats -- 1.45 - 1.0 is 0.4500000000000002 while 0.55 - 1.0 is
+    -0.44999999999999996 -- so a magnitude taken from the raw values matches no
+    key at all, and the sweep whose base value happens to make the arithmetic
+    inexact silently reports no pairs and no reliability. Colour 0 did exactly
+    that while colour 1, whose base is 0.5, came through unharmed.
+    """
+    offsets = np.asarray(offsets, dtype=np.float64)
+    if offsets.ndim != 1:
+        raise ValueError(f"offsets must be one-dimensional, got shape {offsets.shape}")
+    table = {round(float(o), 6): index for index, o in enumerate(offsets)}
+    return [
+        (table[m], table[-m])
+        for m in sorted({abs(key) for key in table if abs(key) > 1e-9}, reverse=True)
+        if m in table and -m in table
+    ]
 
 
 def split_half_reliability(
@@ -239,19 +320,8 @@ def split_half_reliability(
     into two halves that each fit a slope.
     """
     offsets = np.asarray(offsets, dtype=np.float64)
-    diffs = np.asarray(diffs, dtype=np.float64)
-    # Rounded throughout, keys and magnitudes alike. An offset is a difference of
-    # two floats -- 1.45 - 1.0 is 0.4500000000000002 while 0.55 - 1.0 is
-    # -0.44999999999999996 -- so a magnitude taken from the raw values matches no
-    # key at all, and the sweep whose base value happens to make the arithmetic
-    # inexact silently reports no pairs and no reliability. Colour 0 did exactly
-    # that while colour 1, whose base is 0.5, came through unharmed.
-    table = {round(float(o), 6): index for index, o in enumerate(offsets)}
-    pairs = [
-        (table[m], table[-m])
-        for m in sorted({abs(key) for key in table if abs(key) > 1e-9}, reverse=True)
-        if m in table and -m in table
-    ]
+    diffs = _as_float(diffs)
+    pairs = mirrored_pairs(offsets)
     if len(pairs) < 4:
         return float("nan")
 

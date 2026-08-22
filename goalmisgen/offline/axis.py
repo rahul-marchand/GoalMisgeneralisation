@@ -74,13 +74,32 @@ def arm_dirs(run_dir: pathlib.Path, sweep: str, steps: int) -> dict[float, pathl
     return found
 
 
-def load_diffs(base: Base, arms: dict[float, pathlib.Path]) -> dict[float, np.ndarray]:
-    """``theta_arm - theta_base`` for every arm, float64, keyed by offset."""
+def load_diffs(base: Base, arms: dict[float, pathlib.Path], dtype=np.float32) -> dict[float, np.ndarray]:
+    """``theta_arm - theta_base`` for every arm, keyed by offset.
+
+    **float32, and nothing is lost by it.** Checkpoints are float32 on disk, so
+    both sides of the subtraction arrive with 24 bits of mantissa and a float64
+    diff is a wider container for the same numbers. An arm is also very close to
+    its base -- that is what a short fine-tune means -- and the difference of two
+    nearby floats of the same sign is exactly representable, so the subtraction
+    itself is not where precision goes.
+
+    The width/depth grid is what forced the question. A sweep of 24 arms is
+    4.8 GB in float32 and 9.7 GB in float64 at 50M parameters, and ``028`` holds
+    two sweeps at once; every forced conversion downstream then allocated
+    another copy of the same size. The arithmetic that needs the width still gets
+    it -- :func:`goalmisgen.analysis.spectrum.gram_matrix` accumulates in float64
+    and widens each block as it reads it -- and everything that does not now
+    keeps the caller's dtype.
+
+    Pass ``dtype=np.float64`` to reproduce a result measured before this change.
+    """
+    reference = np.asarray(base.flat, dtype=dtype)
     diffs = {}
     for offset, directory in sorted(arms.items()):
         _, params = load_checkpoint(list_checkpoints(directory)[-1][1])
         flat, _ = ravel_pytree(params)
-        diffs[offset] = np.asarray(flat, dtype=np.float64) - base.flat
+        diffs[offset] = np.asarray(flat, dtype=dtype) - reference
     return diffs
 
 

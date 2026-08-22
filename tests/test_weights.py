@@ -16,9 +16,11 @@ from goalmisgen.analysis.weights import (
     explained,
     fit_axis,
     fit_axis_and_drift,
+    gram_matrix,
     permutation_cosines,
     permutation_norms,
     permutation_p_value,
+    project,
     projected_offset,
     split_half_reliability,
 )
@@ -339,3 +341,75 @@ def test_reliability_finds_its_pairs_when_the_offsets_are_inexact() -> None:
     diffs = np.outer(offsets, rng.normal(size=200)) + 0.5 * rng.normal(size=(len(offsets), 200))
 
     assert split_half_reliability(offsets, diffs, splits=80, seed=9) > 0.7
+
+
+# --- storing diffs at the width they came from -------------------------------
+#
+# Checkpoints are float32, so a sweep of a large model is held at that width and
+# the arithmetic widens where it needs to rather than the storage widening
+# everywhere. What these guard is that "where it needs to" is right: a promotion
+# that copies the arms-by-parameters matrix defeats the point, and an accumulator
+# left at float32 quietly costs precision in a number quoted to three places.
+
+
+def test_gram_matrix_is_float64_however_the_diffs_are_stored() -> None:
+    rng = np.random.default_rng(20)
+    diffs = rng.normal(size=(5, 301)).astype(np.float32)
+
+    for chunk in (1, 17, 301, 10_000):
+        gram = gram_matrix(diffs, chunk=chunk)
+        assert gram.dtype == np.float64
+        assert np.allclose(gram, diffs.astype(np.float64) @ diffs.astype(np.float64).T)
+
+
+def test_project_is_float64_however_the_diffs_are_stored() -> None:
+    rng = np.random.default_rng(21)
+    diffs = rng.normal(size=(5, 301)).astype(np.float32)
+    vector = rng.normal(size=301).astype(np.float32)
+
+    for chunk in (1, 17, 301, 10_000):
+        projected = project(diffs, vector, chunk=chunk)
+        assert projected.dtype == np.float64
+        assert np.allclose(projected, diffs.astype(np.float64) @ vector.astype(np.float64))
+
+
+def test_a_fit_does_not_widen_the_matrix_it_was_handed() -> None:
+    """float64 in, float64 out; float32 in, float32 out -- and no copy either way."""
+    rng = np.random.default_rng(22)
+    offsets = np.array([-0.3, -0.1, 0.1, 0.3])
+    _, diffs = linear_family(rng, offsets, noise=0.05)
+
+    assert fit_axis(offsets, diffs).dtype == np.float64
+    assert fit_axis_and_drift(offsets, diffs)[0].dtype == np.float64
+    assert fit_axis(offsets, diffs.astype(np.float32)).dtype == np.float32
+    assert fit_axis_and_drift(offsets, diffs.astype(np.float32))[0].dtype == np.float32
+
+
+def test_integer_diffs_are_still_promoted() -> None:
+    offsets = np.array([-2.0, -1.0, 1.0, 2.0])
+    diffs = np.array([[-2, -4], [-1, -2], [1, 2], [2, 4]])
+
+    assert fit_axis(offsets, diffs).dtype == np.float64
+
+
+def test_the_narrower_storage_changes_no_reported_number() -> None:
+    """The whole justification: same statistics, half the memory."""
+    rng = np.random.default_rng(23)
+    offsets = np.array([-0.4, -0.3, -0.2, -0.1, 0.1, 0.2, 0.3, 0.4])
+    wide = (rng.normal(size=4096) + np.outer(offsets, rng.normal(size=4096))).astype(np.float32).astype(np.float64)
+    narrow = wide.astype(np.float32)
+
+    axis_wide = fit_axis_and_drift(offsets, wide)[0]
+    axis_narrow = fit_axis_and_drift(offsets, narrow)[0]
+
+    assert cosine(axis_wide, axis_narrow) == pytest.approx(1.0, abs=1e-9)
+    assert split_half_reliability(offsets, narrow, splits=40) == pytest.approx(
+        split_half_reliability(offsets, wide, splits=40), abs=1e-9
+    )
+    # Looser here, and the reason is the reference rather than the machinery: the
+    # null is measured against each path's *own* fitted axis, and those differ at
+    # float32 resolution. What is left is 1e-5 on a quantity reported to three
+    # places, which is the claim this test is making.
+    assert permutation_cosines(offsets, narrow, axis_narrow, resamples=50, seed=3).mean() == pytest.approx(
+        permutation_cosines(offsets, wide, axis_wide, resamples=50, seed=3).mean(), abs=1e-4
+    )

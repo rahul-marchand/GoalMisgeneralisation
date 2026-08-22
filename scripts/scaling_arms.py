@@ -23,6 +23,7 @@ one pair of margin if an arm fails.
 from __future__ import annotations
 
 import argparse
+import signal
 
 from goalmisgen.design import arm_values, check_no_preference_flip, sweep_arms
 from goalmisgen.offline.axis import expected_indifference
@@ -35,6 +36,14 @@ OFFSETS: tuple[float, ...] = (0.45, 0.42, 0.39, 0.30, 0.20, 0.10)
 
 
 def main() -> None:
+    # Die quietly when the reader goes away. This script exists to be piped into
+    # shell loops, and `arm_grid --widest-only | head -1` closes the pipe after
+    # one line -- whereupon Python raises BrokenPipeError and prints a traceback
+    # into the run log for something that worked perfectly. A spurious traceback
+    # is worse than untidy: it is indistinguishable, to anything watching the
+    # logs, from a real one.
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--steps", type=int, default=1000, help="Fine-tuning budget; part of the arm's directory name.")
     parser.add_argument("--objective", type=int, nargs="+", default=[0, 1])

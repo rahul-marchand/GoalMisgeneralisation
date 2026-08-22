@@ -27,6 +27,7 @@ import argparse
 import json
 from pathlib import Path
 
+import jax.numpy as jnp
 import numpy as np
 
 from goalmisgen import provenance
@@ -72,6 +73,12 @@ def parse_args() -> argparse.Namespace:
         help="Checkpoint directory to fine-tune from, instead of a fresh initialisation. The "
         "model shape and --hide-values are taken from that run's config.json.",
     )
+    parser.add_argument(
+        "--dtype",
+        choices=("float32", "bfloat16"),
+        default="float32",
+        help="Precision the matmuls run in; parameters stay float32. Fix it for a whole grid.",
+    )
     parser.add_argument("--schedule", choices=("cosine", "constant"), default="cosine")
     parser.add_argument("--note", type=str, default=None, help="Why this run exists; written beside the run.")
     return parser.parse_args()
@@ -109,6 +116,7 @@ def main() -> None:
         checkpoint_first=args.checkpoint_first,
         checkpoint_ratio=args.checkpoint_ratio,
         schedule=args.schedule,
+        dtype=args.dtype,
         init_from=None if args.init_from is None else str(args.init_from),
     )
 
@@ -142,7 +150,7 @@ def main() -> None:
         )
     print()
 
-    model = RoutePrefixLM(model_config)
+    model = RoutePrefixLM(model_config, dtype=getattr(jnp, args.dtype))
 
     def evaluator(params, step: int) -> dict[str, float]:
         row: dict[str, float] = {}

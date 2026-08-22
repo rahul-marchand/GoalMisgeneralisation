@@ -60,6 +60,19 @@ class TrainConfig:
     how far they moved under a fixed budget, so every step should be worth the
     same whichever arm it belongs to.
     """
+    dtype: str = "float32"
+    """``float32`` or ``bfloat16`` -- the precision the matmuls run in.
+
+    Parameters, LayerNorms and the attention softmax stay float32 either way;
+    see :class:`~goalmisgen.offline.model.RoutePrefixLM`. Recorded here rather
+    than in ``ModelConfig`` because it is a property of how a run was trained,
+    not of the network: a checkpoint written under one precision loads and
+    decodes identically under the other.
+
+    It moves the noise floor, so a grid comparing fine-tuning signal against
+    fine-tuning noise has to fix it once for every cell.
+    """
+
     init_from: str | None = None
     """A checkpoint directory to start from instead of a fresh initialisation.
 
@@ -79,13 +92,23 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.schedule not in ("cosine", "constant"):
             raise ValueError(f"schedule should be 'cosine' or 'constant', got {self.schedule!r}")
+        if self.dtype not in ("float32", "bfloat16"):
+            raise ValueError(f"dtype should be 'float32' or 'bfloat16', got {self.dtype!r}")
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict) -> "TrainConfig":
-        return cls(**{field.name: data[field.name] for field in dataclasses.fields(cls)})
+        """Absent keys fall back to the field default.
+
+        A config written before a field existed does not carry it, and every
+        field added since has a default chosen to reproduce the behaviour of the
+        runs that predate it. Insisting on the key instead means a new option
+        makes every existing run on the volume unloadable, which is how the
+        first attempt at adding ``dtype`` broke the analysis of `bcnv11`.
+        """
+        return cls(**{f.name: data[f.name] for f in dataclasses.fields(cls) if f.name in data})
 
 
 def checkpoint_schedule(total_steps: int, first: int = 25, ratio: float = 1.4) -> tuple[int, ...]:
@@ -200,7 +223,7 @@ def train(
             f"{model_config.max_actions}; a route that does not fit is silently truncated"
         )
 
-    model = RoutePrefixLM(model_config)
+    model = RoutePrefixLM(model_config, dtype=getattr(jnp, train_config.dtype))
     key = jax.random.PRNGKey(train_config.seed)
     params = initial_params(model, key)
     if train_config.init_from is not None:

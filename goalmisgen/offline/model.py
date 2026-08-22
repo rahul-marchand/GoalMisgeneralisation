@@ -102,18 +102,25 @@ def prefix_mask(prefix_length: int, sequence_length: int) -> np.ndarray:
 
 class SelfAttention(nn.Module):
     n_heads: int
+    dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(self, x: jnp.ndarray, mask: jnp.ndarray) -> jnp.ndarray:
         batch, length, width = x.shape
         head = width // self.n_heads
-        qkv = nn.Dense(3 * width, name="qkv")(x).reshape(batch, length, 3, self.n_heads, head)
+        dense = dict(dtype=self.dtype, param_dtype=jnp.float32)
+        qkv = nn.Dense(3 * width, name="qkv", **dense)(x).reshape(batch, length, 3, self.n_heads, head)
         q, k, v = qkv[:, :, 0], qkv[:, :, 1], qkv[:, :, 2]
         scores = jnp.einsum("blhd,bmhd->bhlm", q, k) / math.sqrt(head)
-        scores = jnp.where(mask[None, None], scores, jnp.finfo(scores.dtype).min)
-        weights = jax.nn.softmax(scores, axis=-1)
+        # The softmax is taken in float32 whatever the matmuls run in. It is the
+        # one place a narrow exponent bites: the masked entries are set to the
+        # dtype's most negative value, and in bfloat16 that is -3.4e38 with three
+        # significant digits, so exp() of the shifted scores loses the tail that
+        # separates a nearly-uniform attention from a peaked one.
+        scores = jnp.where(mask[None, None], scores.astype(jnp.float32), jnp.finfo(jnp.float32).min)
+        weights = jax.nn.softmax(scores, axis=-1).astype(self.dtype)
         out = jnp.einsum("bhlm,bmhd->blhd", weights, v).reshape(batch, length, width)
-        return nn.Dense(width, name="out")(out)
+        return nn.Dense(width, name="out", **dense)(out)
 
 
 class Block(nn.Module):
@@ -121,22 +128,74 @@ class Block(nn.Module):
 
     n_heads: int
     mlp_ratio: int
+    dtype: jnp.dtype = jnp.float32
 
     @nn.compact
     def __call__(self, x: jnp.ndarray, mask: jnp.ndarray) -> jnp.ndarray:
         width = x.shape[-1]
-        x = x + SelfAttention(self.n_heads, name="attention")(nn.LayerNorm(name="ln_attention")(x), mask)
-        h = nn.LayerNorm(name="ln_mlp")(x)
-        h = nn.Dense(self.mlp_ratio * width, name="mlp_in")(h)
+        dense = dict(dtype=self.dtype, param_dtype=jnp.float32)
+        # LayerNorm stays in float32: it divides by a standard deviation computed
+        # over the width, and doing that in bfloat16 is the other classic way a
+        # mixed-precision transformer goes quietly wrong.
+        norm = dict(dtype=jnp.float32, param_dtype=jnp.float32)
+        x = x + SelfAttention(self.n_heads, self.dtype, name="attention")(
+            nn.LayerNorm(name="ln_attention", **norm)(x).astype(self.dtype), mask
+        )
+        h = nn.LayerNorm(name="ln_mlp", **norm)(x).astype(self.dtype)
+        h = nn.Dense(self.mlp_ratio * width, name="mlp_in", **dense)(h)
         h = jax.nn.gelu(h)
-        h = nn.Dense(width, name="mlp_out")(h)
-        return x + h
+        h = nn.Dense(width, name="mlp_out", **dense)(h)
+        return x + h.astype(x.dtype)
 
 
 class RoutePrefixLM(nn.Module):
     """Maze in, route out. Returns logits and the residual stream at every depth."""
 
     config: ModelConfig
+
+    dtype: jnp.dtype = jnp.float32
+    """Precision the matmuls run in. Parameters stay float32 whatever this says.
+
+    Default float32, so nothing changes unless a caller asks. ``jnp.bfloat16``
+    turns on the H100's tensor cores, whose peak is roughly twice what float32
+    reaches through TF32 -- the probe in ``results/scaling-shape-probe-h100.txt``
+    measured the widest cell of the grid at 69 TFLOP/s, about 7% of the card.
+
+    Mixed, not narrow: weights, the LayerNorms and the attention softmax are all
+    float32, and only the large matmuls drop to bfloat16. Those three exclusions
+    are where a narrow exponent actually costs something; the matmuls are where
+    the time goes.
+
+    **It changes the noise floor**, so it is not free for this campaign in the
+    way it is for ordinary training. Every quantity here is a comparison of
+    fine-tuning signal against fine-tuning noise, so a grid trained at one
+    precision cannot be compared arm-for-arm with one trained at another. Pick
+    one for the whole grid.
+    """
+
+    remat: bool = True
+    """Recompute each block's internals during the backward pass instead of storing them.
+
+    Gradient checkpointing, and it is what makes the wide-and-deep end of the
+    scaling grid trainable at a useful batch size. The block materialises the
+    full ``(batch, heads, length, length)`` attention matrix, and that one tensor
+    is the entire memory bill: at ``d_model=512``, 16 layers and batch 1024 the
+    stored activations come to about 161 GB, which fits on no single card.
+    Rematerialising leaves one block's peak live plus the residual stream between
+    blocks, around 16 GB -- a factor of ten, for one extra forward pass.
+
+    Not an approximation. The parameter tree is untouched, so a checkpoint
+    written with this on loads with it off, and the logits are bit-identical;
+    the gradients agree to float32 reassociation noise (measured at 2e-7
+    relative, against an eps of 1.2e-7) because the recomputed forward pass
+    sums in a different order, not because a different quantity is computed.
+
+    Costed at roughly a third more compute (forward, forward again, backward,
+    against forward and backward). It is left **on at every size**, including the
+    small models that do not need it, so that a step costs the same across the
+    grid and wall-clock comparisons between shapes mean something. Turning it off
+    is for measuring that cost, not for going faster.
+    """
 
     @nn.compact
     def __call__(self, observations: jnp.ndarray, actions: jnp.ndarray) -> tuple[jnp.ndarray, list[jnp.ndarray]]:
@@ -173,13 +232,16 @@ class RoutePrefixLM(nn.Module):
         x = jnp.concatenate([x_cells, sep, x_actions], axis=1)
         mask = jnp.asarray(prefix_mask(cfg.prefix_length, x.shape[1]))
 
+        block = nn.remat(Block) if self.remat else Block
         residuals = [x]
         for index in range(cfg.n_layers):
-            x = Block(cfg.n_heads, cfg.mlp_ratio, name=f"block_{index}")(x, mask)
+            x = block(cfg.n_heads, cfg.mlp_ratio, self.dtype, name=f"block_{index}")(x, mask)
             residuals.append(x)
 
-        x = nn.LayerNorm(name="ln_final")(x)
-        logits = nn.Dense(cfg.n_classes, name="head")(x[:, cfg.prefix_length - 1 :])
+        x = nn.LayerNorm(name="ln_final", dtype=jnp.float32, param_dtype=jnp.float32)(x)
+        logits = nn.Dense(cfg.n_classes, name="head", dtype=jnp.float32, param_dtype=jnp.float32)(
+            x[:, cfg.prefix_length - 1 :]
+        )
         return logits, residuals
 
 

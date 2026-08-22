@@ -263,3 +263,49 @@ def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_p
 
     with pytest.raises(ValueError):
         train(demos, TINY, dataclasses.replace(arm, init_from=str(base_dir)), tmp_path / "bad", log=lambda s: None)
+
+
+# --- rematerialisation --------------------------------------------------------
+#
+# The scaling grid trains with it on at every size, so it has to be invisible:
+# same parameters, same outputs, and gradients that differ only by the order a
+# recomputed forward pass sums in. A checkpoint written under one setting must
+# load under the other, which is what lets analysis code build the model without
+# caring.
+
+
+def _remat_pair(layers: int = 3, width: int = 32):
+    config = ModelConfig(size=5, d_model=width, n_layers=layers, n_heads=2, max_actions=6)
+    rng = np.random.default_rng(0)
+    observations = np.asarray(rng.normal(size=(4, 5, 5, config.n_channels)), dtype=np.float32)
+    actions = np.asarray(rng.integers(0, config.n_actions, size=(4, 6)), dtype=np.int32)
+    return config, observations, actions
+
+
+def test_remat_is_on_by_default() -> None:
+    assert RoutePrefixLM(ModelConfig()).remat is True
+
+
+def test_remat_changes_neither_the_parameter_tree_nor_the_outputs() -> None:
+    config, observations, actions = _remat_pair()
+    on, off = RoutePrefixLM(config, remat=True), RoutePrefixLM(config, remat=False)
+
+    params = on.init(jax.random.PRNGKey(0), observations, actions)
+    assert jax.tree_util.tree_structure(params) == jax.tree_util.tree_structure(
+        off.init(jax.random.PRNGKey(0), observations, actions)
+    )
+    assert np.allclose(on.apply(params, observations, actions)[0], off.apply(params, observations, actions)[0])
+
+
+def test_remat_gradients_differ_only_by_float32_reassociation() -> None:
+    config, observations, actions = _remat_pair()
+    on, off = RoutePrefixLM(config, remat=True), RoutePrefixLM(config, remat=False)
+    params = on.init(jax.random.PRNGKey(0), observations, actions)
+
+    def flat_grad(model):
+        grads = jax.grad(lambda p: model.apply(p, observations, actions)[0].sum())(params)
+        return np.concatenate([np.asarray(leaf).ravel() for leaf in jax.tree_util.tree_leaves(grads)])
+
+    with_remat, without = flat_grad(on), flat_grad(off)
+    assert np.linalg.norm(with_remat - without) / np.linalg.norm(without) < 1e-5
+    assert with_remat @ without / np.linalg.norm(with_remat) / np.linalg.norm(without) == pytest.approx(1.0, abs=1e-12)

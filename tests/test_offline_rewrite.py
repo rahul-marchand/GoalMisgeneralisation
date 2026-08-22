@@ -377,3 +377,18 @@ def test_the_sham_erase_avoids_both_routes_and_matches_the_count(rollouts):
         assert all(free[cell] for cell in sham)
         return
     pytest.skip("no level in the fixture offers both a route and enough free cells")
+
+
+def test_relabelling_by_the_untaken_route_changes_the_labels(rollouts):
+    """The read's control: a real route to the objective the model passed up."""
+    from goalmisgen.offline.probe import relabel
+
+    reached = [r for r in rollouts if r.info.get("reached_index") is not None]
+    if not reached:
+        pytest.skip("the untrained fixture model reached no objective")
+    untaken = relabel(reached, "untaken")
+    assert untaken, "relabelling dropped every rollout"
+    changed = sum(not np.array_equal(a.visited, b.visited) for a, b in zip(reached, untaken))
+    assert changed, "the untaken route is identical to the taken one on every level"
+    for rollout in untaken:
+        assert rollout.visited[rollout.level.agent_start], "a route must start where the agent is"

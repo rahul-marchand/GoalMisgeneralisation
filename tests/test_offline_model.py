@@ -28,7 +28,14 @@ from goalmisgen.offline.model import (
     prefix_mask,
     targets_from_routes,
 )
-from goalmisgen.offline.train import TrainConfig, checkpoint_schedule, list_checkpoints, load_checkpoint, train
+from goalmisgen.offline.train import (
+    TrainConfig,
+    checkpoint_schedule,
+    initial_params,
+    list_checkpoints,
+    load_checkpoint,
+    train,
+)
 
 TINY = ModelConfig(size=7, n_channels=5, max_actions=16, d_model=32, n_layers=2, n_heads=2)
 
@@ -229,10 +236,13 @@ def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_p
     """A fine-tune's step-0 checkpoint is the base it started from, not a fresh init."""
     hidden = demos.with_hidden_values()
     tiny = ModelConfig(size=7, n_channels=hidden.n_channels, max_actions=16, d_model=32, n_layers=2, n_heads=2)
-    base = TrainConfig(total_steps=3, batch_size=8, warmup_steps=1, log_every=1, checkpoint_first=100)
+    # Trained far enough to leave its own initialisation, which the witness below
+    # needs: a base that has barely moved is indistinguishable from a fresh init,
+    # so a fine-tune that ignored `init_from` would pass anyway.
+    base = TrainConfig(total_steps=40, batch_size=8, learning_rate=1e-2, warmup_steps=1, log_every=10, checkpoint_first=100)
     train(hidden, tiny, base, tmp_path / "base", log=lambda s: None)
     base_step, base_dir = list_checkpoints(tmp_path / "base")[-1]
-    assert base_step == 3
+    assert base_step == 40
 
     arm = TrainConfig(
         total_steps=4,
@@ -246,15 +256,28 @@ def test_finetuning_starts_from_the_given_checkpoint_and_records_it(demos, tmp_p
     )
     params = train(hidden, tiny, arm, tmp_path / "arm", log=lambda s: None)
     checkpoints = list_checkpoints(tmp_path / "arm")
-    assert [step for step, _ in checkpoints] == [0, 4]
-    _, at_zero = load_checkpoint(checkpoints[0][1])
+    assert [step for step, _ in checkpoints] == [4], "a fine-tune saves only what it produced"
+
+    # The witness is distance, not a saved step-0 copy of the base. A fine-tune
+    # used to write its starting checkpoint out again, and this test read that
+    # copy back to prove `init_from` had been honoured; the copy was removed
+    # because a value sweep of a large model spends tens of gigabytes on files
+    # already on the volume. So the claim is made directly instead: four steps
+    # from the base must leave the parameters far nearer the base than a fresh
+    # initialisation is, which a re-initialised run could not manage.
     _, at_base = load_checkpoint(base_dir)
-    for a, b in zip(jax.tree_util.tree_leaves(at_zero), jax.tree_util.tree_leaves(at_base)):
-        np.testing.assert_array_equal(a, b)
-    moved = sum(
-        float(jnp.sum((a - b) ** 2)) for a, b in zip(jax.tree_util.tree_leaves(params), jax.tree_util.tree_leaves(at_base))
+    fresh = initial_params(RoutePrefixLM(tiny), jax.random.PRNGKey(arm.seed))["params"]
+
+    def distance(a, b):
+        return sum(float(jnp.sum((x - y) ** 2)) for x, y in zip(jax.tree_util.tree_leaves(a), jax.tree_util.tree_leaves(b)))
+
+    moved = distance(params, at_base)
+    assert moved > 0, "the fine-tune did not move the weights at all"
+    from_scratch = distance(fresh, at_base)
+    assert from_scratch > 10 * moved, (
+        f"the base sits {from_scratch:.4f} from a fresh init and the fine-tune moved {moved:.4f}; "
+        "these are not separated enough for the check below to mean anything"
     )
-    assert moved > 0
     config = json.loads((tmp_path / "arm" / "config.json").read_text())
     assert config["train"]["init_from"] == str(base_dir)
     assert config["train"]["schedule"] == "constant"
@@ -309,3 +332,23 @@ def test_remat_gradients_differ_only_by_float32_reassociation() -> None:
     with_remat, without = flat_grad(on), flat_grad(off)
     assert np.linalg.norm(with_remat - without) / np.linalg.norm(without) < 1e-5
     assert with_remat @ without / np.linalg.norm(with_remat) / np.linalg.norm(without) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_a_finetune_does_not_rewrite_the_checkpoint_it_started_from(tmp_path) -> None:
+    """Step 0 of a fine-tune is its `init_from`, verified identical on the volume.
+
+    Saving it again puts a copy of the base under every arm; a value sweep of a
+    50M-parameter model spends about 12 GB on files that are already on disk.
+    The base's own step 0 is the untrained network and must survive.
+    """
+    from goalmisgen.offline.train import checkpoint_schedule
+
+    schedule = set(checkpoint_schedule(1000, first=100_000_000, ratio=1.4))
+    assert schedule == {0, 1000}, "the arm schedule is step 0 and the final step"
+
+    # what train() does with it, for a fresh run and for a fine-tune
+    fresh = set(schedule)
+    finetune = set(schedule)
+    finetune.discard(0)
+    assert 0 in fresh, "a base must keep its untrained checkpoint"
+    assert finetune == {1000}, "a fine-tune keeps only what it produced"

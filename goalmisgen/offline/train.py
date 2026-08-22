@@ -297,6 +297,15 @@ def train(
     stream = batches(demos, train_config.batch_size, np.random.default_rng(train_config.seed))
     started = time.perf_counter()
     recent_loss, recent_accuracy, recent_count = 0.0, 0.0, 0
+    # A fine-tune's step 0 is, by construction, the checkpoint it started from:
+    # verified identical, not merely similar. Saving it again writes a second
+    # copy of the base under every arm, which across a value sweep of a large
+    # model is tens of gigabytes of a file that is already on the volume and
+    # named in this run's own config.json. The base's own step 0 is kept, since
+    # that is the untrained network the probes read as a baseline.
+    if train_config.init_from is not None:
+        checkpoints.discard(0)
+
     for step in range(train_config.total_steps + 1):
         if step in checkpoints:
             save_checkpoint(run_dir, step, state.params)

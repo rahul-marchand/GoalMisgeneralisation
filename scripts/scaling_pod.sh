@@ -261,7 +261,7 @@ arms() {
     if [ "${ARM_SHARD_INDEX}" = "0" ]; then
         calibrate "${name}" || return 1
     else
-        say "waiting for shard 0 to choose ${name}'"'"'s arm learning rate"
+        say "waiting for shard 0 to choose the arm learning rate for ${name}"
         local waited=0
         until [ -f "${out}/arm_lr.txt" ]; do
             sleep 20; waited=$((waited + 20))

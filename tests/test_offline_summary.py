@@ -144,3 +144,61 @@ def test_a_calibrated_write_moves_the_decoded_distance_by_what_it_says(demos, mo
     before = apply_linear(sep, weights, mean, std)
     after = apply_linear(sep + 3.0 * direction.delta, weights, mean, std)
     np.testing.assert_allclose(after - before, 3.0, atol=1e-6)
+
+
+def test_an_edited_sep_reads_back_at_its_own_depth(demos, model_and_params):
+    """The propagation check's own arithmetic: written where asked, carried or not.
+
+    At the depth of the edit the shift is exactly what was written, whatever the
+    blocks above do with it. Anything else means the grid is landing on the
+    wrong position, which would make a null in ``032`` a null about the harness.
+    """
+    model, params = model_and_params
+    observations = demos.observations(np.arange(6))
+    edit = np.zeros((6, TINY.n_cells + 1, TINY.d_model), dtype=np.float32)
+    edit[:, TINY.n_cells] = 1.5
+
+    plain = summary.sep_residuals(model, params, observations)
+    edited = summary.sep_residuals_edited(model, params, observations, edit, edit_depth=1)
+    np.testing.assert_array_equal(plain[0], edited[0])
+    np.testing.assert_allclose(edited[1], plain[1] + 1.5, atol=1e-4)
+
+
+def test_editing_the_cells_leaves_sep_alone_at_that_depth(demos, model_and_params):
+    """The converse, so the two sites in ``030`` and ``032`` cannot be confused."""
+    model, params = model_and_params
+    observations = demos.observations(np.arange(4))
+    rng = np.random.default_rng(0)
+    edit = rng.normal(size=(4, TINY.n_cells, TINY.d_model)).astype(np.float32)
+
+    plain = summary.sep_residuals(model, params, observations)
+    edited = summary.sep_residuals_edited(model, params, observations, edit, edit_depth=1)
+    np.testing.assert_allclose(edited[1], plain[1], atol=1e-5)
+    # But it does reach SEP one block later, through attention.
+    assert not np.allclose(edited[2], plain[2], atol=1e-3)
+
+
+def test_a_constant_added_to_every_channel_is_invisible(demos, model_and_params):
+    """A guaranteed null, and one an experiment could stumble into.
+
+    Every block begins with a LayerNorm, which subtracts the mean over channels
+    and divides by the spread over channels. Adding the same number to every
+    channel changes neither, so ``x + c`` and ``x`` are the same vector to
+    everything downstream: the edit is erased before it is read.
+
+    The DRC has the analogous trap - ``steering.apply_to_carry`` adds one vector
+    at every cell, which leaves a field's argmin and gradient untouched, and
+    ``012`` says so. This is the transformer's version, and it is why the
+    directions written in ``030`` and ``032`` come from a probe rather than
+    being chosen by hand.
+    """
+    model, params = model_and_params
+    observations = demos.observations(np.arange(4))
+    edit = np.full((4, TINY.n_cells + 1, TINY.d_model), 2.0, dtype=np.float32)
+
+    plain = summary.sep_residuals(model, params, observations)
+    edited = summary.sep_residuals_edited(model, params, observations, edit, edit_depth=1)
+    # Present in the stream at the depth it was written...
+    np.testing.assert_allclose(edited[1], plain[1] + 2.0, atol=1e-4)
+    # ...and gone from everything computed after it.
+    np.testing.assert_allclose(edited[2] - plain[2], 2.0, atol=1e-3)

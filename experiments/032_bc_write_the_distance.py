@@ -57,6 +57,7 @@ import numpy as np
 from goalmisgen import provenance
 from goalmisgen.analysis import steering, targets
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
+from goalmisgen.analysis.probes import apply_linear
 from goalmisgen.offline import summary
 from goalmisgen.offline.decode import greedy_decode, replay_all, summarise_routes
 from goalmisgen.offline.demos import DemoSet
@@ -121,6 +122,11 @@ def sep_edit(direction: np.ndarray, alpha: float, n_episodes: int, n_cells: int)
     grid = np.zeros((n_episodes, n_cells + 1, len(direction)), dtype=np.float32)
     grid[:, n_cells] = alpha * direction
     return grid
+
+
+def cell_and_sep(model, params, observations, edit, depth):
+    """The SEP residual at the top, with ``edit`` applied at ``depth``."""
+    return summary.sep_residuals_edited(model, params, observations, edit, depth)[model.config.n_layers]
 
 
 def exchange_rate(outcomes: list[dict], resamples: int = 200, seed: int = 0) -> tuple[float, float, float]:
@@ -200,6 +206,29 @@ def main() -> None:
                 f"\n{target}: |one cell| = {direction.unit_norm:.4f} of activation; "
                 f"re-decoding a steered vector moves it by {achieved:+.3f} cells (must be +1.000)"
             )
+
+            # Does the write survive to where the head reads? Blocks after this
+            # one can rebuild SEP by attending to the maze tokens, which the
+            # write leaves untouched - the "recomputed downstream" escape that
+            # makes a null ambiguous. Measured rather than argued: the top
+            # probe's decoded value, before and after an edit made here.
+            if depth < cfg.n_layers:
+                top_weights, top_mean, top_std = summary.fit_scalar(fit_sep[cfg.n_layers], y, seed=args.seed)
+                probe_x = summary.sep_residuals(model, params, observations)
+                before = apply_linear(probe_x[cfg.n_layers], top_weights, top_mean, top_std)
+                carried = []
+                for alpha in (a for a in args.alphas if a != 0.0):
+                    grid = sep_edit(direction.delta, alpha, len(observations), cfg.n_cells)
+                    after_stream = np.asarray(
+                        cell_and_sep(model, params, observations, grid, depth)
+                    )
+                    after = apply_linear(after_stream, top_weights, top_mean, top_std)
+                    carried.append((alpha, float(np.mean(after - before))))
+                print(
+                    "   carried to the top: "
+                    + "  ".join(f"{alpha:+.0f}->{moved:+.2f}" for alpha, moved in carried)
+                    + "  (cells of decoded shift; equal to alpha means the edit survives)"
+                )
 
         for target in args.targets:
             direction, weights, mean, std = fitted[target]

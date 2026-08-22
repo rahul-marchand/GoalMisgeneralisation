@@ -63,6 +63,43 @@ def sep_residuals(model: RoutePrefixLM, params, observations: np.ndarray, batch_
     return np.concatenate(chunks, axis=1)
 
 
+@functools.lru_cache(maxsize=16)
+def _sep_edited_fn(config: ModelConfig, edit_depth: int):
+    model = RoutePrefixLM(config)
+
+    @jax.jit
+    def sep(params, observations, edit):
+        actions = jnp.full((observations.shape[0], config.max_actions), NO_ACTION, dtype=jnp.int32)
+        _, streams = model.apply(params, observations, actions, edit, edit_depth)
+        return jnp.stack([s[:, config.n_cells] for s in streams], axis=0)
+
+    return sep
+
+
+def sep_residuals_edited(
+    model: RoutePrefixLM, params, observations: np.ndarray, edit: np.ndarray, edit_depth: int, batch_size: int = 512
+) -> np.ndarray:
+    """:func:`sep_residuals` of the *written* network.
+
+    Which is how "does the edit survive to where the head reads it" is asked.
+    Blocks after ``edit_depth`` can rebuild SEP from the maze tokens, and those
+    are untouched by a write at this site, so a decision that does not move may
+    be a decision that never saw the write.
+    """
+    fn = _sep_edited_fn(model.config, edit_depth)
+    chunks = [
+        np.asarray(
+            fn(
+                params,
+                jnp.asarray(observations[start : start + batch_size]),
+                jnp.asarray(edit[start : start + batch_size]),
+            )
+        )
+        for start in range(0, len(observations), batch_size)
+    ]
+    return np.concatenate(chunks, axis=1)
+
+
 @dataclasses.dataclass(frozen=True)
 class ScalarResult:
     """One scalar probe, in the units of the thing it decodes."""

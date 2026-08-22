@@ -21,7 +21,8 @@ import time
 from pathlib import Path
 
 from goalmisgen.configs.env import MazeConfig
-from goalmisgen.envs.dataset import LevelDataset, block_tasks, dataset_fingerprint, generate_block, split_indices
+from goalmisgen.envs.dataset import LevelDataset, block_tasks, dataset_fingerprint, generate_block
+from goalmisgen.envs.splits import layout_groups, split_by_layout
 from goalmisgen.parallel import worker_pool
 
 
@@ -116,12 +117,22 @@ def main() -> None:
         blocks = [generate_block(*task) for task in tasks]
 
     dataset = LevelDataset.from_blocks(blocks, sampler)
-    splits = split_indices(len(dataset), valid=args.valid_levels, test=args.test_levels)
+    # Held out by maze, not by level. A level is a layout plus a placement, and
+    # the layout generator has far less entropy than the level count suggests --
+    # about 455,000 distinct 11x11 mazes, so each recurs many times in a large
+    # pool and an index-wise split shares almost every test maze with training.
+    # See results/maze-diversity.txt and goalmisgen/envs/splits.py.
+    splits = split_by_layout(dataset.walls_packed, valid=args.valid_levels, test=args.test_levels, seed=args.seed)
     dataset.save(args.out, seed=args.seed, block_size=args.block_size, splits=splits)
     elapsed = time.perf_counter() - start
 
+    groups = layout_groups(dataset.walls_packed)
     size_mb = sum(f.stat().st_size for f in args.out.rglob("*")) / 1e6
-    print("splits      " + ", ".join(f"{k}={len(v):,}" for k, v in sorted(splits.items())))
+    print(f"layouts     {len(set(groups.tolist())):,} distinct mazes among {len(dataset):,} levels")
+    print(
+        "splits      "
+        + ", ".join(f"{k}={len(v):,} ({len(set(groups[v].tolist())):,} mazes)" for k, v in sorted(splits.items()))
+    )
     print(f"done in {elapsed:.1f}s " f"({1000 * elapsed / len(dataset):.2f} ms/level wall clock) -> {size_mb:.1f} MB")
 
 

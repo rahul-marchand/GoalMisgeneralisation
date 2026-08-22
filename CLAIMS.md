@@ -95,6 +95,35 @@ predicts a positive cosine.
 
 ---
 
+## Known limitations of the evidence
+
+Properties of the data that every claim above is conditioned on. Recorded here
+rather than in a writeup because they apply across experiments.
+
+- **Held-out evaluation before 2026-08-22 shared maze layouts with training.**
+  An 11x11 grid holds a 5x5 cell lattice, and the recursive backtracker reaches
+  only about 455,000 distinct mazes however many levels are drawn
+  (`results/maze-diversity.txt`). `split_indices` dealt level *indices*, so in a
+  pool where each layout recurs, most held-out levels are a fresh placement of
+  goals on a maze the model trained on. Every result measured on a pool with
+  fingerprint `d0e70f346ac4a46a` is affected.
+
+  **This does not undermine the claims above**, which are about whether a
+  quantity is readable, graded and writable — not about how well mazes get
+  solved. A memorised layout does not produce a linear axis that reads back an
+  offset at scale and moves behaviour when written to. It would matter to a
+  claim of the form "this architecture solves mazes it has not seen", and no
+  claim here is of that form. The one gloss to avoid is treating E1.1's
+  decodable route as proof of *planning* rather than of decodability, since a
+  recalled association would also decode.
+
+  `goalmisgen/envs/splits.py` holds mazes out instead of levels, and
+  `scripts/resplit_by_layout.py` repairs an existing pool in place. Re-splitting
+  a pool invalidates numbers measured against its old split, so the pools
+  backing the results above are deliberately left alone.
+
+---
+
 ## Not yet claimed
 
 Things the project is set up to say and has not tested. Listed so the gap is

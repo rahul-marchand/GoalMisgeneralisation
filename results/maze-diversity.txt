@@ -1,0 +1,78 @@
+script  ad hoc, on the 7,780,000-level pool generated for the scaling pilot
+where   RunPod H100 pod, 2026-08-22
+levels  levels/values/1.00-0.50@7780000, fingerprint d0e70f346ac4a46a
+        (the same fingerprint as the 1M and 500k pools already on the volume,
+        so this measurement applies to those too)
+
+HOW MANY DISTINCT MAZES DOES AN 11x11 LEVEL POOL ACTUALLY CONTAIN?
+
+Asked because the width/depth campaign was about to be justified on "single
+epoch, no maze seen twice". It was never checked.
+
+        draws        distinct layouts   fraction
+       10,000                   9,881      0.988
+      100,000                  88,555      0.886
+    1,000,000                 387,967      0.388
+    7,780,000                 453,119      0.058
+
+  distinct *levels* (layout + agent + objective placement): 7,778,529 of
+  7,780,000, i.e. 99.98%.
+
+  Blocks 0 and 1 share 222 layouts of 10,000, so this is not a seeding
+  collision; it is saturation. Fitting distinct = S(1 - exp(-n/S)) gives
+  S ~ 455,000, and 7.78M draws has explored essentially all of it.
+
+WHY IT IS SO SMALL. An 11x11 grid holds cells at odd indices only, so the maze
+is a perfect maze on a 5x5 = 25 cell lattice. That lattice has 557,568,000
+spanning trees, but RecursiveBacktracker does not sample them uniformly -- a
+randomised depth-first carve strongly favours long corridors, and its
+high-probability head is about 455k layouts. The other ~99.9% of spanning trees
+are drawn so rarely they never appear.
+
+WHAT IT MEANS.
+
+1. Past about a million levels, more data buys no new mazes. The proposed jump
+   from 7.68M to 30.7M demonstrations would have added zero layouts and only
+   new goal placements. That question is settled without running it.
+
+2. Train, validation and test splits share layouts. split_indices() splits by
+   index, and with 455k layouts across 7.78M levels every held-out layout is
+   almost certainly also in training. Held-out evaluation therefore measures
+   generalisation to new goal placements on familiar mazes, not to new mazes.
+   This is true of every dataset with this fingerprint, so it applies to results
+   already published from the 1M pool, not only to the scaling campaign.
+
+3. "No maze seen twice" is not achievable at 11x11 with this generator. At
+   7.68M demonstrations each layout appears about 17 times. That is the
+   confound the single-epoch design existed to remove, and it grows worse with
+   model size, which is exactly the axis the campaign varies.
+
+WHAT WOULD FIX IT.
+
+  * SPLIT BY LAYOUT, NOT BY INDEX. The cheapest fix by a distance, and probably
+    the right one. split_indices() currently deals level indices into train,
+    valid and test; hashing the layout and dealing *layouts* instead costs
+    nothing, changes neither the generator nor the level distribution nor the
+    dataset fingerprint, and makes held-out evaluation genuinely about unseen
+    mazes. Crucially it converts the confound from an assumption into a
+    measurement: if a 50M-parameter cell shows a train/test gap on disjoint
+    layouts and a 0.8M one does not, that is memorisation, observed rather than
+    hoped away -- and it is worth knowing on its own terms, since it is the same
+    axis the campaign varies. Training would still see each layout ~17 times;
+    the claim just becomes the true one.
+
+The three below change what a level is, and so invalidate every existing pool.
+
+  * A uniform spanning-tree sampler (Wilson's algorithm) on the same 5x5
+    lattice reaches all 557M trees, a ~1200x increase, and changes nothing else
+    about the task. MazeGenerator is already the documented extension point for
+    this.
+  * Larger mazes: 13x13 gives a 6x6 lattice and ~3.2e13 spanning trees. More
+    diversity, but it changes the task and breaks comparability with every
+    existing result.
+  * Accept it, and drop the no-repeats claim: state that layouts recur ~17x and
+    that evaluation is over goal placements rather than mazes.
+
+The first is cheapest and preserves comparability of the task while changing
+the sampler, which does alter the dataset fingerprint and so requires
+regenerating pools.

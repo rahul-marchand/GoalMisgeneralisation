@@ -415,6 +415,9 @@ def main() -> None:
         print(f"typical per-cell residual norm {typical:.3f}; alpha below is a multiple of it")
 
         measured = capture(model, params, demos, measure_indices, layer=depth, decoded=decoded)
+        # The diagnostics describe the edit itself, so they follow whichever arm
+        # is actually being run - a sweep of controls alone is a legitimate run.
+        diagnostic_arm = "plan" if "plan" in edits else args.arms[0]
         top_before = cell_residuals(model, params, observations)[read_depth]
         random_directions = rng.normal(size=directions.shape)
         random_directions /= np.linalg.norm(random_directions, axis=1, keepdims=True)
@@ -422,18 +425,20 @@ def main() -> None:
         # Does the write say what it claims to? Raising a class's logit is not
         # the same as making the probe read it, and a wrong raster order writes
         # a coherent plan onto the wrong maze and reports a clean null.
-        print(f"\n{'alpha':>7}{'write-back':>12}{'propagation':>13}")
+        print(f"\n{'alpha':>7}{'write-back':>12}{'propagation':>13}   (of the {diagnostic_arm} edit)")
         write_back: dict[float, tuple[float, float]] = {}
         for alpha in args.alphas:
             if alpha == 0.0:
                 continue
-            back = rewrite.written_classes(measured, edits["plan"], weights, mean, std, directions, alpha * typical)
-            grid = rewrite.delta_grid(edits["plan"], directions, cfg.size, alpha * typical)
+            back = rewrite.written_classes(
+                measured, edits[diagnostic_arm], weights, mean, std, directions, alpha * typical
+            )
+            grid = rewrite.delta_grid(edits[diagnostic_arm], directions, cfg.size, alpha * typical)
             top_after = cell_residuals(model, params, observations, edit=grid, edit_depth=depth)[read_depth]
-            _, carried = rewrite.propagation(top_before, top_after, edits["plan"], *top_probe)
+            _, carried = rewrite.propagation(top_before, top_after, edits[diagnostic_arm], *top_probe)
             write_back[alpha] = (back, carried)
             print(f"{alpha:>7.2f}{back:>12.3f}{carried:>13.3f}")
-        _, unedited_read = rewrite.propagation(top_before, top_before, edits["plan"], *top_probe)
+        _, unedited_read = rewrite.propagation(top_before, top_before, edits[diagnostic_arm], *top_probe)
         print(
             f"write-back is the probe at this depth reading the class written; propagation is the probe at\n"
             f"the top reading it after the edit was made here, against {unedited_read:.3f} with no edit at all.\n"

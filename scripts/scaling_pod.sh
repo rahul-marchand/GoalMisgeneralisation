@@ -50,6 +50,12 @@ FT_WARMUP="${FT_WARMUP:-50}"
 CALIBRATION_LRS="${CALIBRATION_LRS:-3e-5 1e-4 3e-4}"
 ARM_OBJECTIVES="${ARM_OBJECTIVES:-0 1}"
 ARM_OFFSETS="${ARM_OFFSETS:-}"          # empty = the registered six magnitudes
+# Which slice of a cell's arms this worker takes. The arms of one cell are
+# independent runs writing to disjoint directories, so a fleet can share them
+# out; without this the largest cell's 26 arms queue behind its own base on one
+# card and set the makespan for everything.
+ARM_SHARD_INDEX="${ARM_SHARD_INDEX:-0}"
+ARM_SHARD_COUNT="${ARM_SHARD_COUNT:-1}"
 SEED="${SEED:-1}"
 EVAL_LEVELS="${EVAL_LEVELS:-1024}"   # levels decoded per evaluation set, per checkpoint
 
@@ -248,10 +254,26 @@ calibrate() {
 arms() {
     local name="$1"
     local out; out=$(run_dir "${name}")
-    calibrate "${name}" || return 1
+    # Exactly one worker calibrates. The rate is one scalar per cell and every
+    # arm of that cell must use the same one, so a fleet cannot have each shard
+    # picking its own -- and three workers training the same calibration arm into
+    # the same directory would corrupt it rather than merely waste the card.
+    if [ "${ARM_SHARD_INDEX}" = "0" ]; then
+        calibrate "${name}" || return 1
+    else
+        say "waiting for shard 0 to choose ${name}'"'"'s arm learning rate"
+        local waited=0
+        until [ -f "${out}/arm_lr.txt" ]; do
+            sleep 20; waited=$((waited + 20))
+            [ "${waited}" -gt 3600 ] && { say "gave up waiting for ${name}/arm_lr.txt"; return 1; }
+        done
+    fi
     local lr; lr=$(cat "${out}/arm_lr.txt")
     local init; init=$(last_checkpoint "${out}")
+    local index=-1
     arm_grid | while read -r sweep offset seed dirname tag target; do
+        index=$((index + 1))
+        [ $((index % ARM_SHARD_COUNT)) -eq "${ARM_SHARD_INDEX}" ] || continue
         local arm="${out}/arms/${dirname}"
         if [ -f "${arm}/done.json" ]; then say "have ${name}/${dirname}"; continue; fi
         # The null arm's values are the base's own, so its fine-tuning data comes
@@ -312,8 +334,25 @@ chain() {
     say "CHAIN DONE"
 }
 
+# ---- fleet stages -------------------------------------------------------------
+# `data` is run once, by one worker, because the pools are shared and two
+# workers generating the same dataset would race on the same directory. `work`
+# is what every worker then runs over its own share of the grid.
+data() { mkdirs; levels; demos; armlevels; armdemos; say "DATA DONE"; }
+
+work() {
+    echo "${SHAPES}" | while read -r name _ _ _; do
+        [ -z "${name}" ] && continue
+        say "base ${name}";  base "${name}" || { say "base ${name} FAILED"; continue; }
+        say "arms ${name} (shard ${ARM_SHARD_INDEX}/${ARM_SHARD_COUNT})"; arms "${name}"
+    done
+    say "WORK DONE"
+}
+
 case "${1:-}" in
     plan) plan ;;
+    data) data ;;
+    work) work ;;
     levels) levels ;;
     demos) demos ;;
     armlevels) armlevels ;;

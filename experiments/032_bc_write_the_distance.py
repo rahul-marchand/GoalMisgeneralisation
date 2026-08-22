@@ -55,16 +55,17 @@ from pathlib import Path
 import numpy as np
 
 from goalmisgen import provenance
-from goalmisgen.analysis import steering, targets
+from goalmisgen.analysis import fields, steering, targets
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
-from goalmisgen.analysis.probes import apply_linear
+from goalmisgen.analysis.probes import Feature, apply_linear, fit_ridge
 from goalmisgen.offline import summary
 from goalmisgen.offline.decode import greedy_decode, replay_all, summarise_routes
 from goalmisgen.offline.demos import DemoSet
-from goalmisgen.offline.probe import capture
+from goalmisgen.offline.probe import capture, cell_residuals
 from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 
 N_FEATURES = 2
+RESIDUAL = Feature("residual", lambda rollout: rollout.features)
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +91,15 @@ def parse_args() -> argparse.Namespace:
         help="Cells of decoded distance to add. The units are the point: the exchange rate should move "
         "by this much, so the table is a slope rather than a direction of change.",
     )
+    parser.add_argument(
+        "--site",
+        choices=("sep", "cells"),
+        default="sep",
+        help="Where to write. 'sep' is the end-of-input token, one vector per level. 'cells' writes the "
+        "same calibrated direction at every maze token, which is the twin of the DRC's 007: 'everything "
+        "is alpha further from this objective'. That is the site where the distance actually reads, and "
+        "the edit 012 argues is coherent for a field - it shifts the whole field rather than one cell.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--json", type=Path, default=None)
     return parser.parse_args()
@@ -110,6 +120,40 @@ def wanted(rollouts, target: str) -> np.ndarray:
     if target == "gap":
         return distances(rollouts, 0) - distances(rollouts, 1)
     return distances(rollouts, int(target[1:]))
+
+
+def field_direction(rollouts, target: str):
+    """Ridge over every cell, decoding that cell's distance to the objective.
+
+    The transformer's version of the probe ``007`` steered the DRC with. For
+    ``gap`` the target is the difference of the two fields, which is what the
+    choice turns on and what a single stored number would have to be.
+    """
+    if target == "gap":
+        first = fields.cell_data(rollouts, RESIDUAL, distance_target(0))
+        second = fields.cell_data(rollouts, RESIDUAL, distance_target(1))
+        rows = min(len(first.y), len(second.y))
+        return fit_ridge(first.x[:rows], first.y[:rows] - second.y[:rows], l2=1.0)
+    data = fields.cell_data(rollouts, RESIDUAL, distance_target(int(target[1:])))
+    return fit_ridge(data.x, data.y, l2=1.0)
+
+
+def distance_target(feature: int):
+    return targets.DistanceToObjective(targets.fixed(feature), name=f"d->f{feature}", n_features=N_FEATURES)
+
+
+def cells_edit(direction: np.ndarray, alpha: float, n_episodes: int, n_cells: int) -> np.ndarray:
+    """The same calibrated vector at every maze token: a uniform shift of the field.
+
+    ``012`` distinguishes two kinds of scalar edit. Setting *one* cell's distance
+    against its neighbours describes no maze, and the network ignores it. Moving
+    the whole field says something coherent - "this objective is alpha further
+    from everywhere" - and that is what the DRC's ``007`` wrote and found inert.
+    This is the same edit at the site where this model's distance actually reads.
+    """
+    grid = np.zeros((n_episodes, n_cells, len(direction)), dtype=np.float32)
+    grid[:, :] = alpha * direction
+    return grid
 
 
 def sep_edit(direction: np.ndarray, alpha: float, n_episodes: int, n_cells: int) -> np.ndarray:
@@ -176,7 +220,13 @@ def main() -> None:
     # Rollouts only to build the targets: the probe reads SEP, not the cells,
     # but the levels and the model's own outcomes come from the same capture.
     fit_rollouts = capture(model, params, demos, fit_indices, layer=0)
-    fit_sep = summary.sep_residuals(model, params, demos.observations(fit_indices))
+    if args.site == "sep":
+        fit_features = summary.sep_residuals(model, params, demos.observations(fit_indices))
+        make_edit = sep_edit
+    else:
+        make_edit = cells_edit
+        fit_features = None  # built per depth below: the field probe reads every cell
+    print(f"writing at the {'end-of-input token' if args.site == 'sep' else 'maze tokens, uniformly'}")
 
     results: dict = {
         "run": args.run.name,
@@ -195,10 +245,19 @@ def main() -> None:
                 "no attention layer follows to carry it into the rest of the route."
             )
 
+        if args.site == "cells":
+            depth_rollouts = capture(model, params, demos, fit_indices, layer=depth)
+
         fitted = {}
         for target in args.targets:
             y = wanted(fit_rollouts, target)
-            weights, mean, std = summary.fit_scalar(fit_sep[depth], y, seed=args.seed)
+            if args.site == "cells":
+                # The same probe ``031`` reads the field with, so the direction
+                # written is the one that decodes it - and the same probe the
+                # DRC's ``007`` steered with, cell for cell.
+                weights, mean, std = field_direction(depth_rollouts, target)
+            else:
+                weights, mean, std = summary.fit_scalar(fit_features[depth], y, seed=args.seed)
             direction = steering.from_probe(target, weights, std)
             achieved = steering.verify(direction, weights, mean, std, alpha=1.0)
             fitted[target] = (direction, weights, mean, std)
@@ -212,8 +271,8 @@ def main() -> None:
             # write leaves untouched - the "recomputed downstream" escape that
             # makes a null ambiguous. Measured rather than argued: the top
             # probe's decoded value, before and after an edit made here.
-            if depth < cfg.n_layers:
-                top_weights, top_mean, top_std = summary.fit_scalar(fit_sep[cfg.n_layers], y, seed=args.seed)
+            if depth < cfg.n_layers and args.site == 'sep':
+                top_weights, top_mean, top_std = summary.fit_scalar(fit_features[cfg.n_layers], y, seed=args.seed)
                 probe_x = summary.sep_residuals(model, params, observations)
                 before = apply_linear(probe_x[cfg.n_layers], top_weights, top_mean, top_std)
                 carried = []
@@ -255,7 +314,7 @@ def main() -> None:
                 for alpha in args.alphas:
                     if alpha == 0.0:
                         continue
-                    grid = sep_edit(vector.delta, alpha, len(observations), cfg.n_cells)
+                    grid = make_edit(vector.delta, alpha, len(observations), cfg.n_cells)
                     armed = greedy_decode(model, params, observations, edit=grid, edit_depth=depth)
                     armed_outcomes = replay_all(demos, measure_indices, armed)
                     summary_row = summarise_routes(demos, measure_indices, armed, armed_outcomes)

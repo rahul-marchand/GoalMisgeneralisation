@@ -79,7 +79,16 @@ from goalmisgen.offline.demos import DemoSet
 from goalmisgen.offline.probe import capture, cell_residuals
 from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 
-ARMS = ("plan", "route", "erase", "self", "shuffled", "random")
+ARMS = ("plan", "route", "erase", "self", "shuffled", "random", "erase_start", "erase_tail", "erase_other", "sham")
+"""The last four exist because the first six found the whole effect in ``erase``.
+
+``erase`` writes NEVER on the route the model is walking, which leaves three
+readings the original arms cannot separate: the agent's own cell is in that set
+and may be all of it (``erase_start`` against ``erase_tail``, which partition
+it); writing NEVER at any plausible cells may do it (``sham``, an equal number
+of cells off both routes); and if the edit really says "not that way" it should
+have a sign - erasing the route to the objective it is *not* taking should push
+it back the other way (``erase_other``)."""
 
 
 def parse_args() -> argparse.Namespace:
@@ -257,6 +266,14 @@ def build_edits(arm: str, observations, outcomes, targets, seed: int) -> list[di
             built.append(None)
             continue
         optimal = int(outcome["optimal_feature_id"])
+        if arm in ("erase_start", "erase_tail", "sham"):
+            # Subsets of the erasing half, on the route the model is walking.
+            built.append(rewrite.erase_only(observation, optimal, keep=arm.replace("erase_", ""), seed=seed))
+            continue
+        if arm == "erase_other":
+            # The signed control: erase the route it is *not* taking.
+            built.append(rewrite.erase_only(observation, target, keep="all"))
+            continue
         # "self" points the same machinery where the model was already going.
         pointed_at, replaced = (optimal, target) if arm == "self" else (target, optimal)
         built.append(

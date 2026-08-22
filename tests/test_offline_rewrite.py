@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from goalmisgen.analysis import plans
+from goalmisgen.analysis import geometry, plans
 from goalmisgen.analysis.probes import apply_multinomial, class_directions
 from goalmisgen.envs.dataset import LevelDataset
 from goalmisgen.envs.sampling import MazeLevelSampler
@@ -342,3 +342,38 @@ def test_a_hidden_value_demo_set_cannot_see_a_value_swap(demos):
     assert not np.array_equal(
         hidden.observations(indices), rewrite.swapped_features(hidden).observations(indices)
     )
+
+
+def test_start_and_tail_partition_the_erase(rollouts):
+    """The two halves of the deflationary hypothesis must add back up to the edit."""
+    for rollout in rollouts:
+        whole = rewrite.erase_only(rollout.observation, 0, keep="all")
+        if whole is None:
+            continue
+        start = rewrite.erase_only(rollout.observation, 0, keep="start") or {}
+        tail = rewrite.erase_only(rollout.observation, 0, keep="tail") or {}
+        assert set(start) | set(tail) == set(whole)
+        assert not (set(start) & set(tail))
+        assert all(label == plans.NEVER for label in whole.values())
+        agent = rollout.level.agent_start
+        assert set(start) in ({agent}, set())
+        return
+    pytest.skip("no level in the fixture has a route to objective 0")
+
+
+def test_the_sham_erase_avoids_both_routes_and_matches_the_count(rollouts):
+    for rollout in rollouts:
+        whole = rewrite.erase_only(rollout.observation, 0, keep="all")
+        sham = rewrite.erase_only(rollout.observation, 0, keep="sham", seed=1)
+        if whole is None or sham is None:
+            continue
+        assert len(sham) == len(whole)
+        on_route = set(whole) | {rollout.level.agent_start}
+        other = plans.planned_directions(rollout.observation, 1)
+        if other is not None:
+            on_route |= {tuple(cell) for cell in np.argwhere((other >= 0) & (other < plans.NEVER))}
+        assert not (set(sham) & on_route)
+        free = geometry.free_cells(rollout.observation)
+        assert all(free[cell] for cell in sham)
+        return
+    pytest.skip("no level in the fixture offers both a route and enough free cells")

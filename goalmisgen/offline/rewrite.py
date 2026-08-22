@@ -144,6 +144,66 @@ def plan_edit(
     return edit or None
 
 
+def erase_only(
+    observation: np.ndarray,
+    route_to: int,
+    keep: str = "all",
+    seed: int = 0,
+) -> dict[tuple[int, int], int] | None:
+    """``NEVER`` on the cells of one route, or on a decoy set the same size.
+
+    ``030`` found the whole of its effect in the erasing half of the edit, which
+    leaves three deflationary readings that the arms it had cannot separate.
+    ``keep`` picks between them:
+
+    ``all``     every cell of the route to ``route_to`` - the original arm.
+    ``start``   only the cell the agent is standing on. The erase set contains
+                it, so "we corrupted the position token" predicts this alone
+                reproduces the effect.
+    ``tail``    every route cell *except* the agent's. The complement of
+                ``start``: between them they partition the original edit, so
+                whichever carries it is where the effect lives.
+    ``sham``    the same number of free cells drawn at random from *off* both
+                routes. Tests "writing NEVER at plausible cells breaks it"
+                against "writing NEVER at the cells of the route it is walking
+                tells it something". The shuffled arm is a weaker version of
+                this - it lands a different maze's route here, so its cells are
+                arbitrary rather than merely off-route.
+    """
+    field = plans.planned_directions(observation, route_to, N_FEATURES)
+    if field is None:
+        return None
+    cells = [(int(r), int(c)) for r, c in np.argwhere((field >= 0) & (field < plans.NEVER))]
+    if not cells:
+        return None
+    start = geometry.agent_cell(observation)
+
+    if keep == "start":
+        chosen = [start] if start in cells else []
+    elif keep == "tail":
+        chosen = [cell for cell in cells if cell != start]
+    elif keep == "sham":
+        other = plans.planned_directions(observation, 1 - route_to, N_FEATURES)
+        on_route = set(cells) | {start}
+        if other is not None:
+            on_route |= {(int(r), int(c)) for r, c in np.argwhere((other >= 0) & (other < plans.NEVER))}
+        free = [
+            (int(r), int(c))
+            for r, c in np.argwhere(geometry.free_cells(observation))
+            if (int(r), int(c)) not in on_route
+        ]
+        if len(free) < len(cells):
+            return None
+        picked = np.random.default_rng(seed).choice(len(free), size=len(cells), replace=False)
+        chosen = [free[index] for index in picked]
+    elif keep == "all":
+        chosen = cells
+    else:
+        raise ValueError(f"unknown erase subset {keep!r}")
+
+    return {cell: plans.NEVER for cell in chosen} or None
+
+
 def derange(count: int, seed: int) -> np.ndarray:
     """A permutation with no fixed point, so no plan lands on its own maze."""
     order = np.random.default_rng(seed).permutation(count)

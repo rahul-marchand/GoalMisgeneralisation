@@ -103,4 +103,24 @@ normalisation after the fact.
 
 ## Amendments
 
-*(none yet)*
+**2026-08-23 — seeds cut from three everywhere to one, plus replication at a
+single depth. Registered before any model was trained.**
+
+Three seeds at every depth was overkill for an exploratory sweep, and the
+argument for it does not survive looking at the scatter already in hand. Within
+each depth of the width/depth campaign, across widths — which that campaign
+showed do not matter — `modules/depth` scattered 0.88/0.88/0.88, 0.78/0.75/0.72
+and 0.58/0.59/0.73. Nuisance scatter is therefore about 0.05, against a depth
+signal of 0.25 from L=4 to L=16. That is a five-sigma effect and one seed sees
+it.
+
+Seeds are still needed for **D3**, because "parameter count does nothing at
+fixed depth" is a null and a null without error bars cannot be falsified. But
+that needs replication at *one* depth, not six. So: one seed at each of L = 2,
+4, 8, 16, 32, 64, plus two extra seeds at L=16 alone, which supplies the noise
+floor for the whole curve.
+
+39 GPU-hours rather than 81. D1, D2 and D4 are unaffected — they are trends
+across depth, not comparisons within one. D3 is now tested against a scatter
+measured at L=16 and assumed to hold at L=32, which is an assumption and is
+recorded as one.

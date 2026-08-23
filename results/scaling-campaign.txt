@@ -18,6 +18,47 @@ d512l16    512  16  50,491,909       1.000 |  0.879   0.90 |      1.23
   competence is chose_optimal on held-out levels; write err is the mean
   |written - arm| exchange rate in steps, from an axis fitted without that arm.
 
+0. WHAT ACTUALLY REPLICATED, AND THE METRIC THAT SHOULD HAVE LED
+
+  cell        params  comp | slope o0  o1 | cos(axis_0, axis_1)
+  d128l4     806,533 0.917 |     1.66 1.64 |  -0.943
+  d256l4   3,185,925 0.990 |     1.10 1.10 |  -0.964
+  d512l4  12,663,301 0.996 |     1.03 1.03 |  -0.966
+  d128l8   1,599,621 0.968 |     1.30 1.25 |  -0.814
+  d256l8   6,344,965 1.000 |     1.05 1.06 |  -0.578
+  d512l8  25,272,837 1.000 |     1.00 1.01 |  -0.949
+  d128l16  3,185,797 0.997 |     0.96 0.95 |  -0.893
+  d256l16 12,663,045 0.999 |     1.02 1.03 |  -0.551
+  d512l16 50,491,909 1.000 |     0.93 0.93 |  -0.954
+
+  THE ONE-KNOB RESULT HOLDS ACROSS THE WHOLE GRID. cos(axis_0, axis_1) is
+  negative in all nine cells, mean -0.846, so raising one objective's value and
+  raising the other's move the same weights in opposite senses at every size
+  from 0.80M to 50.5M parameters. Experiment 2's central claim survives 63x in
+  scale and every shape tried. The two weakest, -0.578 and -0.551, are the two
+  cells whose arms were trained at 3e-4; see section 1.
+
+  THE TRANSFER SLOPE IS THE METRIC THAT SHOULD HAVE LED. Write an offset, read
+  back the exchange rate: slope 1.0 means the knob reads at scale. The two
+  independent sweeps agree to within 0.05 in every cell, which is the internal
+  check split-half reliability was supposed to provide and did not. And it is
+  free of the confound that ruined reliability: correlation with log(arm lr) is
+  +0.255 for the slope and -0.005 for its R2, against -0.856 for reliability.
+
+  IT IS COMPETENCE, NOT SHAPE. correlation(competence, |slope - 1|) = -0.995
+  across nine cells. Drop the single cell below 0.99 competence and the
+  parameter correlation falls from -0.741 to -0.360 and depth from -0.445 to
+  -0.254 on the remaining seven. There is no shape effect here; there is a
+  competence effect, and eight of nine cells are saturated at or above 0.99, so
+  across almost the whole grid there was nothing left to vary.
+
+  That is the campaign's real finding, and it is about the task rather than the
+  models: 63x in parameters on a problem the smallest cell already solves at
+  93% never bit. Nothing about the statistics fixes that. The task needs
+  dynamic range -- larger mazes, which would also lift the 455,000-layout
+  ceiling of results/maze-diversity.txt, or three objectives, which would make
+  P3 a real test instead of a foregone one.
+
 1. THE RELIABILITY COLUMN IS NOT A SHAPE EFFECT. IT IS THE LEARNING RATE.
 
   grouped by the arm learning rate the calibration chose:

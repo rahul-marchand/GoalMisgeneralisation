@@ -48,6 +48,12 @@ FT_STEPS="${FT_STEPS:-1000}"
 FT_BATCH="${FT_BATCH:-256}"
 FT_WARMUP="${FT_WARMUP:-50}"
 CALIBRATION_LRS="${CALIBRATION_LRS:-3e-5 1e-4 3e-4}"
+# Set to a rate to skip calibration entirely and use that rate for every arm.
+# The width/depth campaign calibrated per cell to remove the confound that one
+# fixed rate is a different-sized step at different widths, and the calibrated
+# rate then drove its headline metric at r = -0.856. A sweep at FIXED width has
+# no such confound to remove, so the honest move is one rate, chosen once.
+FIXED_ARM_LR="${FIXED_ARM_LR:-}"
 ARM_OBJECTIVES="${ARM_OBJECTIVES:-0 1}"
 ARM_OFFSETS="${ARM_OFFSETS:-}"          # empty = the registered six magnitudes
 # Which slice of a cell's arms this worker takes. The arms of one cell are
@@ -133,8 +139,12 @@ plan() {
     echo
     echo "training"
     printf '  %-28s %s\n' "base" "${BASE_STEPS} steps x batch ${BASE_BATCH}, lr ${BASE_LR}, warmup ${BASE_WARMUP}"
-    printf '  %-28s %s\n' "arm" "${FT_STEPS} steps x batch ${FT_BATCH}, constant lr (calibrated), warmup ${FT_WARMUP}"
-    printf '  %-28s %s\n' "calibration ladder" "${CALIBRATION_LRS}"
+    printf '  %-28s %s\n' "arm" "${FT_STEPS} steps x batch ${FT_BATCH}, constant lr, warmup ${FT_WARMUP}"
+    if [ -n "${FIXED_ARM_LR}" ]; then
+        printf '  %-28s %s\n' "arm learning rate" "${FIXED_ARM_LR} (fixed, no calibration)"
+    else
+        printf '  %-28s %s\n' "calibration ladder" "${CALIBRATION_LRS}"
+    fi
     printf '  %-28s %s\n' "arms per shape" "$(arm_grid | wc -l)"
 }
 
@@ -229,6 +239,11 @@ calibrate() {
     local file="${out}/arm_lr.txt"
     if [ -f "${file}" ]; then say "have arm lr for ${name}: $(cat "${file}")"; return 0; fi
     [ -f "${out}/done.json" ] || { say "${name} has no finished base yet"; return 1; }
+    if [ -n "${FIXED_ARM_LR}" ]; then
+        mkdir -p "${out}"; echo "${FIXED_ARM_LR}" > "${file}"
+        say "arm lr for ${name}: ${FIXED_ARM_LR} (fixed, not calibrated)"
+        return 0
+    fi
     read -r sweep offset seed dirname tag target < <(arm_grid --widest-only | head -1)
     local init; init=$(last_checkpoint "${out}")
     local dirs=""

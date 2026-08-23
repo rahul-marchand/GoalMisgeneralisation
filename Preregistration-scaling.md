@@ -289,3 +289,59 @@ Recorded in full because the value of this file is that departures are visible.
    is reported alongside the axis results, not instead of them.
 
 *(no further amendments)*
+
+---
+
+## Outcomes, 2026-08-23
+
+Recorded after the fact and kept separate from everything above, which was
+written before any cell was trained. Full numbers in
+`results/scaling-campaign.txt`.
+
+| | prediction | outcome |
+|---|---|---|
+| **P1** | width benign, reliability >= 0.90 at L=4 | **unevaluable** — see below |
+| **P2** | depth breaks the write before the read | **falsified, opposite sign** |
+| **P3** | rank stays one | **supported by the null, not by the threshold** |
+| **P4** | axis delocalises with depth; one block enough at L=4 | **half right** |
+| **P5** | matched pairs separate, deep member worse | **falsified, opposite sign** |
+
+**P1 and the reliability metric are unevaluable, because the calibration
+registered on 2026-08-22 broke them.** Axis reliability correlates with the
+calibrated arm learning rate at r = −0.856; grouped by rate the cells separate
+with non-overlapping ranges, grouped by depth they overlap almost entirely.
+Seven of nine cells chose an endpoint of the three-point ladder, so for most of
+the grid the best rate lay outside the range searched. The amendment introduced
+the calibration to remove the confound that one fixed rate is a different-sized
+step at different widths; it removed that confound and introduced a larger one.
+
+**P2 and P5 are falsified in the opposite direction.** Write error does not
+track the learning rate and falls with depth — 2.10, 1.29, 1.05 at L = 4, 8, 16
+— and both parameter-matched pairs put the deeper member ahead. Depth improved
+the write rather than breaking it.
+
+**P4 is half right and the wrong half was the interesting one.** The number of
+modules that must be written to reach the full axis does grow with depth, about
+0.65L. But a single block never sufficed at any depth, including L = 4, where
+the prediction said it would: the best single block was 4.1 steps off even
+there. The axis was never localised to one block, so the story is not "localised
+becomes delocalised" but "delocalised throughout, and more so".
+
+**P3's verdict belongs to the null, not to the threshold.** Participation ratio
+sits on top of its permutation null in every cell, which is the evidence for
+rank one. The residual-reliability statistic, which P3 was actually written
+against with a fixed 0.30 threshold, correlates with axis reliability at +0.989
+— it measures whether *any* direction replicated, not whether a *second* one
+did, and is uninformative here. `029`'s docstring asserts the reverse and is
+wrong.
+
+**Registered and not tested.** The train/test gap by capacity — the
+memorisation prediction, and the reason the layout split was built — was never
+instrumented. Every evaluation set passed to training is held out and no
+training-set evaluation was run, so the gap cannot be computed from what is on
+the volume. It needs one extra evaluation set per cell and a re-run of the
+evaluation pass only.
+
+**A limit on all of it.** Eight of nine cells sit at or above 0.99 held-out
+optimal, so most of the grid is above the regime where the task discriminates,
+and every cell is n = 1.

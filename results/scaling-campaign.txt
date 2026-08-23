@@ -1,0 +1,108 @@
+script  scripts/scaling_pod.sh (fleet of 5x RTX 4090, EU-RO-1), 2026-08-22/23
+design  Preregistration-scaling.md, one seed, 3 widths x 3 depths, 0.80M-50.5M
+data    7.68M demonstrations per cell, single epoch, layouts held out by hash
+
+THE WIDTH/DEPTH CAMPAIGN: WHAT CAME BACK
+
+cell         d   L      params  competence | reliab  slope | write err
+d128l4     128   4     806,533       0.917 |  0.876   0.90 |      2.91
+d256l4     256   4   3,185,925       0.990 |  0.910   0.92 |      1.85
+d512l4     512   4  12,663,301       0.996 |  0.903   0.90 |      1.55
+d128l8     128   8   1,599,621       0.968 |  0.676   0.75 |      1.58
+d256l8     256   8   6,344,965       1.000 |  0.394   0.47 |      1.23
+d512l8     512   8  25,272,837       1.000 |  0.873   0.89 |      1.08
+d128l16    128  16   3,185,797       0.997 |  0.784   0.83 |      0.89
+d256l16    256  16  12,663,045       0.999 |  0.368   0.45 |      1.03
+d512l16    512  16  50,491,909       1.000 |  0.879   0.90 |      1.23
+
+  competence is chose_optimal on held-out levels; write err is the mean
+  |written - arm| exchange rate in steps, from an axis fitted without that arm.
+
+1. THE RELIABILITY COLUMN IS NOT A SHAPE EFFECT. IT IS THE LEARNING RATE.
+
+  grouped by the arm learning rate the calibration chose:
+    3e-5  n=4   reliability 0.891  [0.873, 0.910]
+    1e-4  n=2   reliability 0.830  [0.784, 0.876]
+    3e-4  n=3   reliability 0.479  [0.368, 0.676]
+  grouped by depth, which is what the campaign is about:
+    L=4   n=3   reliability 0.896  [0.876, 0.910]
+    L=8   n=3   reliability 0.647  [0.394, 0.873]
+    L=16  n=3   reliability 0.677  [0.368, 0.879]
+
+  correlation(log lr, reliability) = -0.856. The learning-rate groups separate
+  with non-overlapping ranges; the depth groups overlap almost completely.
+
+  Worse, SEVEN OF NINE CELLS CHOSE AN ENDPOINT of the 3e-5/1e-4/3e-4 ladder, so
+  for most of the grid the best rate was outside the range searched. The warning
+  built into pick_arm_lr.py for exactly this fired almost everywhere and was, in
+  hindsight, the result.
+
+  The calibration was introduced (Preregistration-scaling.md, amendment of
+  2026-08-22) to remove the confound that one fixed rate is a different-sized
+  step at different widths. It removed that one and introduced a larger one.
+  A ladder spanning 10x in three steps cannot resolve a quantity this sensitive.
+
+2. WHAT SURVIVES: THE WRITE, AND IT GOES THE OTHER WAY
+
+  Write error does not track the learning rate -- 1.43, 1.90, 1.28 across the
+  three rate groups, no order -- and falls monotonically with depth:
+    L=4  2.10   L=8  1.29   L=16  1.05     (1.70 at L=4 excluding the one
+                                            cell below 0.99 competence)
+  Both parameter-matched pairs agree, deep member better:
+    3.17M   (256,4) 1.85  vs  (128,16) 0.89
+    12.6M   (512,4) 1.55  vs  (256,16) 1.03
+
+  P2 and P5 predicted depth would break the write before the read. FALSIFIED,
+  and in the opposite direction: depth improved the write.
+
+3. P4: DELOCALISATION IS REAL, AND ONE BLOCK WAS NEVER ENOUGH
+
+  modules that must be written to land within 2 steps of the full axis:
+    L=4   3-4 of 4 blocks      best single block off by 4.1-4.7 steps
+    L=8   5-7 of 8 blocks      best single block off by 5.3-5.8 steps
+    L=16  7-14 of 16 blocks    best single block off by 5.6-5.8 steps
+
+  The count grows with depth, about 0.65L, which is the registered prediction.
+  But the first half of P4 is wrong: a single block never sufficed, at any
+  depth, including the shallowest. The axis was never localised to one block.
+
+  As a FRACTION of blocks the requirement falls (88%, 75%, 66%), so "more
+  layers must be written at greater depth" is true in absolute terms and false
+  in relative ones. The practically relevant claim -- one layer is never enough
+  -- holds everywhere.
+
+  Enrichment (share of ||axis||^2 against share of parameters) RISES with depth,
+  1.22 at L=4 to about 1.8 at L=8 and L=16, so the axis is more concentrated
+  relative to chance in deeper models even as its largest single share falls
+  from 0.30 to 0.11. Raw share and enrichment point opposite ways; enrichment is
+  the one that is comparable across shapes.
+
+4. P3 CANNOT BE ANSWERED, AND THE REASON IS AN INSTRUMENT FAILURE
+
+  Participation ratio against its permutation null, every cell:
+    observed 3.03 vs null 3.02, 3.16 vs 3.14, 10.03 vs 9.19, ...
+  No cell shows excess rank. On this evidence the family is rank one, which is
+  the registered prediction and the task's true rank.
+
+  The residual reliability statistic says nothing. Its correlation with the axis
+  reliability is +0.989: it measures whether ANY direction replicated, not
+  whether a SECOND one did. A cell whose fine-tune was noisy has low residual
+  reliability for the same reason it has a low axis reliability.
+
+  029's own docstring has this exactly backwards. It says to read the
+  replication figure rather than the participation ratio, because noise inflates
+  the ratio. The data says the opposite: the ratio WITH ITS NULL is informative
+  and the replication figure WITHOUT a null is not. A fixed threshold (P3's
+  0.30) was the mistake; the permutation null was the thing that worked.
+
+5. NOT TESTED
+
+  The train/test gap by capacity -- the memorisation prediction registered in
+  the 2026-08-22 amendment, and the reason the layout split was built at all --
+  was never instrumented. Every --eval set passed to training is held out; no
+  training-set evaluation was ever run, so the gap cannot be computed from what
+  is on the volume. It needs one extra evaluation set per cell and a re-run of
+  the evaluation pass, not of the training.
+
+  Competence saturates: eight of nine cells sit at or above 0.99 optimal, so
+  most of the grid is above the regime where the task discriminates at all.

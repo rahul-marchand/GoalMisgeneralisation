@@ -315,7 +315,11 @@ analysis() {
     mkdir -p "${RESULTS}"
     for objective in ${ARM_OBJECTIVES}; do
         for script in 027_bc_value_axis 029_axis_shape; do
-            local stem="${RESULTS}/${script%%_*}.${name}.o${objective}"
+            # The seed is part of the name. Without it a cell run at several
+            # seeds writes every seed's analysis to one path, and the last one
+            # silently wins -- which destroys exactly the replication the seeds
+            # were run for.
+            local stem="${RESULTS}/${script%%_*}.${name}.s${SEED}.o${objective}"
             uv run python "experiments/${script}.py" "${out}" --sweep "o${objective}" --steps "${FT_STEPS}" \
                 --demos "${DEMOS}/test.rho100" --json "${stem}.json" > "${stem}.txt" 2> "${stem}.err" \
                 || say "${script} ${name} o${objective} FAILED (see ${stem}.err)"
@@ -328,7 +332,7 @@ analysis() {
         return 0
     fi
     uv run python experiments/028_bc_value_or_gap.py "${out}" --steps "${FT_STEPS}" \
-        --json "${RESULTS}/028.${name}.json" > "${RESULTS}/028.${name}.txt" 2> "${RESULTS}/028.${name}.err" \
+        --json "${RESULTS}/028.${name}.s${SEED}.json" > "${RESULTS}/028.${name}.s${SEED}.txt" 2> "${RESULTS}/028.${name}.s${SEED}.err" \
         || say "028 ${name} FAILED"
 }
 

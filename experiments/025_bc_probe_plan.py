@@ -31,7 +31,7 @@ import numpy as np
 from goalmisgen.analysis import auc_interval, probe, probe_by_distance
 from goalmisgen.offline.decode import greedy_decode
 from goalmisgen.offline.demos import DemoSet
-from goalmisgen.offline.probe import capture
+from goalmisgen.offline.probe import capture, relabel
 from goalmisgen.offline.train import initial_params, list_checkpoints, load_checkpoint
 from goalmisgen.provenance import header
 
@@ -52,6 +52,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--by-distance", action="store_true")
     parser.add_argument("--no-untrained", action="store_true")
+    parser.add_argument(
+        "--untaken",
+        action="store_true",
+        help="Also fit the same probe against the route to the objective the model did NOT take. Same "
+        "walls, same start, a real route - so a probe scoring as well there is reading the maze rather "
+        "than the plan, and the headline above it means much less than it looks.",
+    )
     return parser.parse_args()
 
 
@@ -94,6 +101,22 @@ def main() -> None:
             if args.by_distance:
                 bands = probe_by_distance(train, test, source=source)
                 print("          by distance (matched negatives): " + "  ".join(f"{b.step}:{b.auc:.3f}" for b in bands))
+
+    if args.untaken:
+        print(f"\n{'depth':>8}{'labelled by':>14}{'AUC':>9}{'95% CI':>18}{'bal.acc':>10}")
+        for layer in layers:
+            label = "all" if layer is None else ("embed" if layer == 0 else f"block {layer}")
+            train = capture(model, params, demos, train_idx, layer, decoded=decoded_train)
+            test = capture(model, params, demos, test_idx, layer, decoded=decoded_test)
+            for name, rollouts in (("own route", (train, test)), ("untaken", (relabel(train, "untaken"), relabel(test, "untaken")))):
+                result = probe(rollouts[0], rollouts[1], source="features")
+                low, high = auc_interval(rollouts[0], rollouts[1], source="features")
+                print(f"{label:>8}{name:>14}{result.auc:>9.3f}{f'[{low:.3f}, {high:.3f}]':>18}{result.balanced_accuracy:>10.3f}")
+        print(
+            "Both labellings are real routes through the same maze from the same cell. The gap between\n"
+            "them is what is specific to the route this model will actually walk; without it, an AUC over\n"
+            "an untrained baseline shows only that the network represents the layout."
+        )
 
     print(
         "\nThe trained probe must beat the untrained one at the same depth. Beating\n"

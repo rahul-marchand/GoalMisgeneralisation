@@ -362,4 +362,34 @@ the early-warning CSVs and each run's `eval.csv` are in `figures/data/bc/`.
 - `offline-bc-value-or-gap-<base>.txt` (`028`): `cos(axis_0, axis_1)` for that
   base, with split-half reliabilities and a permutation null.
 
+- `offline-bc-rewrite.<run>.txt` (`030`): the causal half of Experiment 1, which
+  the BC stream had not had. A directional plan is written into the per-cell
+  residual at one depth and the route decoded under it, six arms against the
+  DRC's, with `--patch` giving the counterfactual ceiling. Two diagnostics come
+  before the behaviour: `write-back`, the probe at the site reading the class
+  written, and `propagation`, the probe at the top reading it after an edit made
+  lower down. Depth `n_layers` is run as a control whose null is arithmetic -
+  the head reads from SEP onward with no attention after it - and it comes back
+  exact to the digit, which is what says the harness is sound.
+- `offline-bc-redteam.<run>.txt` (`030` with the erase arms): the four controls
+  that decide whether the erasing half is a plan edit or a lesion -
+  `erase_start` (the agent's cell alone), `erase_tail` (the rest of the route),
+  `sham` (the same count of cells off both routes) and `erase_other` (erasing
+  the route it is *not* walking, which gives the claim a sign).
+- `offline-bc-randdraw.s<seed>.txt` (`030 --arms random shuffled --seed N`): five
+  draws of the norm-matched random direction, because one draw is not a control.
+  It lands between +0.1 and +5.0 points against the plan arm's +7.4, so "random
+  directions do nothing" - the DRC's phrasing - is too strong here.
+- `offline-bc-probe-untaken.<run>.txt` (`025 --untaken`): the plan probe fitted
+  against the route to the objective the model did *not* take. Same walls, same
+  start; the gap between the two labellings is what belongs to the plan rather
+  than to the layout.
+- `offline-bc-distance-{cells,sep}.<run>.txt` (`031`): the distance read, as a
+  field over maze tokens and as a scalar at the end-of-input token, with `005`'s
+  controls, an untrained network of the same shape, and the own/other split.
+- `offline-bc-writesep[-gap].<run>.txt` (`032`): the calibrated distance write at
+  the end-of-input token. The direction moves the decoded distance by exactly one
+  cell, so the prediction is a number rather than a direction of change, and
+  `carried to the top` says how much of it survives to where the head reads.
+
 What they say is summarised in the offline-bc handoff and below as it lands.

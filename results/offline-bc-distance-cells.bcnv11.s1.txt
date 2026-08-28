@@ -1,0 +1,92 @@
+script 031_bc_outcome_keyed_distance.py
+commit 7483d9e
+argv   /workspace/data/offline/runs/bcnv11.s1 --demos /workspace/data/offline/demos/test.rho100 --sites cells --train-episodes 256 --test-episodes 512 --json /workspace/data/offline/results/offline-bc-distance-cells.bcnv11.s1.json
+
+bcnv11.s1 @ step 30,000; test.rho100 (rho=1.0); 256 fitted / 512 scored; 4 blocks, d_model 128; values hidden
+
+==============================================================================
+depth 0  (embed)
+
+    site    target                               arm  partial  within hard shape  hard R2    MAE   n_hard
+   embed     d->f0             residual (l2 clipped)   -0.043  -0.075      0.002   -0.701   6.90   11,242
+   embed     d->f0         oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,242
+   embed     d->f0          null:manhattan+chebyshev    0.049   0.081      0.061   -0.460   5.44   11,242
+   embed     d->f0       shuffled:d->f0 (l2 clipped)   -0.039  -0.036      0.003   -0.702   6.91   11,242
+                  controls ok (oracle passes, null and shuffled fail)
+
+   embed     d->f1             residual (l2 clipped)   -0.018  -0.060      0.002   -0.716   6.82   11,231
+   embed     d->f1         oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,231
+   embed     d->f1          null:manhattan+chebyshev    0.049   0.086      0.072   -0.397   5.48   11,231
+   embed     d->f1                    shuffled:d->f1    0.008   0.017      0.000   -0.718   6.82   11,231
+                  controls ok (oracle passes, null and shuffled fail)
+
+
+==============================================================================
+depth 1  (block1)
+
+    site    target                               arm  partial  within hard shape  hard R2    MAE   n_hard
+  block1     d->f0             residual (l2 clipped)    0.022   0.008      0.005   -0.715   6.71   11,242
+  block1     d->f0         oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,242
+  block1     d->f0          null:manhattan+chebyshev    0.049   0.081      0.061   -0.460   5.44   11,242
+  block1     d->f0       shuffled:d->f0 (l2 clipped)   -0.039  -0.036      0.003   -0.702   6.91   11,242
+                  controls ok (oracle passes, null and shuffled fail)
+
+  block1     d->f1             residual (l2 clipped)   -0.005  -0.052      0.004   -0.710   6.80   11,231
+  block1     d->f1         oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,231
+  block1     d->f1          null:manhattan+chebyshev    0.049   0.086      0.072   -0.397   5.48   11,231
+  block1     d->f1                    shuffled:d->f1    0.008   0.017      0.000   -0.718   6.82   11,231
+                  controls ok (oracle passes, null and shuffled fail)
+
+
+==============================================================================
+depth 2  (block2)
+
+    site    target                               arm  partial  within hard shape  hard R2    MAE   n_hard
+  block2     d->f0                          residual    0.231   0.243      0.058   -0.340   5.29   11,242
+  block2     d->f0         oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,242
+  block2     d->f0          null:manhattan+chebyshev    0.049   0.081      0.061   -0.460   5.44   11,242
+  block2     d->f0       shuffled:d->f0 (l2 clipped)   -0.039  -0.036      0.003   -0.702   6.91   11,242
+                  controls ok (oracle passes, null and shuffled fail)
+
+  block2     d->f1                          residual    0.117   0.117      0.032   -0.491   6.01   11,231
+  block2     d->f1         oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,231
+  block2     d->f1          null:manhattan+chebyshev    0.049   0.086      0.072   -0.397   5.48   11,231
+  block2     d->f1                    shuffled:d->f1    0.008   0.017      0.000   -0.718   6.82   11,231
+                  controls ok (oracle passes, null and shuffled fail)
+
+
+==============================================================================
+depth 3  (block3)
+
+    site    target                               arm  partial  within hard shape  hard R2    MAE   n_hard
+  block3     d->f0                          residual    0.363   0.401      0.075   -0.232   4.95   11,242
+  block3     d->f0         oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,242
+  block3     d->f0          null:manhattan+chebyshev    0.049   0.081      0.061   -0.460   5.44   11,242
+  block3     d->f0       shuffled:d->f0 (l2 clipped)   -0.039  -0.036      0.003   -0.702   6.91   11,242
+                  controls ok (oracle passes, null and shuffled fail)
+
+  block3     d->f1                          residual    0.146   0.157      0.039   -0.460   5.95   11,231
+  block3     d->f1         oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,231
+  block3     d->f1          null:manhattan+chebyshev    0.049   0.086      0.072   -0.397   5.48   11,231
+  block3     d->f1                    shuffled:d->f1    0.008   0.017      0.000   -0.718   6.82   11,231
+                  controls ok (oracle passes, null and shuffled fail)
+
+
+==============================================================================
+depth 4  (block4)
+
+    site    target                               arm  partial  within hard shape  hard R2    MAE   n_hard
+  block4     d->f0                          residual    0.372   0.406      0.084   -0.222   4.98   11,242
+  block4     d->f0         oracle:d->f0 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,242
+  block4     d->f0          null:manhattan+chebyshev    0.049   0.081      0.061   -0.460   5.44   11,242
+  block4     d->f0       shuffled:d->f0 (l2 clipped)   -0.039  -0.036      0.003   -0.702   6.91   11,242
+                  controls ok (oracle passes, null and shuffled fail)
+
+  block4     d->f1                          residual    0.151   0.153      0.044   -0.467   5.95   11,231
+  block4     d->f1         oracle:d->f1 (l2 clipped)    1.000   1.000      1.000    1.000   0.00   11,231
+  block4     d->f1          null:manhattan+chebyshev    0.049   0.086      0.072   -0.397   5.48   11,231
+  block4     d->f1                    shuffled:d->f1    0.008   0.017      0.000   -0.718   6.82   11,231
+                  controls ok (oracle passes, null and shuffled fail)
+
+
+wrote /workspace/data/offline/results/offline-bc-distance-cells.bcnv11.s1.json

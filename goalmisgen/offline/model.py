@@ -148,6 +148,20 @@ class Block(nn.Module):
         return x + h.astype(x.dtype)
 
 
+def add_edit(x: jnp.ndarray, edit: jnp.ndarray | None) -> jnp.ndarray:
+    """Add ``edit`` to the first ``edit.shape[1]`` positions of the stream.
+
+    ``edit`` covers a prefix of the sequence: ``n_cells`` positions writes at the
+    maze tokens, ``prefix_length`` writes at SEP as well. A caller may reach the
+    action positions, but their residual is rebuilt from the token embedding at
+    every decode step, so an edit there lasts one token; the maze tokens are the
+    site with the persistence the DRC's cell state has.
+    """
+    if edit is None:
+        return x
+    return x.at[:, : edit.shape[1]].add(edit)
+
+
 class RoutePrefixLM(nn.Module):
     """Maze in, route out. Returns logits and the residual stream at every depth."""
 
@@ -198,10 +212,33 @@ class RoutePrefixLM(nn.Module):
     """
 
     @nn.compact
-    def __call__(self, observations: jnp.ndarray, actions: jnp.ndarray) -> tuple[jnp.ndarray, list[jnp.ndarray]]:
+    def __call__(
+        self,
+        observations: jnp.ndarray,
+        actions: jnp.ndarray,
+        edit: jnp.ndarray | None = None,
+        edit_depth: int = 0,
+    ) -> tuple[jnp.ndarray, list[jnp.ndarray]]:
         """
         ``observations``: ``(B, size, size, n_channels)`` float.
         ``actions``: ``(B, max_actions)`` int, moves with ``-1`` past the end.
+        ``edit``: ``(B, n, d_model)`` added to the residual stream at depth
+        ``edit_depth`` - 0 the embedding, ``k`` after block ``k`` - over the
+        first ``n`` positions, or ``None`` for the untouched network. The
+        residual *recorded* at that depth is the edited one, so a probe reading
+        it sees what was written.
+
+        The edit carries no parameters, so a checkpoint written before this
+        argument existed loads unchanged and ``edit=None`` reproduces the old
+        logits exactly. ``tests/test_offline_rewrite.py`` asserts both.
+
+        **An edit at the maze tokens after the last block cannot change a single
+        logit**, and that is arithmetic rather than a finding: the head reads
+        positions from SEP onward, and no attention layer follows to carry a
+        maze position into them. Depth ``n_layers`` is therefore a guaranteed
+        null, worth running as the control it is - and worth knowing before
+        reading anything into a depth whose effect is small, since the depths
+        differ in how many attention layers are left to consume the edit.
 
         Returns ``logits`` of shape ``(B, max_actions + 1, n_classes)`` - the
         prediction made at SEP and at each action position, i.e. for
@@ -232,10 +269,15 @@ class RoutePrefixLM(nn.Module):
         x = jnp.concatenate([x_cells, sep, x_actions], axis=1)
         mask = jnp.asarray(prefix_mask(cfg.prefix_length, x.shape[1]))
 
+        if edit is not None and not 0 <= edit_depth <= cfg.n_layers:
+            raise ValueError(f"edit_depth {edit_depth} is not a depth of a {cfg.n_layers}-block model")
+
+        x = add_edit(x, edit) if edit_depth == 0 else x
         block = nn.remat(Block) if self.remat else Block
         residuals = [x]
         for index in range(cfg.n_layers):
             x = block(cfg.n_heads, cfg.mlp_ratio, self.dtype, name=f"block_{index}")(x, mask)
+            x = add_edit(x, edit) if edit_depth == index + 1 else x
             residuals.append(x)
 
         x = nn.LayerNorm(name="ln_final", dtype=jnp.float32, param_dtype=jnp.float32)(x)

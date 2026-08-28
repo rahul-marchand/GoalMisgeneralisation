@@ -50,30 +50,43 @@ class CellRollout:
     level: Level
 
 
-@functools.lru_cache(maxsize=8)
-def _residuals_fn(config: ModelConfig):
+@functools.lru_cache(maxsize=16)
+def _residuals_fn(config: ModelConfig, edit_depth: int = 0):
     model = RoutePrefixLM(config)
 
     @jax.jit
-    def residuals(params, observations):
+    def residuals(params, observations, edit=None):
         actions = jnp.full((observations.shape[0], config.max_actions), NO_ACTION, dtype=jnp.int32)
-        _, streams = model.apply(params, observations, actions)
+        _, streams = model.apply(params, observations, actions, edit, edit_depth)
         return jnp.stack([s[:, : config.n_cells] for s in streams], axis=0)
 
     return residuals
 
 
-def cell_residuals(model: RoutePrefixLM, params, observations: np.ndarray, batch_size: int = 512) -> np.ndarray:
+def cell_residuals(
+    model: RoutePrefixLM,
+    params,
+    observations: np.ndarray,
+    batch_size: int = 512,
+    edit: np.ndarray | None = None,
+    edit_depth: int = 0,
+) -> np.ndarray:
     """``(n_layers + 1, B, size, size, d_model)``: embedding, then after each block.
 
     Captured with no action tokens present; the prefix cannot see them anyway,
     so this is the same grid the model decodes from.
+
+    With ``edit``, the grids are those of the *written* network - which is how
+    "does a write at block 2 still read at block 4" is asked, and that question
+    decides whether a small behavioural effect is a fact about the
+    representation or about the edit not surviving a block.
     """
     cfg = model.config
-    fn = _residuals_fn(cfg)
+    fn = _residuals_fn(cfg, edit_depth)
     chunks = []
     for start in range(0, len(observations), batch_size):
-        out = np.asarray(fn(params, jnp.asarray(observations[start : start + batch_size])))
+        write = None if edit is None else jnp.asarray(edit[start : start + batch_size])
+        out = np.asarray(fn(params, jnp.asarray(observations[start : start + batch_size]), write))
         chunks.append(out.reshape(out.shape[0], out.shape[1], cfg.size, cfg.size, cfg.d_model))
     return np.concatenate(chunks, axis=1)
 
@@ -148,8 +161,21 @@ def relabel(rollouts: list[CellRollout], objective: str) -> list[CellRollout]:
             index = int(rollout.info["optimal_index"])
         elif objective == "feature0":
             index = next(k for k, o in enumerate(level.objectives) if o.feature_id == 0)
+        elif objective == "untaken":
+            # The route the model did not walk, on the maze it did walk. The
+            # control that separates "these features hold the plan it is
+            # following" from "these features hold the routes of this maze":
+            # both labellings are real routes through the same walls from the
+            # same start, so a probe that scores as well on this one is reading
+            # the layout rather than the intention.
+            reached = rollout.info.get("reached_index")
+            if reached is None:
+                continue
+            index = 1 - int(reached) if len(level.objectives) == 2 else None
+            if index is None:
+                raise ValueError("'untaken' is defined for two objectives")
         else:
-            raise ValueError(f"unknown objective {objective!r}; expected 'optimal' or 'feature0'")
+            raise ValueError(f"unknown objective {objective!r}; expected 'optimal', 'feature0' or 'untaken'")
         path = path_to_objective(level, index)
         if path is None:
             continue

@@ -20,3 +20,9 @@ checkpoints/
 # with nothing to say which is current.
 *.pre-push-backup.md
 *.stage2-backup-*.md
+
+# Figure source data. Measured on the pod, archived on the network volume
+# (rahul-goalmisgen-data:/data/figures-data); the repo keeps code, write-ups,
+# results/ tables and the rendered figures. Files tracked before this policy
+# stay tracked - an ignore never untracks.
+/figures/data/

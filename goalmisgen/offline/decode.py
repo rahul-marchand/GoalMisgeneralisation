@@ -242,10 +242,21 @@ class RouteSummary:
         )
 
 
-def summarise_routes(demos: DemoSet, indices: np.ndarray, decoded: Decoded, outcomes: list[dict]) -> RouteSummary:
+def summarise_routes(
+    demos: DemoSet, indices: np.ndarray, decoded: Decoded, outcomes: list[dict], indifference: bool = True
+) -> RouteSummary:
+    """``indifference=False`` skips the exchange-rate fit and reports NaN for it.
+
+    That fit is :func:`~goalmisgen.analysis.behaviour.indifference_point`, four
+    thousand gradient steps, and it dominates everything else here by an order
+    of magnitude: 39.5s against 6.6s of decoding and 2.7s of replay per 10,000
+    levels. A caller that only wants the routes -- every sweep script does --
+    should not pay for it, the more so since the fitted crossing is biased by
+    saturation and the analyses read theirs off binned rates instead.
+    """
     expert = demos.routes(indices)
     matched = np.all(decoded.actions == expert, axis=1)
-    gaps, took_richer, _ = value_distance_decisions(outcomes)
+    gaps, took_richer, _ = value_distance_decisions(outcomes) if indifference else (np.empty(0), np.empty(0), None)
     return RouteSummary(
         behaviour=summarise(outcomes),
         legal=float(np.mean([o["illegal_moves"] == 0 for o in outcomes])),
@@ -255,11 +266,19 @@ def summarise_routes(demos: DemoSet, indices: np.ndarray, decoded: Decoded, outc
     )
 
 
-def evaluate(model: RoutePrefixLM, params, demos: DemoSet, indices: np.ndarray) -> tuple[RouteSummary, Decoded, list[dict]]:
-    """Decode, replay and summarise one held-out set."""
-    decoded = greedy_decode(model, params, demos.observations(indices))
+def evaluate(
+    model: RoutePrefixLM, params, demos: DemoSet, indices: np.ndarray, decoder=None, indifference: bool = True
+) -> tuple[RouteSummary, Decoded, list[dict]]:
+    """Decode, replay and summarise one held-out set.
+
+    ``decoder`` defaults to :func:`greedy_decode`. Pass
+    ``fast_decode.greedy_decode_cached`` for the same routes an order of
+    magnitude faster; it is imported lazily by the caller rather than here, so
+    this module keeps no dependency on it.
+    """
+    decoded = (decoder or greedy_decode)(model, params, demos.observations(indices))
     outcomes = replay_all(demos, indices, decoded)
-    return summarise_routes(demos, indices, decoded, outcomes), decoded, outcomes
+    return summarise_routes(demos, indices, decoded, outcomes, indifference), decoded, outcomes
 
 
 def build_model(config: ModelConfig) -> RoutePrefixLM:

@@ -327,7 +327,10 @@ def test_remat_gradients_differ_only_by_float32_reassociation() -> None:
 
     def flat_grad(model):
         grads = jax.grad(lambda p: model.apply(p, observations, actions)[0].sum())(params)
-        return np.concatenate([np.asarray(leaf).ravel() for leaf in jax.tree_util.tree_leaves(grads)])
+        # float64: the cosine below is asserted to 1e-12, which the gradients'
+        # own float32 accumulation cannot certify - it held on CPU only by luck
+        # of reassociation, and a GPU's different summation order exposed it.
+        return np.concatenate([np.asarray(leaf).ravel() for leaf in jax.tree_util.tree_leaves(grads)]).astype(np.float64)
 
     with_remat, without = flat_grad(on), flat_grad(off)
     assert np.linalg.norm(with_remat - without) / np.linalg.norm(without) < 1e-5

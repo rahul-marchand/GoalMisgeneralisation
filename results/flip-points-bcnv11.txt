@@ -1,0 +1,40 @@
+script flip_points_bc.py
+commit dc8ec33
+argv   
+
+First 20,000 levels of offline/demos/test.rho100; unreached counts as not-taken.
+Models are kept when their crossing lies in (0.5, 25) steps.
+
+s1: 47 models, theta 1.6..23.9
+  bracketed 40.3%  (censored low 52.9%, high 6.8%)
+  violations in gap band: per-decision 5.8%  (zero 18.9%, <=2 61.2%)
+  no-stable-gap null:     per-decision 16.1%  (zero 0.0%, <=2 1.0%)
+  gap 4..18 (5,047 levels):
+    flip - gap  median -0.09, IQR 3.93 steps   [part 1 within-cell width 4.0..5.4]
+    eps         median -0.009, IQR 0.462
+  saved /home/rahul/projects/GoalMisgeneralisation/figures/data/h1/flip/bcnv11.s1.npz
+
+s2: 49 models, theta 1.6..22.0
+  bracketed 41.0%  (censored low 53.4%, high 5.5%)
+  violations in gap band: per-decision 4.5%  (zero 24.1%, <=2 68.2%)
+  no-stable-gap null:     per-decision 12.6%  (zero 0.2%, <=2 3.6%)
+  gap 4..18 (5,366 levels):
+    flip - gap  median -0.12, IQR 3.49 steps   [part 1 within-cell width 4.0..5.4]
+    eps         median -0.011, IQR 0.406
+  saved /home/rahul/projects/GoalMisgeneralisation/figures/data/h1/flip/bcnv11.s2.npz
+
+s3: 47 models, theta 1.5..21.8
+  bracketed 41.9%  (censored low 52.3%, high 5.8%)
+  violations in gap band: per-decision 5.0%  (zero 21.2%, <=2 65.1%)
+  no-stable-gap null:     per-decision 14.0%  (zero 0.0%, <=2 2.3%)
+  gap 4..18 (5,288 levels):
+    flip - gap  median -0.13, IQR 3.71 steps   [part 1 within-cell width 4.0..5.4]
+    eps         median -0.011, IQR 0.433
+  saved /home/rahul/projects/GoalMisgeneralisation/figures/data/h1/flip/bcnv11.s3.npz
+
+cross-seed correlation of flip - gap (common bracketed levels in the band):
+  s1-s2: +0.372  (n 4,691)
+  s1-s3: +0.411  (n 4,665)
+  s2-s3: +0.385  (n 4,880)
+The binary within-cell xi gave +0.26..+0.35; a higher value here means the
+continuous flip point recovers more of the same per-level misread.

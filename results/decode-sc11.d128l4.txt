@@ -1,0 +1,3 @@
+decoded 20,000 in 12.2s
+reached 97.3%  optimal 92.5%  followed f0 81.6%  legal 97.3%  matched expert 88.7%  return 0.395  steps 9.8  indifference nan
+saved figures/data/scaling/d128l4.npz

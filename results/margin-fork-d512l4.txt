@@ -1,0 +1,29 @@
+script margin_swap_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/scaling/sc11.d512l4.s1 --read fork --eval-demos /workspace/data/offline/demos/scaling/test.rho100 --choices figures/data/scaling/d512l4.npz
+
+forward passes done in 132s
+70,502 valid (maze, start) presentations in |gap| <= 14; 15,706 natural starts
+
+== 0. is the margin a faithful readout of choice? (natural start, unswapped) ==
+  AUC(margin, decoded choice): 0.998 overall, 0.998 near threshold (gap 6..14)
+
+== 1. calibration ==
+  g = 0.780 logits per step  (per-|gap| tertile: 0.254 0.439 0.897 )
+
+== 2. the decomposition, in steps ==
+  direction bias removed from T (approach-pair fixed effect): 2.5% of Var(T)
+  sd(eps)   (swap-antisymmetric, location-difference-keyed, debiased): 2.73
+  sd(sigma) (swap-symmetric, maze/colour-keyed):                       4.20
+  share of within-cell variance that inverts under the swap: 29.7%
+  closure: Var(eps) + Var(sigma) = 25.03 vs single-orientation within-cell 25.20
+  shuffled-pairing control: sd 3.56 (cancellation destroyed)
+  per-presentation arrays saved to figures/data/margin-fork-sc11.d512l4.s1.npz
+
+== 3. within eps: path-keyed or start-invariant? ==
+  15,210 mazes with >=3 usable starts (mean 4.1)
+  start-invariant share of Var(eps): 11.4%   (goal-local stories predict ~100%)
+  start-varying share:               88.6%   (path-cost error predicts most of it)
+
+Gauge note: eps is 'perceived path-cost difference' error; fractional distance
+misread and per-maze price error are one number and stay unseparated.

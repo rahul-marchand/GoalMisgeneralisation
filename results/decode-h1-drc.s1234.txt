@@ -1,0 +1,29 @@
+script decode_h1_drc.py
+commit dc8ec33
+argv   /workspace/data/runs/novalue11.s1234 --episodes 50000 --out figures/data/drc/novalue11.s1234.npz
+
+checkpoint /workspace/data/runs/novalue11.s1234/local-files/cp_140206080
+values     (1.0, 0.5)
+rolled out 50,000 episodes in 66s  (update 27384)
+reached 100.0%  chose optimal 95.3%
+
+saved figures/data/drc/novalue11.s1234.npz  (50,000 episode rows; levels sampled with replacement)
+
+threshold, read from the pooled curve (bcnv11 part 1: crossing 10.9-11.1, width 4.4-5.9):
+  crossing 7.64   width q75-q25 1.22 steps   (q25 7.10, q75 8.32)
+  take-richer rate by gap:
+    gap   4: 0.998  (n 1,591)
+    gap   5: 0.984  (n 1,490)
+    gap   6: 0.966  (n 1,418)
+    gap   7: 0.797  (n 1,308)
+    gap   8: 0.333  (n 1,209)
+    gap   9: 0.074  (n 1,237)
+    gap  10: 0.020  (n 1,104)
+    gap  11: 0.003  (n 938)
+    gap  12: 0.002  (n 885)
+    gap  13: 0.000  (n 817)
+    gap  14: 0.000  (n 766)
+    gap  15: 0.000  (n 686)
+    gap  16: 0.000  (n 636)
+    gap  17: 0.000  (n 577)
+    gap  18: 0.000  (n 520)

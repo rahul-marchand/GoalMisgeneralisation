@@ -1,0 +1,115 @@
+script gain_knob_checks.py
+commit dc8ec33
+argv   
+bcnv11 value-axis grid, robustness checks behind UtilityRule.md part 3.
+
+== 1. the exponential, with and without the ceiling (theta > 20 dropped) ==
+series          c all  R2 all | c <=20  R2 <=20  n kept
+written o0 s1   2.31  0.9962 |   2.23   0.9967      10
+written o0 s2   1.94  0.9862 |   2.05   0.9849      11
+written o0 s3   2.13  0.9918 |   2.17   0.9893      11
+written o1 s1   2.26  0.9980 |   2.27   0.9970      10
+written o1 s2   1.95  0.9884 |   2.05   0.9873      11
+written o1 s3   2.19  0.9892 |   2.27   0.9864      11
+
+== 2. collapse stats under different measurement choices ==
+mean +- within-series sd of q25/theta and q75/theta over the 12 series
+  first-crossing, bins>=25 (doc)     q25/t 0.72 ± 0.120    q75/t 1.35 ± 0.136   (12 series)
+  first-crossing, bins>=100          q25/t 0.72 ± 0.123    q75/t 1.34 ± 0.134   (12 series)
+  isotonic, bins>=25                 q25/t 0.72 ± 0.120    q75/t 1.36 ± 0.146   (12 series)
+  isotonic, bins>=100                q25/t 0.72 ± 0.123    q75/t 1.34 ± 0.141   (12 series)
+  first-crossing, theta<=17 only     q25/t 0.72 ± 0.123    q75/t 1.34 ± 0.138   (12 series)
+
+== 3. composition: hold d_poor in a fixed band (5..12), written o0 s1 ==
+ offset  theta  q25/t  q75/t    (all-level values for comparison)
+  -0.30   5.39   0.68   1.41    (0.70 / 1.30)
+  -0.20   6.68   0.75   1.53    (0.73 / 1.29)
+  -0.10   8.53   0.74   1.40    (0.76 / 1.27)
+   0.00  10.77   0.75   1.36    (0.79 / 1.22)
+   0.10  12.67   0.78   1.54    (0.82 / 1.38)
+   0.20  17.36   0.70   1.55    (0.74 / 1.36)
+
+== 4. deep writes: does log-linearity continue below -0.45? ==
+written far outside the trained range; exp prediction uses c fitted on |offset| <= 0.45
+series    offset   theta  exp pred  reached
+o0 s1    -0.55    2.67      2.90    96.7%
+o0 s1    -0.65    1.90      2.30    96.3%
+o0 s1    -0.80    1.29      1.63    95.5%
+o0 s1    -1.00    0.79      1.03    94.4%
+o0 s1    -1.20    0.47      0.65    92.6%
+o0 s1    -1.50    0.06      0.32    87.6%
+o0 s1    -2.00   -0.35      0.10    72.3%
+
+o0 s2    -0.55    2.48      3.56    98.0%
+o0 s2    -0.65    1.69      2.93    97.8%
+o0 s2    -0.80    0.93      2.19    97.3%
+o0 s2    -1.00    0.50      1.49    96.5%
+o0 s2    -1.20    0.37      1.01    95.0%
+o0 s2    -1.50    0.46      0.56    90.5%
+o0 s2    -2.00    1.44      0.21    74.7%
+
+o0 s3    -0.55    2.32      3.21    97.3%
+o0 s3    -0.65    1.57      2.59    97.1%
+o0 s3    -0.80    0.88      1.88    96.7%
+o0 s3    -1.00    0.26      1.23    95.8%
+o0 s3    -1.20    0.14      0.80    94.5%
+o0 s3    -1.50    0.17      0.42    91.4%
+o0 s3    -2.00    0.80      0.15    79.2%
+
+o1 s1     0.55    2.67      2.98    96.5%
+o1 s1     0.65    1.94      2.38    96.2%
+o1 s1     0.80    1.32      1.69    95.4%
+o1 s1     1.00    0.78      1.08    94.2%
+o1 s1     1.20    0.45      0.69    92.5%
+o1 s1     1.50    0.06      0.35    88.2%
+o1 s1     2.00   -0.44      0.11    75.1%
+
+
+== 5. single-block writes: does the move factorise across layers? ==
+axis written one parameter block at a time; c_g from log theta vs offset
+s1  (base theta 10.33)
+  embed       10.34  10.42  10.49  10.55   c_g  0.02
+  block_0      8.30   9.32  11.36  12.40   c_g  0.45
+  block_1      6.92   8.61  11.79  15.51   c_g  0.88
+  block_2      8.49   9.40  11.29  12.11   c_g  0.40
+  block_3      9.06  10.09  10.82  11.54   c_g  0.25
+  head        10.47  10.45  10.44  10.46   c_g -0.00
+  sum c_g 2.01
+  offset  -0.45: sum of block dlog  -0.935   full write  -1.053
+  offset  -0.20: sum of block dlog  -0.384   full write  -0.431
+  offset   0.20: sum of block dlog   0.386   full write   0.441
+  offset   0.45: sum of block dlog   0.889   full write   1.032
+  c_max 0.88 -> first factor zeroes near offset -1.14
+
+s2  (base theta 10.36)
+  embed       10.16  10.27  10.36  10.41   c_g  0.03
+  block_0      7.57   9.08  11.73  12.98   c_g  0.61
+  block_1      8.17   9.36  11.49  12.78   c_g  0.50
+  block_2      8.56   9.44  11.31  12.77   c_g  0.45
+  block_3      9.48   9.99  10.62  11.22   c_g  0.18
+  head        10.33  10.34  10.36  10.37   c_g  0.00
+  sum c_g 1.76
+  offset  -0.45: sum of block dlog  -0.853   full write  -1.074
+  offset  -0.20: sum of block dlog  -0.372   full write  -0.381
+  offset   0.20: sum of block dlog   0.342   full write   0.375
+  offset   0.45: sum of block dlog   0.731   full write   0.737
+  c_max 0.61 -> first factor zeroes near offset -1.65
+
+s3  (base theta 10.41)
+  embed       10.22  10.34  10.51  10.67   c_g  0.05
+  block_0      7.32   8.90  11.53  13.32   c_g  0.66
+  block_1      7.65   8.95  11.67  13.20   c_g  0.62
+  block_2      8.55   9.41  11.39  12.42   c_g  0.43
+  block_3      9.84  10.13  10.76  11.24   c_g  0.15
+  head        10.46  10.42  10.44  10.45   c_g -0.00
+  sum c_g 1.90
+  offset  -0.45: sum of block dlog  -0.927   full write  -1.116
+  offset  -0.20: sum of block dlog  -0.441   full write  -0.411
+  offset   0.20: sum of block dlog   0.353   full write   0.378
+  offset   0.45: sum of block dlog   0.768   full write   0.940
+  c_max 0.66 -> first factor zeroes near offset -1.51
+
+
+== 6. where does measurable data end? ==
+top write s1 o0+045: last gap with >=25 levels: 30, rate there 0.48
+base s1: last gap with >=25 levels: 33

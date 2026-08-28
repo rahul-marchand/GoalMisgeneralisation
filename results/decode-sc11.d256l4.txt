@@ -1,0 +1,3 @@
+decoded 20,000 in 19.1s
+reached 99.8%  optimal 98.6%  followed f0 82.6%  legal 99.9%  matched expert 97.8%  return 0.449  steps 9.3  indifference nan
+saved figures/data/scaling/d256l4.npz

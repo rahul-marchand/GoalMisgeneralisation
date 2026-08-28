@@ -1,0 +1,39 @@
+script steer_flip_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/scaling/sc11.d512l4.s1 --flip figures/data/scaling/flip.d512l4.npz --probe-demos /workspace/data/offline/demos/scaling/train.rho100 --eval-demos /workspace/data/offline/demos/scaling/test.rho100
+
+direction: true-gap probe at sep depth 3, written at sep;  eval r2 +0.532;  |unit dose| 0.119
+
+== 1. dose-response: does writing +d steps of gap shift the crossing by -d? ==
+  dose  -8.0: crossing  10.51   reached 100.0%
+  dose  -6.0: crossing  10.51   reached 100.0%
+  dose  -4.0: crossing  10.51   reached 100.0%
+  dose  -3.0: crossing  10.51   reached 100.0%
+  dose  -2.0: crossing  10.51   reached 100.0%
+  dose  -1.0: crossing  10.51   reached 100.0%
+  dose  +0.0: crossing  10.51   reached 100.0%
+  dose  +1.0: crossing  10.51   reached 100.0%
+  dose  +2.0: crossing  10.51   reached 100.0%
+  dose  +3.0: crossing  10.51   reached 100.0%
+  dose  +4.0: crossing  10.51   reached 100.0%
+  dose  +6.0: crossing  10.51   reached 100.0%
+  dose  +8.0: crossing  10.51   reached 100.0%
+  slope over |dose| <= 3: -0.000   (fully causal and calibrated would be -1)
+  norm-matched random direction:
+    dose  -8.0: crossing  10.51
+    dose  -4.0: crossing  10.51
+    dose  +4.0: crossing  10.51
+    dose  +8.0: crossing  10.51
+
+== 2. per-level flip doses: do they land where the behavioural flip points say? ==
+  2 of 5,998 band levels flip within the dose grid
+  too few flips for the per-level statistics (a direction with no causal effect looks like this)
+
+== 3. clamp: remove the probe-visible residual, does the curve sharpen? ==
+                      within-cell var  curve width
+  base                         0.0166         0.60
+  clamped                      0.0164         0.60
+  shuffled control             0.0164         0.60
+  variance removed by clamping: +1.1%  (control +1.1%)
+  The removed share is xi that entered through this subspace; no sharpening is
+  ambiguous while the probe reads the gap at r2 ~ 0.3-0.5, sharpening is not.

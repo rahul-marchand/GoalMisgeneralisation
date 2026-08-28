@@ -1,0 +1,33 @@
+script probe_flip_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/bcnv11.s2 --flip figures/data/h1/flip/bcnv11.s2.npz
+
+eval: 20,000 levels, 5,366 bracketed in gap 4..18
+flip residual sd in band: 3.29 steps
+
+within-cell centring: 122 cells covering 3,884 of the band
+
+== 1. does the true-gap probe's residual track the model's flip residual? ==
+Within a cell the true gap is constant, so the probe's variation is its residual;
+corr is against the flip residual, centred the same way.
+  trained:
+    sep           +0.000  +0.019  +0.024  +0.133  +0.244  +0.243   (layers 0..4, all)
+    agent         +0.013  +0.041  +0.048  +0.082  +0.189  +0.209   (layers 0..4, all)
+    objectives    +0.028  +0.027  +0.075  +0.090  +0.080  +0.125   (layers 0..4, all)
+    cells_mean    +0.042  +0.019  +0.058  +0.077  +0.091  +0.114   (layers 0..4, all)
+  untrained:
+    sep             +nan  -0.015  -0.006  +0.001  -0.006  +0.005   (layers 0..4, all)
+    agent         +0.013  +0.006  -0.001  -0.008  +0.000  -0.002   (layers 0..4, all)
+    objectives    +0.028  +0.029  +0.035  +0.022  +0.021  +0.030   (layers 0..4, all)
+    cells_mean    +0.051  -0.002  +0.012  +0.000  -0.001  +0.042   (layers 0..4, all)
+
+== 2. target swap at sep / all (best true-gap calibration) ==
+Half the bracketed band trains, half tests. Rows: what the probe was trained on;
+columns: R2 against each target on the held-out half.
+  trained on    R2 true gap   R2 flip
+  true gap            0.206     0.226
+  flip                0.169     0.223
+  corr(the two probes' held-out predictions) = +0.944
+
+If the activations hold the model's own estimate, the flip-trained probe beats the
+true-trained probe on flip; if they only hold the truth, the columns tie.

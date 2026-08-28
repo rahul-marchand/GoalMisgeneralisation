@@ -1,0 +1,38 @@
+script distance_field_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/scaling/sc11.d256l4.s1 --probe-demos /workspace/data/offline/demos/scaling/train.rho100 --eval-demos /workspace/data/offline/demos/scaling/test.rho100
+
+256 train / 512 test episodes; DRC reference: partial ~0.70, hard R2 ~0.25, MAE ~3.5
+
+== distance-to-agent ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0          -0.023     -0.046   -0.561    [-0.61,-0.52]   7.05   0.001
+  trained depth 1 (l2 clipped)   -0.007     -0.025   -0.559    [-0.62,-0.52]   7.05   0.001
+  trained depth 2           0.303      0.338   -0.310    [-0.40,-0.25]   5.42   0.310
+  trained depth 3           0.302      0.336   -0.293    [-0.37,-0.22]   5.52   0.300
+  trained depth 4           0.314      0.349   -0.262    [-0.32,-0.20]   5.56   0.297
+  trained all               0.363      0.407   -0.225    [-0.30,-0.16]   5.29   0.346
+  untrained all (l2 clipped)   -0.034     -0.048   -0.558    [-0.61,-0.52]   7.06  -0.001
+  observation (l2 clipped)    0.012      0.012   -0.564    [-0.61,-0.53]   7.06   0.000
+
+== d->rich (colour0) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)   -0.060     -0.089   -0.579    [-0.63,-0.52]   7.03  -0.004
+  trained depth 1 (l2 clipped)   -0.052     -0.078   -0.581    [-0.63,-0.52]   7.04  -0.006
+  trained depth 2           0.410      0.477   -0.081    [-0.13,-0.03]   4.96   0.416
+  trained depth 3           0.645      0.681    0.216    [+0.18,+0.25]   3.98   0.595
+  trained depth 4           0.700      0.728    0.333    [+0.30,+0.36]   3.68   0.647
+  trained all               0.711      0.738    0.354    [+0.32,+0.38]   3.66   0.654
+  untrained all (l2 clipped)   -0.075     -0.096   -0.588    [-0.64,-0.53]   7.06  -0.016
+  observation (l2 clipped)   -0.000     -0.013   -0.582    [-0.63,-0.53]   7.03  -0.002
+
+== d->poor (colour1) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0           0.038      0.047   -0.559    [-0.61,-0.50]   7.01  -0.002
+  trained depth 1 (l2 clipped)    0.068      0.112   -0.562    [-0.61,-0.51]   7.01  -0.003
+  trained depth 2           0.232      0.291   -0.222    [-0.27,-0.16]   5.86   0.261
+  trained depth 3           0.385      0.478   -0.077    [-0.13,-0.02]   5.20   0.388
+  trained depth 4           0.412      0.523   -0.058    [-0.11,-0.00]   5.01   0.415
+  trained all               0.441      0.549   -0.029    [-0.08,+0.03]   4.92   0.433
+  untrained all (l2 clipped)    0.008      0.026   -0.570    [-0.63,-0.51]   7.03  -0.010
+  observation               0.005     -0.001   -0.559    [-0.61,-0.50]   7.01  -0.002

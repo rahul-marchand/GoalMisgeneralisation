@@ -1,0 +1,64 @@
+script gain_knob_report.py
+commit dc8ec33
+argv   
+bcnv11 value-axis grid, 20,000 held-out levels of offline/demos/test.rho100, greedy decode.
+Is the threshold a stored count (curve slides) or a gain (curve stretches)?
+
+== 1. the curve dilates rather than slides ==
+slide predicts q25-t, q75-t invariant; stretch predicts q25/t, q75/t invariant
+
+written o0 s1:   offset  theta |  q25-t  q75-t |  q25/t  q75/t
+                  -0.45   3.61 |  -1.63   1.56 |  0.547  1.432
+                  -0.40   4.17 |  -1.70   1.47 |  0.593  1.353
+                  -0.30   5.30 |  -1.57   1.61 |  0.704  1.304
+                  -0.20   6.72 |  -1.79   1.97 |  0.734  1.294
+                  -0.10   8.43 |  -2.05   2.31 |  0.756  1.274
+                  -0.05   9.37 |  -2.02   2.30 |  0.785  1.246
+                   0.00  10.33 |  -2.20   2.30 |  0.787  1.223
+                   0.05  11.39 |  -2.64   3.31 |  0.768  1.291
+                   0.10  12.09 |  -2.20   4.54 |  0.818  1.376
+                   0.20  16.06 |  -4.14   5.77 |  0.742  1.359
+                   0.30  20.31 |  -5.84    nan |  0.712    nan
+                   0.40  28.95 | -12.75    nan |  0.560    nan
+                   0.45  29.00 | -12.46    nan |  0.570    nan
+
+across the 12 series (mean of the statistic, then its sd across models):
+   q25-t: mean   -2.18   within-series sd 0.819
+   q75-t: mean    2.96   within-series sd 1.838
+   q25/t: mean    0.72   within-series sd 0.120
+   q75/t: mean    1.35   within-series sd 0.136
+
+== 2. the written dial is log-linear:  theta = theta_0 * exp(c * offset) ==
+series            n  R2 linear   R2 log      c
+written o0 s1    13     0.8913   0.9962   2.31
+written o0 s2    13     0.9727   0.9862   1.94
+written o0 s3    13     0.9313   0.9918   2.13
+written o1 s1    13     0.9151   0.9980   2.26
+written o1 s2    13     0.9705   0.9884   1.95
+written o1 s3    13     0.9448   0.9892   2.19
+arms o0 s1    13     0.9890   0.9134   2.54
+arms o0 s2    13     0.9960   0.9058   2.56
+arms o0 s3    13     0.9970   0.8858   2.56
+arms o1 s1    13     0.9515   0.9316   2.68
+arms o1 s2    13     0.9877   0.9092   2.56
+arms o1 s3    13     0.9944   0.8987   2.62
+(arms follow the expert's linear theta* = 10 + 20*offset instead: trained, not written)
+
+== 3. flips are nested: raising theta only adds levels ==
+backward flips (took richer at base, poorer at the write) are forbidden under a fixed per-level misread
+write         theta both reached  forward  backward  back/fwd
+s1 o0+005     11.39       19,450      365         8     0.022
+s1 o0+010     12.09       19,395      768        15     0.020
+s1 o0+020     16.06       48,125    3,787        91     0.024
+s1 o0+030     20.31       19,105    1,969        61     0.031
+s1 o0+045     29.00       18,920    2,426       102     0.042
+s2 o0+005     11.28       19,686      374         4     0.011
+s2 o0+010     12.26       19,658      744        10     0.013
+s2 o0+020     15.07       19,597    1,360        26     0.019
+s2 o0+030     16.67       19,521    1,900        54     0.028
+s2 o0+045     21.65       19,379    2,461       128     0.052
+s3 o0+005     11.39       48,881      951        10     0.011
+s3 o0+010     12.12       19,512      727        14     0.019
+s3 o0+020     15.18       19,447    1,376        30     0.022
+s3 o0+030     18.08       48,393    4,913       130     0.026
+s3 o0+045     26.64       48,013    6,373       285     0.045

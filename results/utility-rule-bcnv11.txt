@@ -1,0 +1,36 @@
+script utility_rule_report.py
+commit dc8ec33
+argv   
+
+bcnv11, 50,000 held-out levels of offline/demos/test.rho100, greedy decode.
+Expert threshold is exactly 10 steps: (1.0 - 0.5) / 0.05, undiscounted.
+
+=== 1. the threshold, and its drift with absolute distance ===
+  seed    theta at d_poor=0  drift per step  crossing
+  s1                  10.41           0.120     11.10
+  s2                  10.40           0.088     10.88
+  s3                  10.61           0.059     10.91
+  A threshold that depends only on the gap would have zero drift.
+
+=== 2. how wide the threshold is, and what the drift accounts for ===
+  seed     pooled  within cell   drift  drift share
+  s1         5.87         5.43    0.92         2.5%
+  s2         4.37         4.05    0.68         2.4%
+  s3         4.94         4.66    0.58         1.4%
+  Steps. 'within cell' is the spread left once both distances are held fixed.
+
+=== 3. is the within-cell residual a property of the level or of the network? ===
+  37,562 levels decoded by every seed, in 466 cells (n >= 40)
+    corr(residual s1, residual s2) = +0.2970
+    corr(residual s1, residual s3) = +0.3463
+    corr(residual s2, residual s3) = +0.2563
+    within-cell shuffle null: mean -0.0004, sd 0.0092
+  Independently trained networks depart from the cell majority on the same levels.
+
+=== 4. what hand-built level features explain of that residual ===
+  seed    geometry  route shape    both   random
+  s1        0.0103       0.0068  0.0158   0.0018
+  s2        0.0065       0.0026  0.0086   0.0020
+  s3        0.0061       0.0054  0.0102   0.0015
+  21 features against a same-sized random control. The shared component in (3)
+  is an order of magnitude larger than anything these explain.

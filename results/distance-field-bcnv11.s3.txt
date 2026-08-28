@@ -1,0 +1,38 @@
+script distance_field_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/bcnv11.s3
+
+256 train / 512 test episodes; DRC reference: partial ~0.70, hard R2 ~0.25, MAE ~3.5
+
+== distance-to-agent ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)    0.002     -0.022   -0.563    [-0.61,-0.52]   6.81  -0.003
+  trained depth 1 (l2 clipped)    0.004     -0.024   -0.563    [-0.61,-0.52]   6.80  -0.003
+  trained depth 2           0.113      0.127   -0.410    [-0.46,-0.36]   5.89   0.188
+  trained depth 3           0.138      0.159   -0.391    [-0.45,-0.34]   5.85   0.199
+  trained depth 4           0.152      0.161   -0.364    [-0.42,-0.32]   5.88   0.192
+  trained all               0.220      0.240   -0.296    [-0.36,-0.24]   5.47   0.274
+  untrained all (l2 clipped)   -0.011     -0.020   -0.562    [-0.61,-0.52]   6.81  -0.005
+  observation (l2 clipped)    0.009      0.012   -0.561    [-0.61,-0.52]   6.79  -0.000
+
+== d->rich (colour0) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)   -0.028     -0.038   -0.540    [-0.59,-0.49]   6.88  -0.001
+  trained depth 1 (l2 clipped)   -0.019     -0.040   -0.541    [-0.59,-0.49]   6.88  -0.001
+  trained depth 2           0.140      0.155   -0.324    [-0.39,-0.27]   5.87   0.213
+  trained depth 3           0.317      0.367   -0.185    [-0.24,-0.13]   5.27   0.324
+  trained depth 4           0.318      0.352   -0.181    [-0.24,-0.13]   5.27   0.326
+  trained all               0.369      0.406   -0.127    [-0.18,-0.07]   5.08   0.365
+  untrained all (l2 clipped)   -0.000     -0.004   -0.543    [-0.59,-0.49]   6.88  -0.002
+  observation (l2 clipped)   -0.013     -0.000   -0.543    [-0.60,-0.50]   6.89  -0.003
+
+== d->poor (colour1) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)    0.020      0.004   -0.685    [-0.76,-0.63]   6.91   0.003
+  trained depth 1 (l2 clipped)    0.019      0.004   -0.684    [-0.76,-0.63]   6.90   0.004
+  trained depth 2           0.114      0.127   -0.547    [-0.63,-0.48]   6.22   0.141
+  trained depth 3           0.155      0.186   -0.518    [-0.60,-0.45]   6.16   0.149
+  trained depth 4           0.159      0.183   -0.518    [-0.60,-0.45]   6.16   0.151
+  trained all               0.181      0.207   -0.464    [-0.55,-0.40]   5.89   0.198
+  untrained all (l2 clipped)    0.006     -0.001   -0.686    [-0.76,-0.63]   6.92  -0.001
+  observation (l2 clipped)    0.012      0.008   -0.689    [-0.76,-0.63]   6.93  -0.000

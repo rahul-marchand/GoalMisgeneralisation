@@ -1,0 +1,104 @@
+script probe_bc_distance.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/bcnv11.s3
+
+probe-train  20,000 of 20,000 levels of /workspace/data/offline/demos/train.rho100
+eval         50,000 valid, 48,963 scored, of /workspace/data/offline/demos/test.rho100
+take rate    0.814
+
+=== trained: probing gap ===
+  site                          layer 0                  layer 1                  layer 2                  layer 3                  layer 4                      all
+  sep                r2 -0.000 sd 11.58       r2 -0.003 sd 11.60       r2 +0.090 sd 11.05       r2 +0.232 sd 10.14       r2 +0.434 sd  8.71       r2 +0.488 sd  8.28
+  agent              r2 -0.002 sd 11.59       r2 +0.100 sd 10.98       r2 +0.222 sd 10.21       r2 +0.264 sd  9.93       r2 +0.357 sd  9.28       r2 +0.436 sd  8.70
+  objectives         r2 -0.001 sd 11.59       r2 +0.087 sd 11.06       r2 +0.328 sd  9.49       r2 +0.351 sd  9.33       r2 +0.343 sd  9.38       r2 +0.409 sd  8.90
+  cells_mean         r2 +0.079 sd 11.11       r2 -0.004 sd 11.60       r2 +0.167 sd 10.57       r2 +0.169 sd 10.56       r2 +0.243 sd 10.07       r2 +0.380 sd  9.12
+
+=== trained: probing d_rich ===
+  site                          layer 0                  layer 1                  layer 2                  layer 3                  layer 4                      all
+  sep                r2 -0.000 sd  8.20       r2 +0.002 sd  8.20       r2 +0.138 sd  7.62       r2 +0.325 sd  6.74       r2 +0.558 sd  5.45       r2 +0.620 sd  5.06
+  agent              r2 +0.001 sd  8.20       r2 +0.084 sd  7.85       r2 +0.291 sd  6.91       r2 +0.366 sd  6.54       r2 +0.485 sd  5.89       r2 +0.558 sd  5.46
+  objectives         r2 +0.001 sd  8.20       r2 +0.046 sd  8.02       r2 +0.280 sd  6.96       r2 +0.332 sd  6.71       r2 +0.340 sd  6.67       r2 +0.425 sd  6.22
+  cells_mean         r2 +0.089 sd  7.83       r2 +0.003 sd  8.19       r2 +0.262 sd  7.05       r2 +0.273 sd  6.99       r2 +0.370 sd  6.51       r2 +0.468 sd  5.99
+
+=== trained: probing d_poor ===
+  site                          layer 0                  layer 1                  layer 2                  layer 3                  layer 4                      all
+  sep                r2 -0.000 sd  8.22       r2 +0.006 sd  8.19       r2 +0.112 sd  7.74       r2 +0.191 sd  7.39       r2 +0.279 sd  6.98       r2 +0.361 sd  6.57
+  agent              r2 +0.001 sd  8.21       r2 +0.115 sd  7.73       r2 +0.163 sd  7.51       r2 +0.182 sd  7.43       r2 +0.262 sd  7.06       r2 +0.345 sd  6.65
+  objectives         r2 +0.003 sd  8.20       r2 +0.084 sd  7.86       r2 +0.282 sd  6.96       r2 +0.297 sd  6.89       r2 +0.299 sd  6.88       r2 +0.374 sd  6.50
+  cells_mean         r2 +0.082 sd  7.87       r2 +0.008 sd  8.18       r2 +0.081 sd  7.88       r2 +0.108 sd  7.76       r2 +0.189 sd  7.40       r2 +0.339 sd  6.68
+
+=== trained: does the probed gap predict choice within a (d_rich, d_poor) cell? ===
+  Target is constant inside a cell, so this is the probe residual against the model's choice.
+  Yardstick: 21 hand-built level features reach r2 ~ 0.01 (utility-rule-bcnv11.txt part 4).
+  sep          layer 0  auc 0.500  r2 0.0000  cells 475  levels 38,346
+  sep          layer 1  auc 0.502  r2 0.0000  cells 475  levels 38,346
+  sep          layer 2  auc 0.520  r2 0.0002  cells 475  levels 38,346
+  sep          layer 3  auc 0.535  r2 0.0004  cells 475  levels 38,346
+  sep          layer 4  auc 0.616  r2 0.0055  cells 475  levels 38,346
+  sep          all      auc 0.609  r2 0.0054  cells 475  levels 38,346
+  agent        layer 0  auc 0.506  r2 0.0000  cells 475  levels 38,346
+  agent        layer 1  auc 0.525  r2 0.0003  cells 475  levels 38,346
+  agent        layer 2  auc 0.539  r2 0.0007  cells 475  levels 38,346
+  agent        layer 3  auc 0.539  r2 0.0008  cells 475  levels 38,346
+  agent        layer 4  auc 0.576  r2 0.0027  cells 475  levels 38,346
+  agent        all      auc 0.586  r2 0.0035  cells 475  levels 38,346
+  objectives   layer 0  auc 0.536  r2 0.0006  cells 475  levels 38,346
+  objectives   layer 1  auc 0.516  r2 0.0002  cells 475  levels 38,346
+  objectives   layer 2  auc 0.548  r2 0.0013  cells 475  levels 38,346
+  objectives   layer 3  auc 0.556  r2 0.0016  cells 475  levels 38,346
+  objectives   layer 4  auc 0.561  r2 0.0016  cells 475  levels 38,346
+  objectives   all      auc 0.573  r2 0.0025  cells 475  levels 38,346
+  cells_mean   layer 0  auc 0.507  r2 0.0000  cells 475  levels 38,346
+  cells_mean   layer 1  auc 0.517  r2 0.0002  cells 475  levels 38,346
+  cells_mean   layer 2  auc 0.531  r2 0.0004  cells 475  levels 38,346
+  cells_mean   layer 3  auc 0.528  r2 0.0003  cells 475  levels 38,346
+  cells_mean   layer 4  auc 0.549  r2 0.0010  cells 475  levels 38,346
+  cells_mean   all      auc 0.563  r2 0.0020  cells 475  levels 38,346
+
+=== untrained network: probing gap ===
+  site                          layer 0                  layer 1                  layer 2                  layer 3                  layer 4                      all
+  sep                r2 -0.000 sd 11.58       r2 -0.002 sd 11.59       r2 -0.003 sd 11.60       r2 -0.003 sd 11.60       r2 -0.003 sd 11.60       r2 -0.004 sd 11.60
+  agent              r2 -0.002 sd 11.59       r2 -0.003 sd 11.60       r2 -0.004 sd 11.60       r2 -0.006 sd 11.62       r2 -0.004 sd 11.60       r2 -0.006 sd 11.61
+  objectives         r2 -0.001 sd 11.59       r2 -0.003 sd 11.59       r2 -0.003 sd 11.60       r2 -0.005 sd 11.61       r2 -0.005 sd 11.61       r2 -0.001 sd 11.59
+  cells_mean         r2 +0.100 sd 10.98       r2 -0.002 sd 11.59       r2 -0.005 sd 11.61       r2 -0.002 sd 11.59       r2 -0.002 sd 11.59       r2 +0.087 sd 11.07
+
+=== untrained network (same routes): does the probed gap predict choice within a (d_rich, d_poor) cell? ===
+  Target is constant inside a cell, so this is the probe residual against the model's choice.
+  Yardstick: 21 hand-built level features reach r2 ~ 0.01 (utility-rule-bcnv11.txt part 4).
+  sep          layer 0  auc 0.500  r2 0.0000  cells 475  levels 38,346
+  sep          layer 1  auc 0.485  r2 0.0001  cells 475  levels 38,346
+  sep          layer 2  auc 0.486  r2 0.0001  cells 475  levels 38,346
+  sep          layer 3  auc 0.490  r2 0.0000  cells 475  levels 38,346
+  sep          layer 4  auc 0.489  r2 0.0000  cells 475  levels 38,346
+  sep          all      auc 0.495  r2 0.0000  cells 475  levels 38,346
+  agent        layer 0  auc 0.506  r2 0.0000  cells 475  levels 38,346
+  agent        layer 1  auc 0.496  r2 0.0000  cells 475  levels 38,346
+  agent        layer 2  auc 0.494  r2 0.0000  cells 475  levels 38,346
+  agent        layer 3  auc 0.503  r2 0.0000  cells 475  levels 38,346
+  agent        layer 4  auc 0.501  r2 0.0000  cells 475  levels 38,346
+  agent        all      auc 0.502  r2 0.0000  cells 475  levels 38,346
+  objectives   layer 0  auc 0.536  r2 0.0006  cells 475  levels 38,346
+  objectives   layer 1  auc 0.522  r2 0.0003  cells 475  levels 38,346
+  objectives   layer 2  auc 0.519  r2 0.0002  cells 475  levels 38,346
+  objectives   layer 3  auc 0.517  r2 0.0001  cells 475  levels 38,346
+  objectives   layer 4  auc 0.520  r2 0.0002  cells 475  levels 38,346
+  objectives   all      auc 0.517  r2 0.0001  cells 475  levels 38,346
+  cells_mean   layer 0  auc 0.502  r2 0.0000  cells 475  levels 38,346
+  cells_mean   layer 1  auc 0.488  r2 0.0000  cells 475  levels 38,346
+  cells_mean   layer 2  auc 0.496  r2 0.0000  cells 475  levels 38,346
+  cells_mean   layer 3  auc 0.488  r2 0.0000  cells 475  levels 38,346
+  cells_mean   layer 4  auc 0.490  r2 0.0000  cells 475  levels 38,346
+  cells_mean   all      auc 0.508  r2 0.0000  cells 475  levels 38,346
+
+=== observation baseline: a linear readout of the raw maze ===
+  gap: r2 -0.010  mae 9.08  resid sd 11.64  l2 100
+  within-cell: auc 0.514  r2 0.0001  cells 475  levels 38,346
+  A linear map cannot run BFS; this bounds what maze appearance alone buys.
+
+=== split-half reliability at sep / all ===
+  half probe: gap r2 +0.476  mae 6.35  resid sd 8.38  l2 1; within-cell auc 0.601  r2 0.0047  cells 475  levels 38,346
+  half probe: gap r2 +0.480  mae 6.32  resid sd 8.35  l2 10; within-cell auc 0.613  r2 0.0056  cells 475  levels 38,346
+  within-cell corr(residual A, residual B)  +0.872   (probe signal against probe noise)
+  disattenuated choice correlation          +0.077   (what a noiseless probe would see)
+  Squared, the disattenuated value is the share of within-cell choice variance the model's
+  own gap estimate accounts for. Near the cross-seed xi ceiling, the misread is all of xi.

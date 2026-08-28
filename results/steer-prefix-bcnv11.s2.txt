@@ -1,0 +1,41 @@
+script steer_flip_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/bcnv11.s2 --flip figures/data/h1/flip/bcnv11.s2.npz --positions prefix
+
+direction: true-gap probe at cells_mean depth 3, written at prefix;  eval r2 +0.115;  |unit dose| 0.028
+
+== 1. dose-response: does writing +d steps of gap shift the crossing by -d? ==
+  dose  -8.0: crossing  10.36   reached 98.6%
+  dose  -6.0: crossing  10.37   reached 98.6%
+  dose  -4.0: crossing  10.37   reached 98.6%
+  dose  -3.0: crossing  10.37   reached 98.6%
+  dose  -2.0: crossing  10.37   reached 98.6%
+  dose  -1.0: crossing  10.37   reached 98.6%
+  dose  +0.0: crossing  10.36   reached 98.6%
+  dose  +1.0: crossing  10.35   reached 98.6%
+  dose  +2.0: crossing  10.34   reached 98.6%
+  dose  +3.0: crossing  10.34   reached 98.6%
+  dose  +4.0: crossing  10.33   reached 98.6%
+  dose  +6.0: crossing  10.33   reached 98.6%
+  dose  +8.0: crossing  10.32   reached 98.6%
+  slope over |dose| <= 3: -0.006   (fully causal and calibrated would be -1)
+  norm-matched random direction:
+    dose  -8.0: crossing  10.32
+    dose  -4.0: crossing  10.33
+    dose  +4.0: crossing  10.36
+    dose  +8.0: crossing  10.36
+
+== 2. per-level flip doses: do they land where the behavioural flip points say? ==
+  28 of 5,366 band levels flip within the dose grid
+  violations mean 0.00 of 13
+  corr(d*, theta0 - flip) = +0.420     slope of d* on flip -1.129 (predicted -1)
+  corr(d*, theta0 - gap)  = +0.035
+
+== 3. clamp: remove the probe-visible residual, does the curve sharpen? ==
+                      within-cell var  curve width
+  base                         0.1047         3.91
+  clamped                      0.1049         3.92
+  shuffled control             0.1052         3.91
+  variance removed by clamping: -0.1%  (control -0.4%)
+  The removed share is xi that entered through this subspace; no sharpening is
+  ambiguous while the probe reads the gap at r2 ~ 0.3-0.5, sharpening is not.

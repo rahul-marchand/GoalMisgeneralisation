@@ -1,0 +1,33 @@
+script arm_threshold_shape.py
+commit dc8ec33
+argv   figures/data/h1/arms
+
+bcnv11.s1, o0 sweep. Every model decoded on the same 50,000 held-out
+levels of test.rho100, at the BASE values, so the exchange rates are comparable.
+
+base: theta 11.10  sigma_theta 5.87  ratio 0.529
+
+=== 13 arms ===
+   offset  expert   theta   sigma  sigma/theta  resid corr  cells
+    -0.45     1.0    2.15    4.79        2.226       0.172    162
+    -0.40     2.0    3.49    4.74        1.359       0.198    173
+    -0.30     4.0    5.18    4.81        0.928       0.261    185
+    -0.20     6.0    7.48    5.17        0.691       0.396    200
+    -0.10     8.0    9.03    5.92        0.656       0.490    216
+    -0.05     9.0   10.41    6.30        0.606       0.510    214
+    +0.00    10.0   10.91    6.36        0.583       0.565    215
+    +0.05    11.0   12.21    6.97        0.571       0.573    215
+    +0.10    12.0   15.23    8.25        0.542       0.460    212
+    +0.20    14.0   16.66    9.03        0.542       0.411    211
+    +0.30    16.0   18.72    9.97        0.532       0.379    213
+    +0.40    18.0   22.16   11.64        0.525       0.324    205
+    +0.45    19.0   23.36   12.61        0.540       0.328    214
+
+=== does the spread follow the threshold? ===
+  sigma = +2.82 +0.382 * theta      corr(theta, sigma) = +0.976
+  A threshold stored in steps predicts slope 0 (sigma flat); a ratio predicts growth.
+  A rescaled distance readout predicts slope ~ sigma_base/theta_base = 0.529 and intercept ~ 0.
+
+  residual signature vs base: +0.172 to +0.573 over 13 arms
+  (base-to-base is 1.0 by construction; seed-to-seed was +0.26..+0.35)
+

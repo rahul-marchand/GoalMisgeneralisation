@@ -1,0 +1,74 @@
+script distance_field_bc.py
+commit dc8ec33
+argv   /workspace/data/offline/runs/scaling/sc11.d512l16.s1 --probe-demos /workspace/data/offline/demos/scaling/train.rho100 --eval-demos /workspace/data/offline/demos/scaling/test.rho100
+
+256 train / 512 test episodes; DRC reference: partial ~0.70, hard R2 ~0.25, MAE ~3.5
+
+== distance-to-agent ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)   -0.023     -0.043   -0.561    [-0.61,-0.52]   7.05   0.001
+  trained depth 1 (l2 clipped)   -0.004     -0.018   -0.558    [-0.61,-0.52]   7.05   0.001
+  trained depth 2           0.252      0.263   -0.317    [-0.40,-0.26]   5.56   0.294
+  trained depth 3           0.264      0.280   -0.297    [-0.37,-0.24]   5.46   0.310
+  trained depth 4           0.287      0.312   -0.272    [-0.34,-0.21]   5.41   0.320
+  trained depth 5           0.352      0.395   -0.217    [-0.29,-0.16]   5.25   0.354
+  trained depth 6           0.384      0.435   -0.169    [-0.24,-0.11]   5.18   0.373
+  trained depth 7           0.404      0.450   -0.154    [-0.22,-0.09]   5.13   0.383
+  trained depth 8           0.392      0.438   -0.176    [-0.24,-0.11]   5.17   0.372
+  trained depth 9           0.389      0.442   -0.186    [-0.26,-0.12]   5.16   0.372
+  trained depth 10          0.401      0.454   -0.182    [-0.25,-0.12]   5.13   0.379
+  trained depth 11          0.414      0.472   -0.171    [-0.23,-0.10]   5.08   0.390
+  trained depth 12          0.435      0.498   -0.138    [-0.20,-0.08]   5.01   0.406
+  trained depth 13          0.442      0.509   -0.120    [-0.18,-0.06]   5.00   0.411
+  trained depth 14          0.458      0.525   -0.104    [-0.17,-0.04]   4.93   0.422
+  trained depth 15          0.479      0.550   -0.077    [-0.15,-0.02]   4.86   0.437
+  trained depth 16          0.488      0.559   -0.063    [-0.13,-0.00]   4.83   0.443
+  trained all               0.505      0.575   -0.036    [-0.09,+0.02]   4.83   0.449
+  untrained all (l2 clipped)   -0.020     -0.027   -0.575    [-0.63,-0.54]   7.07  -0.008
+  observation (l2 clipped)    0.012      0.012   -0.564    [-0.61,-0.53]   7.06   0.000
+
+== d->rich (colour0) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0 (l2 clipped)   -0.061     -0.091   -0.579    [-0.63,-0.52]   7.03  -0.004
+  trained depth 1 (l2 clipped)   -0.056     -0.085   -0.579    [-0.63,-0.52]   7.03  -0.005
+  trained depth 2           0.087      0.115   -0.461    [-0.54,-0.38]   6.27   0.135
+  trained depth 3           0.229      0.263   -0.320    [-0.39,-0.26]   5.31   0.316
+  trained depth 4           0.306      0.346   -0.266    [-0.33,-0.20]   5.07   0.364
+  trained depth 5           0.406      0.467   -0.180    [-0.24,-0.13]   4.84   0.416
+  trained depth 6           0.486      0.544   -0.085    [-0.14,-0.04]   4.61   0.468
+  trained depth 7           0.601      0.642    0.074    [+0.03,+0.12]   4.20   0.558
+  trained depth 8           0.653      0.677    0.175    [+0.13,+0.21]   4.03   0.601
+  trained depth 9           0.707      0.719    0.254    [+0.22,+0.29]   3.72   0.653
+  trained depth 10          0.750      0.760    0.338    [+0.31,+0.37]   3.44   0.696
+  trained depth 11          0.786      0.800    0.418    [+0.39,+0.44]   3.15   0.734
+  trained depth 12          0.812      0.826    0.480    [+0.46,+0.50]   2.88   0.762
+  trained depth 13          0.834      0.848    0.546    [+0.52,+0.57]   2.59   0.787
+  trained depth 14          0.847      0.863    0.604    [+0.58,+0.63]   2.55   0.801
+  trained depth 15          0.853      0.870    0.622    [+0.59,+0.65]   2.48   0.809
+  trained depth 16          0.856      0.874    0.631    [+0.60,+0.66]   2.47   0.812
+  trained all               0.863      0.878    0.642    [+0.62,+0.67]   2.39   0.820
+  untrained all (l2 clipped)   -0.053     -0.070   -0.619    [-0.68,-0.55]   7.13  -0.043
+  observation (l2 clipped)   -0.000     -0.013   -0.582    [-0.63,-0.53]   7.03  -0.002
+
+== d->poor (colour1) ==
+  arm                     partial  within-ep  hard R2               CI    MAE  pooled
+  trained depth 0           0.038      0.047   -0.559    [-0.61,-0.50]   7.01  -0.002
+  trained depth 1 (l2 clipped)    0.065      0.107   -0.558    [-0.61,-0.50]   7.01  -0.002
+  trained depth 2           0.109      0.143   -0.374    [-0.43,-0.30]   6.21   0.165
+  trained depth 3           0.143      0.163   -0.352    [-0.41,-0.28]   6.15   0.183
+  trained depth 4           0.170      0.217   -0.276    [-0.34,-0.20]   5.85   0.243
+  trained depth 5           0.259      0.345   -0.198    [-0.26,-0.13]   5.59   0.300
+  trained depth 6           0.312      0.407   -0.171    [-0.24,-0.10]   5.48   0.326
+  trained depth 7           0.339      0.446   -0.144    [-0.21,-0.07]   5.38   0.347
+  trained depth 8           0.322      0.438   -0.146    [-0.21,-0.07]   5.47   0.338
+  trained depth 9           0.332      0.451   -0.141    [-0.21,-0.07]   5.41   0.347
+  trained depth 10          0.338      0.454   -0.148    [-0.22,-0.07]   5.38   0.349
+  trained depth 11          0.364      0.485   -0.123    [-0.18,-0.05]   5.26   0.371
+  trained depth 12          0.389      0.512   -0.098    [-0.16,-0.03]   5.17   0.388
+  trained depth 13          0.416      0.536   -0.077    [-0.13,-0.01]   5.06   0.408
+  trained depth 14          0.448      0.584   -0.050    [-0.10,+0.03]   4.94   0.431
+  trained depth 15          0.464      0.601   -0.050    [-0.11,+0.03]   4.87   0.441
+  trained depth 16          0.459      0.595   -0.054    [-0.11,+0.03]   4.87   0.438
+  trained all               0.464      0.592   -0.036    [-0.09,+0.05]   4.86   0.446
+  untrained all (l2 clipped)   -0.015      0.028   -0.612    [-0.67,-0.54]   7.07  -0.027
+  observation               0.005     -0.001   -0.559    [-0.61,-0.50]   7.01  -0.002

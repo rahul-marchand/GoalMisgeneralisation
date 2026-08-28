@@ -221,3 +221,29 @@ def test_the_distance_gap_matches_the_solver():
         assert targets.distance_gap(rollout) == pytest.approx(abs(distances[0] - distances[1]))
         checked += 1
     assert checked > 30
+
+
+AGENT = targets.DistanceToAgent()
+
+
+def test_distance_to_agent_matches_the_plain_bfs_field():
+    for rollout in make_rollouts(30):
+        source = geometry.agent_cell(rollout.observation)
+        expected = geometry.bfs_field(~geometry.free_cells(rollout.observation), source)
+        expected[expected == 0] = np.nan  # the agent's own cell, dropped by both
+
+        actual = AGENT.labels(rollout)
+        np.testing.assert_array_equal(np.isfinite(actual), np.isfinite(expected))
+        np.testing.assert_array_equal(actual[np.isfinite(actual)], expected[np.isfinite(expected)])
+        # Objectives are passable: their cells carry finite labels.
+        for feature_id in range(2):
+            assert np.isfinite(actual[geometry.objective_cell(rollout.observation, feature_id)])
+
+
+def test_distance_to_agent_confound_lower_bounds_its_labels():
+    for rollout in make_rollouts(20, seed=3):
+        labels = AGENT.labels(rollout)
+        confound = AGENT.confound(rollout)
+        finite = np.isfinite(labels)
+        assert np.all(confound[..., 0][finite] <= labels[finite] + 1e-9)
+        assert np.isnan(labels[geometry.agent_cell(rollout.observation)])

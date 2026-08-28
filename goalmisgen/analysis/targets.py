@@ -143,6 +143,39 @@ class DistanceToObjective:
         return np.stack([geometry.manhattan_field(shape, source), geometry.chebyshev_field(shape, source)], axis=-1)
 
 
+@dataclasses.dataclass(frozen=True)
+class DistanceToAgent:
+    """Shortest-path distance from each cell to the agent's start.
+
+    The field a planner would build outward from itself, source-keyed by the
+    agent rather than an objective. Objectives are passable here, matching
+    ``CellRollout.distance``: the question is what the representation holds, not
+    what the episode rules allow.
+
+    The null is the same free-space geometry as :class:`DistanceToObjective`;
+    the agent's own cell is dropped for the same reason as the objective's -
+    it is an input channel, so every arm scores it and none learns anything.
+    """
+
+    name: str = "distance-to-agent"
+    n_features: int = 2
+    confound_names: tuple[str, ...] = ("manhattan", "chebyshev")
+
+    def labels(self, rollout) -> np.ndarray:
+        observation = rollout.observation
+        geometry.check_layout(observation, self.n_features)
+        source = geometry.agent_cell(observation)
+        field = geometry.bfs_field(~geometry.free_cells(observation), source)
+        field[~geometry.free_cells(observation)] = np.nan
+        field[field == 0] = np.nan
+        return field
+
+    def confound(self, rollout) -> np.ndarray:
+        shape = rollout.observation.shape[:2]
+        source = geometry.agent_cell(rollout.observation)
+        return np.stack([geometry.manhattan_field(shape, source), geometry.chebyshev_field(shape, source)], axis=-1)
+
+
 def controls(target: CellTarget, rollouts: Sequence, seed: int = 0) -> tuple[Feature, ...]:
     """The arms that decide whether any other number in the table is readable.
 

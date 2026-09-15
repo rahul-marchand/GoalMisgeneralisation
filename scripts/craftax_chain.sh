@@ -4,15 +4,17 @@
 # values, and the 027 axis analysis - the Craftax twin of
 # offline_value_axis_pod.sh, in one resumable chain.
 #
-#   bash scripts/craftax_chain.sh all            # everything below, in order
+#   bash scripts/craftax_chain.sh prep           # levels + demos (CPU), then one tmux per seed running `seed N`
+#   bash scripts/craftax_chain.sh seed N         # base cxnv15.sN, its arms, 027 on both sweeps
 #   bash scripts/craftax_chain.sh levels         # ore-field datasets: base values + one per arm value
 #   bash scripts/craftax_chain.sh demos          # train/valid/test at rho 1.0, valid at 0.5 and 0.0, arm demos
-#   bash scripts/craftax_chain.sh bases          # SEEDS hidden-value bases, one after another
+#   bash scripts/craftax_chain.sh base N         # one hidden-value base
 #   bash scripts/craftax_chain.sh arms BASE      # every arm of one base
 #   bash scripts/craftax_chain.sh analysis BASE  # 027 on both sweeps
 #
 # Every stage skips what is already on disk, so the chain can be re-run after
-# an interruption. The log ends with CRAFTAX_CHAIN_DONE or *_FAILED.
+# an interruption. A seed's log ends with CRAFTAX_SEED_DONE N or *_FAILED; the
+# prep log ends with CRAFTAX_PREP_DONE once the seed sessions are launched.
 # Everything lands under $DATA/craftax/ and $DATA/logs/craftax/.
 set -uo pipefail
 ulimit -n "$(ulimit -Hn)"
@@ -76,19 +78,16 @@ demos() {
     done
 }
 
-bases() {
-    local seed name
-    for seed in ${SEEDS}; do
-        name="cxnv15.s${seed}"
-        [ -f "${RUNS}/${name}/done.json" ] && { echo "done ${name}"; continue; }
-        echo "$(date -u +%FT%TZ) training ${name}"
-        ${UV} run python experiments/023_train_bc.py \
-            --demos "${DEMOS}/train.rho100" --hide-values \
-            --eval "rho100=${DEMOS}/valid.rho100" "rho050=${DEMOS}/valid.rho050" "rho000=${DEMOS}/valid.rho000" \
-            --out "${RUNS}/${name}" --seed "${seed}" --steps "${BASE_STEPS}" \
-            --note "Craftax stage 2 hidden-value base: the bcnv11 recipe on 15x15 ore fields executed by the Craftax engine (17-action head, routes end in DO), seed ${seed}." \
-            > "${LOGS}/${name}.log" 2>&1 || { echo "BASE_FAILED ${name}"; return 1; }
-    done
+base() {
+    local seed="$1" name="cxnv15.$1"
+    [ -f "${RUNS}/${name}/done.json" ] && { echo "done ${name}"; return 0; }
+    echo "$(date -u +%FT%TZ) training ${name}"
+    ${UV} run python experiments/023_train_bc.py \
+        --demos "${DEMOS}/train.rho100" --hide-values \
+        --eval "rho100=${DEMOS}/valid.rho100" "rho050=${DEMOS}/valid.rho050" "rho000=${DEMOS}/valid.rho000" \
+        --out "${RUNS}/${name}" --seed "${seed#s}" --steps "${BASE_STEPS}" \
+        --note "Craftax stage 2 hidden-value base: the bcnv11 recipe on 15x15 ore fields executed by the Craftax engine (17-action head, routes end in DO), seed ${seed}." \
+        > "${LOGS}/${name}.log" 2>&1 || { echo "BASE_FAILED ${name}"; return 1; }
 }
 
 arm() {  # arm BASE SWEEP OFFSET SEED
@@ -130,21 +129,31 @@ analysis() {
     done
 }
 
-all() {
-    levels || { echo "CRAFTAX_CHAIN_FAILED levels"; exit 1; }
-    demos || { echo "CRAFTAX_CHAIN_FAILED demos"; exit 1; }
-    bases || { echo "CRAFTAX_CHAIN_FAILED bases"; exit 1; }
-    for seed in ${SEEDS}; do arms "cxnv15.s${seed}"; done
-    for seed in ${SEEDS}; do analysis "cxnv15.s${seed}"; done
-    echo "CRAFTAX_CHAIN_DONE"
+seed() {
+    local n="$1"
+    base "s${n}" || { echo "CRAFTAX_SEED_FAILED ${n} base"; exit 1; }
+    arms "cxnv15.s${n}"
+    analysis "cxnv15.s${n}"
+    echo "CRAFTAX_SEED_DONE ${n}"
+}
+
+prep() {
+    levels || { echo "CRAFTAX_PREP_FAILED levels"; exit 1; }
+    demos || { echo "CRAFTAX_PREP_FAILED demos"; exit 1; }
+    for n in ${SEEDS}; do
+        tmux new-session -d -s "craftax-s${n}" "bash scripts/craftax_chain.sh seed ${n} > ${LOGS}/seed${n}.log 2>&1"
+        echo "launched craftax-s${n} -> ${LOGS}/seed${n}.log"
+    done
+    echo "CRAFTAX_PREP_DONE"
 }
 
 case "${1:-}" in
-    all) all ;;
+    prep) prep ;;
+    seed) seed "$2" ;;
     levels) levels ;;
     demos) demos ;;
-    bases) bases ;;
+    base) base "s$2" ;;
     arms) arms "$2" ;;
     analysis) analysis "$2" ;;
-    *) echo "usage: $0 all | levels | demos | bases | arms BASE | analysis BASE" >&2; exit 2 ;;
+    *) echo "usage: $0 prep | seed N | levels | demos | base N | arms BASE | analysis BASE" >&2; exit 2 ;;
 esac

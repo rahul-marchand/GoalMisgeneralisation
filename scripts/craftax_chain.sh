@@ -127,6 +127,11 @@ analysis() {
             > "${RESULTS}/value_axis.${base}.o${objective}.txt" 2> "${RESULTS}/value_axis.${base}.o${objective}.err" \
             || echo "027_FAILED ${base} o${objective}"
     done
+    # 028: cos(axis_0, axis_1) across the two sweeps, raw and disattenuated - the one-knob statistic.
+    ${UV} run python experiments/028_bc_value_or_gap.py "${RUNS}/${base}" --steps "${FT_STEPS}" \
+        --json "${RESULTS}/value_or_gap.${base}.json" \
+        > "${RESULTS}/value_or_gap.${base}.txt" 2> "${RESULTS}/value_or_gap.${base}.err" \
+        || echo "028_FAILED ${base}"
 }
 
 seed() {

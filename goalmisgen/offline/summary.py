@@ -200,9 +200,7 @@ def scalar_probe(
     truth = test_y[test_ok]
 
     episodes = np.arange(len(truth))
-    interval = metrics.bootstrap_episodes(
-        lambda rows: metrics.r2(truth[rows], prediction[rows]), episodes, seed=seed
-    )
+    interval = metrics.bootstrap_episodes(lambda rows: metrics.r2(truth[rows], prediction[rows]), episodes, seed=seed)
     slope, _ = metrics.affine_fit(truth, prediction)
     stratum = np.zeros(len(truth), dtype=np.int64) if confound is None else confound[test_ok].astype(np.int64)
     return ScalarResult(
@@ -238,20 +236,14 @@ def own_and_other(
         [
             index
             for index in range(len(reached))
-            if reached[index] in truths
-            and all(np.isfinite(truths[feature][index]) for feature in truths)
+            if reached[index] in truths and all(np.isfinite(truths[feature][index]) for feature in truths)
         ]
     )
     if not len(usable):
         raise ValueError("no episode has a finite distance to both objectives")
 
     own_error = np.array([abs(predictions[reached[i]][i] - truths[reached[i]][i]) for i in usable])
-    other_error = np.array(
-        [
-            abs(predictions[1 - reached[i]][i] - truths[1 - reached[i]][i])
-            for i in usable
-        ]
-    )
+    other_error = np.array([abs(predictions[1 - reached[i]][i] - truths[1 - reached[i]][i]) for i in usable])
     episodes = np.arange(len(usable))
     low, high = metrics.bootstrap_paired(
         lambda rows: float(other_error[rows].mean()),

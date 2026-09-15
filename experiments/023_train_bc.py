@@ -32,7 +32,8 @@ import numpy as np
 
 from goalmisgen import provenance
 from goalmisgen.offline.decode import evaluate
-from goalmisgen.offline.demos import DemoSet, shared_levels
+from goalmisgen.offline.demonstrations import load_demonstrations
+from goalmisgen.offline.demos import shared_levels
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
 from goalmisgen.offline.train import TrainConfig, load_run_config, train
 
@@ -92,11 +93,12 @@ def main() -> None:
         source = load_run_config(args.init_from.parent.parent)
         hide_values = bool(source["demos"].get("hide_values", False))
         model_config = ModelConfig.from_dict(source["model"])
-    demos = DemoSet.load(args.demos, hide_values=hide_values)
+    demos = load_demonstrations(args.demos, hide_values=hide_values)
     if args.init_from is None:
         model_config = ModelConfig(
             size=demos.size,
             n_channels=demos.n_channels,
+            n_actions=demos.n_actions,
             max_actions=demos.max_actions,
             d_model=args.d_model,
             n_layers=args.layers,
@@ -106,6 +108,8 @@ def main() -> None:
         raise SystemExit(
             f"{args.init_from} reads {model_config.n_channels} channels but {args.demos} gives {demos.n_channels}"
         )
+    elif model_config.n_actions != demos.n_actions:
+        raise SystemExit(f"{args.init_from} emits {model_config.n_actions} actions but {args.demos} uses {demos.n_actions}")
     train_config = TrainConfig(
         total_steps=args.steps,
         batch_size=args.batch_size,
@@ -125,7 +129,7 @@ def main() -> None:
         name, _, path = item.partition("=")
         if not path:
             raise SystemExit(f"--eval expects name=path, got {item!r}")
-        held_out[name] = DemoSet.load(path, hide_values=hide_values)
+        held_out[name] = load_demonstrations(path, hide_values=hide_values)
     for name, other in held_out.items():
         shared = shared_levels(demos, other)
         if shared:

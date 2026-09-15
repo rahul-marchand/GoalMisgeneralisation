@@ -26,8 +26,6 @@ null is guaranteed in advance.
 
 from __future__ import annotations
 
-import dataclasses
-
 import numpy as np
 
 from goalmisgen.analysis import geometry, plans
@@ -88,8 +86,7 @@ def typical_cell_norm(rollouts) -> float:
     embedding and a nudge at block 4.
     """
     norms = [
-        np.linalg.norm(rollout.features[geometry.free_cells(rollout.observation)], axis=-1).mean()
-        for rollout in rollouts
+        np.linalg.norm(rollout.features[geometry.free_cells(rollout.observation)], axis=-1).mean() for rollout in rollouts
     ]
     return float(np.mean(norms))
 
@@ -187,11 +184,7 @@ def erase_only(
         on_route = set(cells) | {start}
         if other is not None:
             on_route |= {(int(r), int(c)) for r, c in np.argwhere((other >= 0) & (other < plans.NEVER))}
-        free = [
-            (int(r), int(c))
-            for r, c in np.argwhere(geometry.free_cells(observation))
-            if (int(r), int(c)) not in on_route
-        ]
+        free = [(int(r), int(c)) for r, c in np.argwhere(geometry.free_cells(observation)) if (int(r), int(c)) not in on_route]
         if len(free) < len(cells):
             return None
         picked = np.random.default_rng(seed).choice(len(free), size=len(cells), replace=False)
@@ -285,6 +278,7 @@ def propagation(
     at block 2 does not survive to block 4, the experiment measured the depth
     budget rather than whether the plan is used.
     """
+
     def rate(grids: np.ndarray) -> float:
         hits, total = 0, 0
         for grid, edit in zip(grids, edits):
@@ -320,7 +314,7 @@ def swapped_values(demos: DemoSet) -> DemoSet:
     """
     if demos.values.shape[1] != 2:
         raise ValueError(f"swapping values is defined for two objectives, not {demos.values.shape[1]}")
-    return dataclasses.replace(demos, values=np.asarray(demos.values)[:, ::-1].copy())
+    return demos.with_values(np.asarray(demos.values)[:, ::-1])
 
 
 def swapped_features(demos: DemoSet) -> DemoSet:
@@ -337,7 +331,7 @@ def swapped_features(demos: DemoSet) -> DemoSet:
     asks "if the cue said so", which on a proxy-trained model is the
     misgeneralisation itself rather than a control for it.
     """
-    return dataclasses.replace(demos, feature_ids=np.asarray(demos.feature_ids)[:, ::-1].copy())
+    return demos.with_feature_ids(np.asarray(demos.feature_ids)[:, ::-1])
 
 
 def patch_edit(

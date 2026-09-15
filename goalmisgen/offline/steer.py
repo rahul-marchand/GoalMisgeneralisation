@@ -135,7 +135,12 @@ def steered_decode(
     for start in range(0, len(observations), batch_size):
         stop = start + batch_size
         a, n, f = _steered_decode_chunk(
-            cfg, depth, tree, jnp.asarray(observations[start:stop]), positions, jnp.asarray(delta[start:stop], dtype=jnp.float32)
+            cfg,
+            depth,
+            tree,
+            jnp.asarray(observations[start:stop]),
+            positions,
+            jnp.asarray(delta[start:stop], dtype=jnp.float32),
         )
         actions.append(np.asarray(a, dtype=np.int32))
         lengths.append(np.asarray(n, dtype=np.int32))

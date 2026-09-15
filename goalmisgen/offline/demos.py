@@ -27,12 +27,12 @@ from typing import Sequence
 
 import numpy as np
 
-from goalmisgen.envs.dataset import LevelDataset, source_fingerprint
 from goalmisgen.envs.colour_keyed import ColourKeyedFeatures
+from goalmisgen.envs.dataset import LevelDataset, source_fingerprint
 from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.level import Level
 from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
-from goalmisgen.envs.solver import MOVES, path_to_objective, solve
+from goalmisgen.envs.solver import MOVES, UNREACHABLE, path_to_objective, solve
 from goalmisgen.parallel import worker_pool
 
 ARRAY_FIELDS: tuple[str, ...] = (
@@ -140,6 +140,21 @@ class DemoSet:
         return self.actions.shape[1]
 
     @property
+    def n_actions(self) -> int:
+        """Size of the model's action vocabulary: the four moves."""
+        return len(MOVES)
+
+    @property
+    def move_actions(self) -> tuple[int, ...]:
+        """Model action id of each maze move, in :data:`~goalmisgen.envs.solver.MOVES` order.
+
+        The identity here; a task with a larger vocabulary maps the same four
+        moves elsewhere, and anything that reads move logits by maze direction
+        goes through this rather than assuming the two orders agree.
+        """
+        return tuple(range(len(MOVES)))
+
+    @property
     def rho(self) -> float:
         return float(self.meta["rho"])
 
@@ -211,6 +226,35 @@ class DemoSet:
         """The same demonstrations, observed without (or with) the value channel."""
         return dataclasses.replace(self, hide_values=hide)
 
+    def with_values(self, values: np.ndarray) -> "DemoSet":
+        """The same levels with other objective values - a counterfactual, not a re-demonstration.
+
+        The routes are left as they are, so they may now be the wrong expert for
+        the observation; the callers that build counterfactuals never train on
+        them, only decode and replay.
+        """
+        values = np.asarray(values)
+        if values.shape != self.values.shape:
+            raise ValueError(f"values must be shaped {self.values.shape}, got {values.shape}")
+        return dataclasses.replace(self, values=values.copy())
+
+    def with_feature_ids(self, feature_ids: np.ndarray) -> "DemoSet":
+        """The same levels with other colours; see :meth:`with_values`."""
+        feature_ids = np.asarray(feature_ids)
+        if feature_ids.shape != self.feature_ids.shape:
+            raise ValueError(f"feature_ids must be shaped {self.feature_ids.shape}, got {feature_ids.shape}")
+        return dataclasses.replace(self, feature_ids=feature_ids.copy())
+
+    def replay(self, index: int, actions: Sequence[int], emitted_eos: bool = True) -> dict:
+        """Execute a route on level ``index`` under the maze's rules; see :func:`replay`."""
+        return replay(
+            self.level(index),
+            actions,
+            float(self.meta["step_penalty"]),
+            int(self.meta["step_limit"]),
+            emitted_eos,
+        )
+
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
@@ -281,6 +325,76 @@ class DemoSet:
             "n": int(len(indices)),
         }
         return cls(**arrays, size=int(dataset.max_size), meta=meta)
+
+
+def replay(level: Level, actions: Sequence[int], step_penalty: float, step_limit: int, emitted_eos: bool = True) -> dict:
+    """Walk ``actions`` on ``level`` under ``MazeEnv``'s rules; return its info.
+
+    Returns the union of the environment's level info and outcome info, plus
+    ``illegal_moves`` (moves into walls), ``emitted_eos``, and the ``visited``
+    / ``visit_step`` grids the plan probe labels are built from.
+    """
+    solution = solve(level, step_penalty, step_limit=step_limit)
+    height, width = level.shape
+    visited = np.zeros((height, width), dtype=bool)
+    visit_step = np.full((height, width), -1, dtype=np.int16)
+
+    position = level.agent_start
+    visited[position] = True
+    visit_step[position] = 0
+    goal = {objective.position: index for index, objective in enumerate(level.objectives)}
+
+    reached = None
+    steps = 0
+    illegal = 0
+    for action in actions:
+        if action == NO_ACTION:
+            break
+        d_row, d_col = MOVES[int(action)]
+        candidate = (position[0] + d_row, position[1] + d_col)
+        inside = 0 <= candidate[0] < height and 0 <= candidate[1] < width
+        if inside and not level.is_wall(candidate):
+            position = candidate
+        else:
+            illegal += 1
+        steps += 1
+        if not visited[position]:
+            visited[position] = True
+            visit_step[position] = steps
+        reached = goal.get(position)
+        if reached is not None or steps >= step_limit:
+            break
+
+    optimal = solution.optimal_index
+    info: dict = {
+        "optimal_index": optimal,
+        "optimal_feature_id": level.objectives[optimal].feature_id,
+        "optimal_value": level.objectives[optimal].value,
+        "optimal_distance": solution.distances[optimal],
+        "utility_margin": solution.utility_margin,
+        "is_ambiguous": solution.is_ambiguous,
+        "level_size": height,
+    }
+    for index, objective in enumerate(level.objectives):
+        distance = solution.distances[index]
+        info[f"feature_{objective.feature_id}_value"] = objective.value
+        info[f"feature_{objective.feature_id}_distance"] = UNREACHABLE if distance is None else distance
+
+    walked = -step_penalty * steps
+    if reached is None:
+        info.update(reached_objective=False, episode_steps=steps, episode_return=walked)
+    else:
+        info.update(
+            reached_objective=True,
+            reached_index=reached,
+            reached_feature_id=level.objectives[reached].feature_id,
+            reached_value=level.objectives[reached].value,
+            chose_optimal=reached in solution.optimal_indices,
+            episode_steps=steps,
+            episode_return=walked + level.objectives[reached].value,
+        )
+    info.update(illegal_moves=illegal, emitted_eos=bool(emitted_eos), visited=visited, visit_step=visit_step)
+    return info
 
 
 def expert_route(level: Level, step_penalty: float, step_limit: int) -> tuple[int, tuple[int, ...], object]:

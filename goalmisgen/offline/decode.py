@@ -16,16 +16,14 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from typing import Sequence
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 from goalmisgen.analysis.behaviour import BehaviourSummary, indifference_point, summarise, value_distance_decisions
-from goalmisgen.envs.level import Level
-from goalmisgen.envs.solver import MOVES, UNREACHABLE, solve
-from goalmisgen.offline.demos import NO_ACTION, DemoSet
+from goalmisgen.offline.demonstrations import Demonstrations
+from goalmisgen.offline.demos import NO_ACTION, replay  # noqa: F401 - replay is re-exported
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
 
 
@@ -133,82 +131,16 @@ def _next_token(config: ModelConfig, edit_depth: int = 0):
     return next_token
 
 
-def replay(level: Level, actions: Sequence[int], step_penalty: float, step_limit: int, emitted_eos: bool = True) -> dict:
-    """Walk ``actions`` on ``level`` under ``MazeEnv``'s rules; return its info.
+def replay_all(demos: Demonstrations, indices: np.ndarray, decoded: Decoded) -> list[dict]:
+    """Replay every decoded route on its level, under the task's own rules.
 
-    Returns the union of the environment's level info and outcome info, plus
-    ``illegal_moves`` (moves into walls), ``emitted_eos``, and the ``visited``
-    / ``visit_step`` grids the plan probe labels are built from.
+    The demonstration set knows how a route is executed - a maze route walks
+    :class:`MazeEnv`'s rules, a Craftax route steps the engine - so the
+    dispatch lives on it, and everything downstream of the outcome dict is
+    task-agnostic.
     """
-    solution = solve(level, step_penalty, step_limit=step_limit)
-    height, width = level.shape
-    visited = np.zeros((height, width), dtype=bool)
-    visit_step = np.full((height, width), -1, dtype=np.int16)
-
-    position = level.agent_start
-    visited[position] = True
-    visit_step[position] = 0
-    goal = {objective.position: index for index, objective in enumerate(level.objectives)}
-
-    reached = None
-    steps = 0
-    illegal = 0
-    for action in actions:
-        if action == NO_ACTION:
-            break
-        d_row, d_col = MOVES[int(action)]
-        candidate = (position[0] + d_row, position[1] + d_col)
-        inside = 0 <= candidate[0] < height and 0 <= candidate[1] < width
-        if inside and not level.is_wall(candidate):
-            position = candidate
-        else:
-            illegal += 1
-        steps += 1
-        if not visited[position]:
-            visited[position] = True
-            visit_step[position] = steps
-        reached = goal.get(position)
-        if reached is not None or steps >= step_limit:
-            break
-
-    optimal = solution.optimal_index
-    info: dict = {
-        "optimal_index": optimal,
-        "optimal_feature_id": level.objectives[optimal].feature_id,
-        "optimal_value": level.objectives[optimal].value,
-        "optimal_distance": solution.distances[optimal],
-        "utility_margin": solution.utility_margin,
-        "is_ambiguous": solution.is_ambiguous,
-        "level_size": height,
-    }
-    for index, objective in enumerate(level.objectives):
-        distance = solution.distances[index]
-        info[f"feature_{objective.feature_id}_value"] = objective.value
-        info[f"feature_{objective.feature_id}_distance"] = UNREACHABLE if distance is None else distance
-
-    walked = -step_penalty * steps
-    if reached is None:
-        info.update(reached_objective=False, episode_steps=steps, episode_return=walked)
-    else:
-        info.update(
-            reached_objective=True,
-            reached_index=reached,
-            reached_feature_id=level.objectives[reached].feature_id,
-            reached_value=level.objectives[reached].value,
-            chose_optimal=reached in solution.optimal_indices,
-            episode_steps=steps,
-            episode_return=walked + level.objectives[reached].value,
-        )
-    info.update(illegal_moves=illegal, emitted_eos=bool(emitted_eos), visited=visited, visit_step=visit_step)
-    return info
-
-
-def replay_all(demos: DemoSet, indices: np.ndarray, decoded: Decoded) -> list[dict]:
-    step_penalty = float(demos.meta["step_penalty"])
-    step_limit = int(demos.meta["step_limit"])
     return [
-        replay(demos.level(int(index)), decoded.actions[row], step_penalty, step_limit, bool(decoded.emitted_eos[row]))
-        for row, index in enumerate(indices)
+        demos.replay(int(index), decoded.actions[row], bool(decoded.emitted_eos[row])) for row, index in enumerate(indices)
     ]
 
 
@@ -260,7 +192,7 @@ class RouteSummary:
 
 
 def summarise_routes(
-    demos: DemoSet, indices: np.ndarray, decoded: Decoded, outcomes: list[dict], indifference: bool = True
+    demos: Demonstrations, indices: np.ndarray, decoded: Decoded, outcomes: list[dict], indifference: bool = True
 ) -> RouteSummary:
     """``indifference=False`` skips the exchange-rate fit and reports NaN for it.
 
@@ -286,7 +218,7 @@ def summarise_routes(
 def evaluate(
     model: RoutePrefixLM,
     params,
-    demos: DemoSet,
+    demos: Demonstrations,
     indices: np.ndarray,
     decoder=None,
     indifference: bool = True,

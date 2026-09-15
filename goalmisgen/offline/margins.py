@@ -70,9 +70,18 @@ def objective_fields(level: Level) -> np.ndarray:
     )
 
 
-def approach_sets(fields: np.ndarray, cell: tuple[int, int]) -> tuple[tuple[int, ...], ...]:
+def approach_sets(
+    fields: np.ndarray, cell: tuple[int, int], move_actions: tuple[int, ...] | None = None
+) -> tuple[tuple[int, ...], ...]:
     """Per objective, the moves from ``cell`` that strictly shorten its route
-    and do not shorten the other's. Empty tuples mark a degenerate cell."""
+    and do not shorten the other's. Empty tuples mark a degenerate cell.
+
+    Moves are returned as model action ids: ``move_actions`` maps each maze
+    direction (:data:`~goalmisgen.envs.solver.MOVES` order) to the id the
+    model's logits use, ``Demonstrations.move_actions``. The default is the
+    maze's own identity mapping.
+    """
+    move_actions = tuple(range(len(MOVES))) if move_actions is None else tuple(move_actions)
     height, width = fields.shape[1:]
     toward = []
     for k in range(len(fields)):
@@ -82,7 +91,7 @@ def approach_sets(fields: np.ndarray, cell: tuple[int, int]) -> tuple[tuple[int,
             r, c = cell[0] + dr, cell[1] + dc
             if 0 <= r < height and 0 <= c < width and here != UNREACHABLE:
                 if fields[k][r, c] != UNREACHABLE and fields[k][r, c] == here - 1:
-                    moves.append(action)
+                    moves.append(move_actions[action])
         toward.append(set(moves))
     return tuple(tuple(sorted(toward[k] - toward[1 - k])) for k in range(2))
 

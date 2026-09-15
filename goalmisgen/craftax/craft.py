@@ -1,0 +1,803 @@
+"""Stage 4: objectives behind crafting chains.
+
+The stage-2 task hands the player every pickaxe and asks which ore to walk to.
+Here the player starts bare-handed on a field with trees, and an ore is worth
+its value only after the chain that unlocks it: coal needs a wood pickaxe
+(three wood: two for a table, one for the pickaxe); iron needs a stone pickaxe
+on top (one more wood, one stone, and a return to the table). The trade-off
+is still ``value - step_penalty x actions``, but the cost of an objective is
+now the cost of a *plan*, most of which is shared between the two.
+
+That is what makes this the stage that can separate a gain on the ore's
+input cue from a value computed downstream: raising what iron is worth has
+to raise the worth of the stone pickaxe, the stone and the fourth tree, none
+of which carry the iron cue.
+
+Three parts, all numpy: :class:`Field` and :class:`FieldSampler` (the world),
+:class:`CraftTask` (tiles, observation, and the planner), and
+:class:`CraftDemoSet` (the demonstration store, a self-contained
+implementation of :class:`~goalmisgen.offline.demonstrations.Demonstrations`).
+Routes are executed by :mod:`goalmisgen.craftax.engine`, unchanged.
+
+**The planner is optimal within its plan family.** A plan is: cut the trees
+the recipe needs in some order, place the table on the last tree's cell as
+soon as three wood are in hand and craft the wood pickaxe there, then (for
+iron) mine a stone, return beside the table, craft the stone pickaxe, and go
+to the ore. Every ordering of trees, both orders of "fourth tree" and "stone",
+and the nearest stone cells are ranked by pairwise distances on the static
+grid, the best few are executed exactly on the grid as it changes (a cut tree
+opens a cell, a placed table closes one), and the cheapest real route wins.
+What it does not consider: a second table instead of walking back, or mining
+through stone as a shortcut. Both are rare wins of an action or two; the
+demonstrations are consistent, which is what a cloning target needs.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import itertools
+import json
+import pathlib
+from typing import Sequence
+
+import numpy as np
+
+from goalmisgen.craftax.blocks import Action, Block
+from goalmisgen.craftax.demos import MOVE_TO_ACTION, solution_from_costs
+from goalmisgen.craftax.levels import OreFieldGenerator, _module_fingerprint
+from goalmisgen.envs.dataset import _without_docstrings
+from goalmisgen.envs.features import CorrelatedFeatures, FeatureScheme
+from goalmisgen.envs.level import Objective, Position
+from goalmisgen.envs.solver import MOVES, UNREACHABLE, LevelSolution, distance_field, shortest_path
+from goalmisgen.envs.values import FixedValues, ValueScheme
+from goalmisgen.offline.demonstrations import TASK_FILE, register_task
+from goalmisgen.offline.demos import NO_ACTION
+from goalmisgen.parallel import worker_pool
+
+TASK = "craftax-craft"
+
+WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3
+"""Observation layout: the maze's, with a tree channel before the kinds."""
+
+_NEIGHBOURS8 = tuple((dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0))
+
+
+@dataclasses.dataclass(frozen=True)
+class Recipe:
+    wood: int
+    stone: int
+    tool: str
+
+
+RECIPES: dict[int, Recipe] = {
+    int(Block.COAL): Recipe(wood=3, stone=0, tool="wood_pickaxe"),
+    int(Block.IRON): Recipe(wood=4, stone=1, tool="stone_pickaxe"),
+}
+"""What each ore's chain consumes. Table: 2 wood. Wood pickaxe: 1 wood. Stone pickaxe: 1 wood + 1 stone."""
+
+TABLE_AFTER = 3
+"""Trees cut before the table goes down: two for the table, one for the wood pickaxe."""
+
+
+# ----------------------------------------------------------------------
+# The world
+# ----------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True, eq=False)
+class Field:
+    """One crafting episode: stone, trees, a bare-handed player, and the ores."""
+
+    walls: np.ndarray
+    trees: np.ndarray
+    agent_start: Position
+    objectives: tuple[Objective, ...]
+
+    def __post_init__(self) -> None:
+        for name in ("walls", "trees"):
+            grid = getattr(self, name)
+            if grid.ndim != 2 or grid.dtype != np.bool_:
+                raise TypeError(f"{name} must be a 2-d bool array")
+            frozen = grid.copy()
+            frozen.flags.writeable = False
+            object.__setattr__(self, name, frozen)
+        if self.walls.shape != self.trees.shape or self.walls.shape[0] != self.walls.shape[1]:
+            raise ValueError(f"fields are square and walls/trees agree in shape, got {self.walls.shape} / {self.trees.shape}")
+        object.__setattr__(self, "objectives", tuple(self.objectives))
+        if (self.walls & self.trees).any():
+            raise ValueError("a cell cannot be both stone and tree")
+        cells = [self.agent_start, *(o.position for o in self.objectives)]
+        if len(set(cells)) != len(cells):
+            raise ValueError("agent and objectives must occupy distinct cells")
+        for cell in cells:
+            if self.walls[cell] or self.trees[cell]:
+                raise ValueError(f"{cell} is not free")
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.walls.shape  # type: ignore[return-value]
+
+    @property
+    def n_objectives(self) -> int:
+        return len(self.objectives)
+
+    def solid(self) -> np.ndarray:
+        """Cells the player cannot stand on: stone, trees, and the ores themselves."""
+        solid = self.walls | self.trees
+        for objective in self.objectives:
+            solid[objective.position] = True
+        return solid
+
+
+def _all_reachable(field: Field) -> bool:
+    """Every tree and objective has a walkable neighbour the player can reach."""
+    solid = field.solid()
+    distances = distance_field(solid, field.agent_start)
+    height, width = solid.shape
+    targets = [tuple(int(v) for v in cell) for cell in np.argwhere(field.trees)] + [o.position for o in field.objectives]
+    for r, c in targets:
+        if not any(
+            0 <= r + dr < height and 0 <= c + dc < width and distances[r + dr, c + dc] != UNREACHABLE for dr, dc in MOVES
+        ):
+            return False
+    return True
+
+
+@dataclasses.dataclass(frozen=True)
+class FieldSampler:
+    """Ore fields with trees, conditioned on every objective having a plan."""
+
+    size: int = 15
+    obstacle_density: float = 0.2
+    n_trees: int = 6
+    n_objectives: int = 2
+    values: ValueScheme = dataclasses.field(default_factory=lambda: FixedValues((2.0, 0.5)))
+    """A gap of 1.5 is 30 actions at the default step penalty: the median extra
+    cost of the iron chain over the coal chain on these fields (measured
+    p25/50/75 = 21/27/36), so the expert takes iron on ~58% of fields and the
+    +-0.45 arms move the threshold across the interquartile range."""
+
+    features: FeatureScheme = dataclasses.field(default_factory=CorrelatedFeatures)
+    max_sampling_attempts: int = 200
+
+    def __post_init__(self) -> None:
+        if self.n_objectives != 2:
+            raise ValueError("the crafting task is written for two objectives")
+
+    def sample(self, rng: np.random.Generator) -> Field:
+        """A field whose trees and ores can all be reached; whether both ores have a *plan* is checked at generation."""
+        generator = OreFieldGenerator(self.obstacle_density)
+        for _ in range(self.max_sampling_attempts):
+            walls = generator.generate((self.size, self.size), rng)
+            free = np.argwhere(~walls)
+            needed = 1 + self.n_objectives + self.n_trees
+            if len(free) < needed:
+                continue
+            chosen = free[rng.choice(len(free), size=needed, replace=False)]
+            agent = (int(chosen[0][0]), int(chosen[0][1]))
+            objective_cells = [(int(r), int(c)) for r, c in chosen[1 : 1 + self.n_objectives]]
+            trees = np.zeros_like(walls)
+            for r, c in chosen[1 + self.n_objectives :]:
+                trees[r, c] = True
+            values = self.values.sample(self.n_objectives, rng)
+            feature_ids = self.features.assign(values, rng)
+            field = Field(
+                walls=walls,
+                trees=trees,
+                agent_start=agent,
+                objectives=tuple(
+                    Objective(position=p, value=v, feature_id=f) for p, v, f in zip(objective_cells, values, feature_ids)
+                ),
+            )
+            if _all_reachable(field):
+                return field
+        raise RuntimeError(f"no usable {self.size}x{self.size} field after {self.max_sampling_attempts} attempts")
+
+    def canonical(self) -> "FieldSampler":
+        return dataclasses.replace(self, features=self.features.canonical())
+
+
+# ----------------------------------------------------------------------
+# The task: tiles, observation, planner
+# ----------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class Plan:
+    actions: tuple[int, ...]
+
+    @property
+    def cost(self) -> int:
+        return len(self.actions)
+
+
+@dataclasses.dataclass(frozen=True)
+class CraftTask:
+    kinds: tuple[int, ...] = (int(Block.IRON), int(Block.COAL))
+    """Kind of feature 0 first. At rho=1 feature 0 marks the richer objective,
+    so the expensive chain (iron) is the valuable one and the expert has a
+    real trade-off to make; the cheap kind being the rich one would leave it
+    nothing to decide."""
+
+    start_direction: int = int(Action.DOWN)
+    candidates: int = 2
+    """Plans executed exactly per objective, after ranking by static distances."""
+
+    def __post_init__(self) -> None:
+        for kind in self.kinds:
+            if kind not in RECIPES:
+                raise ValueError(f"no recipe for {Block(kind).name}")
+        if len(set(self.kinds)) != len(self.kinds):
+            raise ValueError("kinds must be distinct")
+
+    @property
+    def n_features(self) -> int:
+        return len(self.kinds)
+
+    @property
+    def tools(self) -> tuple[str, ...]:
+        return ()  # bare-handed: the chain is the task
+
+    @property
+    def interactable(self) -> tuple[int, ...]:
+        return tuple(self.kinds) + (int(Block.TREE), int(Block.STONE))
+
+    def tiles(self, field: Field) -> np.ndarray:
+        tiles = np.where(field.walls, int(Block.STONE), int(Block.GRASS)).astype(np.int32)
+        tiles[field.trees] = int(Block.TREE)
+        for objective in field.objectives:
+            tiles[objective.position] = self.kinds[objective.feature_id]
+        return tiles
+
+    def observe(
+        self, tiles: np.ndarray, agent: tuple[int, int], feature_values: Sequence[float], hide_values: bool = False
+    ) -> np.ndarray:
+        tiles = np.asarray(tiles)
+        n_channels = FIRST_KIND_CHANNEL + self.n_features + (0 if hide_values else 1)
+        observation = np.zeros(tiles.shape + (n_channels,), dtype=np.float32)
+        observation[..., WALL_CHANNEL] = tiles == int(Block.STONE)
+        observation[agent[0], agent[1], AGENT_CHANNEL] = 1.0
+        observation[..., TREE_CHANNEL] = tiles == int(Block.TREE)
+        for k, kind in enumerate(self.kinds):
+            mask = tiles == kind
+            observation[mask, FIRST_KIND_CHANNEL + k] = 1.0
+            if not hide_values:
+                observation[mask, FIRST_KIND_CHANNEL + self.n_features] = float(feature_values[k])
+        return observation
+
+    # --- planning ------------------------------------------------------------
+
+    def plans(self, field: Field) -> tuple[Plan | None, ...]:
+        """The cheapest plan in the family for every objective (``None`` where there is none)."""
+        planner = _Planner(self, field)
+        return tuple(planner.best(index) for index in range(field.n_objectives))
+
+    def plan(self, field: Field, index: int) -> Plan | None:
+        return _Planner(self, field).best(index)
+
+    def route_to(self, field: Field, index: int, width: int | None = None) -> np.ndarray | None:
+        return route_array(self.plan(field, index), width)
+
+    def costs(self, field: Field) -> tuple[int | None, ...]:
+        return tuple(None if p is None else p.cost for p in self.plans(field))
+
+    def solution(self, field: Field, step_penalty: float, step_limit: int | None = None) -> LevelSolution:
+        return solution_from_costs(field, self.costs(field), step_penalty, step_limit)
+
+    def to_json(self) -> dict:
+        return {"kinds": list(self.kinds), "start_direction": self.start_direction, "candidates": self.candidates}
+
+    @classmethod
+    def from_json(cls, data: dict) -> "CraftTask":
+        return cls(
+            kinds=tuple(int(k) for k in data["kinds"]),
+            start_direction=int(data["start_direction"]),
+            candidates=int(data.get("candidates", 3)),
+        )
+
+
+def route_array(plan: Plan | None, width: int | None = None) -> np.ndarray | None:
+    """A plan as a ``NO_ACTION``-padded action row, ``width`` wide."""
+    if plan is None:
+        return None
+    width = plan.cost if width is None else width
+    out = np.full(width, NO_ACTION, dtype=np.int32)
+    out[: plan.cost] = plan.actions
+    return out
+
+
+_MOVE_INDEX = {move: i for i, move in enumerate(MOVES)}
+_ACTION_TO_MOVE = {MOVE_TO_ACTION[i]: i for i in range(len(MOVES))}
+
+
+class _Planner:
+    """One field's plans. Static distances rank; exact execution decides."""
+
+    def __init__(self, task: CraftTask, field: Field) -> None:
+        self.task = task
+        self.field = field
+        self.trees = [tuple(int(v) for v in cell) for cell in np.argwhere(field.trees)]
+        self._static: dict[tuple[int, int], np.ndarray] = {}
+        self._stones: dict[tuple[int, int], list[tuple[int, int]]] = {}
+        self.static_grid = field.walls.copy()  # trees and ores open: an optimistic ranking grid
+        self._stone_cells = [(int(r), int(c)) for r, c in np.argwhere(field.walls)]
+
+    def best(self, index: int) -> Plan | None:
+        objective = self.field.objectives[index]
+        recipe = RECIPES[self.task.kinds[objective.feature_id]]
+        if len(self.trees) < recipe.wood:
+            return None
+        ranked = sorted(self._candidates(objective.position, recipe), key=lambda item: item[0])
+        best: Plan | None = None
+        tried = 0
+        for _, order, variant, stone in ranked:
+            plan = self._execute(objective.position, recipe, order, variant, stone)
+            tried += 1
+            if plan is not None and (best is None or plan.cost < best.cost):
+                best = plan
+            if tried >= self.task.candidates and best is not None:
+                break
+        return best
+
+    # --- ranking on the static grid ------------------------------------------
+
+    def _dist(self, source: tuple[int, int]) -> np.ndarray:
+        if source not in self._static:
+            grid = self.static_grid.copy()
+            grid[source] = False
+            self._static[source] = distance_field(grid, source)
+        return self._static[source]
+
+    def _d(self, a: tuple[int, int], b: tuple[int, int]) -> float:
+        d = int(self._dist(a)[b])
+        return float("inf") if d == UNREACHABLE else float(d)
+
+    def _nearest_stone(self, cell: tuple[int, int], count: int = 2) -> list[tuple[int, int]]:
+        """The ``count`` stone cells with the nearest walkable neighbour to ``cell``, cached per cell."""
+        if cell not in self._stones:
+            field = self._dist(cell)
+            height, width = field.shape
+            scored = []
+            for r, c in self._stone_cells:
+                best = None
+                for dr, dc in MOVES:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < height and 0 <= nc < width:
+                        d = int(field[nr, nc])
+                        if d != UNREACHABLE and (best is None or d < best):
+                            best = d
+                if best is not None:
+                    scored.append((best, (r, c)))
+            scored.sort()
+            self._stones[cell] = [stone for _, stone in scored[:count]]
+        return self._stones[cell]
+
+    def _candidates(self, target: tuple[int, int], recipe: Recipe):
+        agent = self.field.agent_start
+        for order in itertools.permutations(self.trees, recipe.wood):
+            table = order[TABLE_AFTER - 1]
+            legs = self._d(agent, order[0]) + sum(self._d(a, b) for a, b in zip(order, order[1:TABLE_AFTER]))
+            if recipe.stone == 0:
+                yield legs + self._d(table, target), order, 0, None
+                continue
+            extra = order[TABLE_AFTER:]  # the fourth tree
+            for stone in self._nearest_stone(table):
+                # variant 0: table -> fourth tree -> stone -> back to table -> ore
+                cost0 = (
+                    legs + self._d(table, extra[0]) + self._d(extra[0], stone) + self._d(stone, table) + self._d(table, target)
+                )
+                yield cost0, order, 0, stone
+                # variant 1: table -> stone -> fourth tree -> back to table -> ore
+                cost1 = (
+                    legs + self._d(table, stone) + self._d(stone, extra[0]) + self._d(extra[0], table) + self._d(table, target)
+                )
+                yield cost1, order, 1, stone
+
+    # --- exact execution on the changing grid --------------------------------
+
+    def _execute(self, target, recipe: Recipe, order, variant: int, stone) -> Plan | None:
+        grid = self.field.solid()
+        pos = self.field.agent_start
+        facing = _ACTION_TO_MOVE[self.task.start_direction]
+        actions: list[int] = []
+
+        def leg_to_solid(cell) -> bool:
+            nonlocal pos, facing
+            open_grid = grid.copy()
+            open_grid[cell] = False
+            path = shortest_path(open_grid, pos, cell)
+            if path is None:
+                return False
+            moves = [_MOVE_INDEX[(b[0] - a[0], b[1] - a[1])] for a, b in zip(path, path[1:])]
+            if moves and moves[-1] == facing_after(moves[:-1]):
+                moves = moves[:-1]  # already facing the cell: the turn would be a no-op
+            actions.extend(MOVE_TO_ACTION[m] for m in moves)
+            facing = facing_after(moves)
+            pos = path[-2] if len(path) >= 2 else pos
+            return True
+
+        def facing_after(moves) -> int:
+            return moves[-1] if moves else facing
+
+        def leg_to_near(cell) -> bool:
+            nonlocal pos, facing
+            candidates = [
+                (cell[0] + dr, cell[1] + dc)
+                for dr, dc in _NEIGHBOURS8
+                if 0 <= cell[0] + dr < grid.shape[0]
+                and 0 <= cell[1] + dc < grid.shape[1]
+                and not grid[cell[0] + dr, cell[1] + dc]
+            ]
+            if pos in candidates:
+                return True
+            field = distance_field(grid, pos)
+            reachable = [(int(field[c]), c) for c in candidates if field[c] != UNREACHABLE]
+            if not reachable:
+                return False
+            _, chosen = min(reachable)
+            path = shortest_path(grid, pos, chosen)
+            assert path is not None
+            moves = [_MOVE_INDEX[(b[0] - a[0], b[1] - a[1])] for a, b in zip(path, path[1:])]
+            actions.extend(MOVE_TO_ACTION[m] for m in moves)
+            facing = facing_after(moves)
+            pos = chosen
+            return True
+
+        def cut(tree) -> bool:
+            if not leg_to_solid(tree):
+                return False
+            actions.append(int(Action.DO))
+            grid[tree] = False
+            return True
+
+        table = None
+        for j, tree in enumerate(order[:TABLE_AFTER]):
+            if not cut(tree):
+                return None
+            if j + 1 == TABLE_AFTER:
+                actions.append(int(Action.PLACE_TABLE))
+                grid[tree] = True
+                table = tree
+                actions.append(int(Action.MAKE_WOOD_PICKAXE))
+        if recipe.stone:
+            extra = order[TABLE_AFTER:]
+            steps = [("tree", extra[0]), ("stone", stone)] if variant == 0 else [("stone", stone), ("tree", extra[0])]
+            for what, cell in steps:
+                if what == "tree":
+                    if not cut(cell):
+                        return None
+                else:
+                    if not leg_to_solid(cell):
+                        return None
+                    actions.append(int(Action.DO))
+                    grid[cell] = False  # stone becomes path
+            if not leg_to_near(table):
+                return None
+            actions.append(int(Action.MAKE_STONE_PICKAXE))
+        if not leg_to_solid(target):
+            return None
+        actions.append(int(Action.DO))
+        return Plan(tuple(actions))
+
+
+# ----------------------------------------------------------------------
+# The demonstration store
+# ----------------------------------------------------------------------
+
+ARRAY_FIELDS: tuple[str, ...] = (
+    "level_index",
+    "walls_packed",
+    "trees_packed",
+    "agent",
+    "positions",
+    "values",
+    "feature_ids",
+    "actions",
+    "lengths",
+    "distances",
+    "target",
+    "ambiguous",
+    "utility_margin",
+)
+
+
+def pool_fingerprint(sampler: FieldSampler, seed: int) -> str:
+    """Identifies a pool of fields: sampler config, seed, and the code that draws and plans them."""
+    digest = hashlib.sha256()
+    digest.update(repr(sampler.canonical()).encode())
+    digest.update(str(seed).encode())
+    digest.update(_module_fingerprint().encode())
+    source = pathlib.Path(__file__).read_text()
+    import ast
+
+    digest.update(hashlib.sha256(ast.dump(_without_docstrings(ast.parse(source))).encode()).hexdigest().encode())
+    return digest.hexdigest()[:16]
+
+
+@dataclasses.dataclass(frozen=True)
+class CraftDemoSet:
+    """Expert crafting demonstrations on a pool of fields, at one correlation."""
+
+    level_index: np.ndarray
+    walls_packed: np.ndarray
+    trees_packed: np.ndarray
+    agent: np.ndarray
+    positions: np.ndarray
+    values: np.ndarray
+    feature_ids: np.ndarray
+    actions: np.ndarray
+    lengths: np.ndarray
+    distances: np.ndarray
+    target: np.ndarray
+    ambiguous: np.ndarray
+    utility_margin: np.ndarray
+    size: int
+    meta: dict
+    task: CraftTask = dataclasses.field(default_factory=CraftTask)
+    path: pathlib.Path | None = None
+    hide_values: bool = False
+
+    def __len__(self) -> int:
+        return len(self.level_index)
+
+    @property
+    def n_objectives(self) -> int:
+        return self.positions.shape[1]
+
+    @property
+    def n_channels(self) -> int:
+        return FIRST_KIND_CHANNEL + self.task.n_features + (0 if self.hide_values else 1)
+
+    @property
+    def n_actions(self) -> int:
+        return len(Action)
+
+    @property
+    def max_actions(self) -> int:
+        return self.actions.shape[1]
+
+    @property
+    def move_actions(self) -> tuple[int, ...]:
+        return MOVE_TO_ACTION
+
+    @property
+    def rho(self) -> float:
+        return float(self.meta["rho"])
+
+    def _grids(self, name: str, indices) -> np.ndarray:
+        packed = np.asarray(getattr(self, name)[np.asarray(indices)])
+        flat = np.unpackbits(packed, axis=1, count=self.size * self.size)
+        return flat.reshape(len(packed), self.size, self.size).astype(np.bool_)
+
+    def level(self, index: int) -> Field:
+        return Field(
+            walls=self._grids("walls_packed", [index])[0],
+            trees=self._grids("trees_packed", [index])[0],
+            agent_start=(int(self.agent[index, 0]), int(self.agent[index, 1])),
+            objectives=tuple(
+                Objective(
+                    position=(int(self.positions[index, k, 0]), int(self.positions[index, k, 1])),
+                    value=float(self.values[index, k]),
+                    feature_id=int(self.feature_ids[index, k]),
+                )
+                for k in range(self.n_objectives)
+            ),
+        )
+
+    def observations(self, indices) -> np.ndarray:
+        """Vectorised twin of ``task.observe`` on the stored arrays; a test holds them equal."""
+        indices = np.asarray(indices)
+        batch = len(indices)
+        observation = np.zeros((batch, self.size, self.size, self.n_channels), dtype=np.float32)
+        observation[..., WALL_CHANNEL] = self._grids("walls_packed", indices)
+        observation[..., TREE_CHANNEL] = self._grids("trees_packed", indices)
+        rows = np.arange(batch)
+        agent = np.asarray(self.agent[indices])
+        observation[rows, agent[:, 0], agent[:, 1], AGENT_CHANNEL] = 1.0
+        for k in range(self.n_objectives):
+            r, c = self.positions[indices, k, 0], self.positions[indices, k, 1]
+            observation[rows, r, c, FIRST_KIND_CHANNEL + self.feature_ids[indices, k]] = 1.0
+            if not self.hide_values:
+                observation[rows, r, c, FIRST_KIND_CHANNEL + self.task.n_features] = self.values[indices, k]
+        return observation
+
+    def routes(self, indices) -> np.ndarray:
+        return np.asarray(self.actions[np.asarray(indices)]).astype(np.int32)
+
+    def replay(self, index: int, actions: Sequence[int], emitted_eos: bool = True) -> dict:
+        from goalmisgen.craftax import engine
+
+        return engine.replay(
+            self.level(index),
+            self.task,
+            np.asarray(actions),
+            float(self.meta["step_penalty"]),
+            int(self.meta["step_limit"]),
+            emitted_eos,
+        )
+
+    def replay_many(self, indices, actions, emitted_eos) -> list[dict]:
+        from goalmisgen.craftax import engine
+
+        return engine.replay_batch(
+            [self.level(int(i)) for i in indices],
+            self.task,
+            np.asarray(actions),
+            float(self.meta["step_penalty"]),
+            int(self.meta["step_limit"]),
+            list(emitted_eos),
+        )
+
+    # --- views ---
+    def subset(self, indices) -> "CraftDemoSet":
+        indices = np.asarray(indices)
+        arrays = {name: np.asarray(getattr(self, name)[indices]) for name in ARRAY_FIELDS}
+        return dataclasses.replace(self, **arrays, meta={**self.meta, "n": int(len(indices))}, path=None)
+
+    def with_hidden_values(self, hide: bool = True) -> "CraftDemoSet":
+        return dataclasses.replace(self, hide_values=hide)
+
+    def with_values(self, values) -> "CraftDemoSet":
+        values = np.asarray(values)
+        if values.shape != self.values.shape:
+            raise ValueError(f"values must be shaped {self.values.shape}, got {values.shape}")
+        return dataclasses.replace(self, values=values.copy())
+
+    def with_feature_ids(self, feature_ids) -> "CraftDemoSet":
+        feature_ids = np.asarray(feature_ids)
+        if feature_ids.shape != self.feature_ids.shape:
+            raise ValueError(f"feature_ids must be shaped {self.feature_ids.shape}, got {feature_ids.shape}")
+        return dataclasses.replace(self, feature_ids=feature_ids.copy())
+
+    # --- persistence ---
+    def save(self, path) -> None:
+        directory = pathlib.Path(path)
+        directory.mkdir(parents=True, exist_ok=True)
+        for name in ARRAY_FIELDS:
+            np.save(directory / f"{name}.npy", np.asarray(getattr(self, name)))
+        (directory / "meta.json").write_text(json.dumps({**self.meta, "size": self.size, "n": len(self)}, indent=2))
+        (directory / TASK_FILE).write_text(json.dumps({"task": TASK, **self.task.to_json()}, indent=2))
+
+    @classmethod
+    def load(cls, path, mmap: bool = True, hide_values: bool = False) -> "CraftDemoSet":
+        directory = pathlib.Path(path)
+        meta = json.loads((directory / "meta.json").read_text())
+        marker = json.loads((directory / TASK_FILE).read_text())
+        if marker.get("task") != TASK:
+            raise ValueError(f"{directory} holds task {marker.get('task')!r}, not {TASK!r}")
+        arrays = {name: np.load(directory / f"{name}.npy", mmap_mode="r" if mmap else None) for name in ARRAY_FIELDS}
+        return cls(
+            **arrays,
+            size=int(meta["size"]),
+            meta=meta,
+            task=CraftTask.from_json(marker),
+            path=directory,
+            hide_values=hide_values,
+        )
+
+    # --- generation ---
+    @classmethod
+    def generate(
+        cls,
+        sampler: FieldSampler,
+        seed: int,
+        start: int,
+        count: int,
+        rho: float,
+        task: CraftTask | None = None,
+        colour_seed: int = 0,
+        step_penalty: float = 0.05,
+        step_limit: int = 200,
+        max_actions: int = 128,
+        workers: int = 1,
+        chunk_size: int = 2_000,
+        split: str | None = None,
+    ) -> "CraftDemoSet":
+        """Fields ``start .. start+count`` of the pool ``(sampler, seed)``, demonstrated at ``rho``.
+
+        Field ``i`` is drawn from the ``i``-th child of ``SeedSequence(seed)``,
+        so a pool is addressed by index the way a level dataset is: splits are
+        index ranges, and ``shared_levels`` can compare sets from one pool.
+        Kinds are assigned from ``(colour_seed, i)``, so sets at different rho
+        are paired field for field; fixed values consume no randomness, so
+        pools at different values share layouts, as the maze's do.
+        """
+        task = task or CraftTask()
+        ranges = [(s, min(s + chunk_size, start + count)) for s in range(start, start + count, chunk_size)]
+        args = [(sampler, seed, lo, hi, rho, task, colour_seed, step_penalty, step_limit, max_actions) for lo, hi in ranges]
+        if workers > 1 and len(args) > 1:
+            with worker_pool(workers) as pool:
+                blocks = pool.starmap(demonstrate_block, args)
+        else:
+            blocks = [demonstrate_block(*a) for a in args]
+        arrays = {name: np.concatenate([b[name] for b in blocks]) for name in ARRAY_FIELDS}
+        values = sorted({float(v) for v in np.unique(arrays["values"])}, reverse=True)
+        meta = {
+            "task": {"task": TASK, **task.to_json()},
+            "source": None,
+            "source_fingerprint": pool_fingerprint(sampler, seed),
+            "sampler": repr(sampler),
+            "seed": int(seed),
+            "start": int(start),
+            "split": split,
+            "rho": float(rho),
+            "colour_seed": int(colour_seed),
+            "values": values,
+            "step_penalty": float(step_penalty),
+            "step_limit": int(step_limit),
+            "max_actions": int(max_actions),
+            "n": int(count),
+        }
+        return cls(**arrays, size=sampler.size, meta=meta, task=task)
+
+
+def demonstrate_block(sampler, seed, lo, hi, rho, task, colour_seed, step_penalty, step_limit, max_actions) -> dict:
+    """Fields ``lo .. hi`` of the pool, planned. Safe to run in a worker process."""
+    children = np.random.SeedSequence(seed).spawn(hi)[lo:hi]
+    scheme = CorrelatedFeatures(rho)
+    canonical = sampler.canonical()
+    count = hi - lo
+    n_objectives = sampler.n_objectives
+    size = sampler.size
+    out = {
+        "level_index": np.arange(lo, hi, dtype=np.int64),
+        "walls_packed": np.empty((count, int(np.ceil(size * size / 8))), dtype=np.uint8),
+        "trees_packed": np.empty((count, int(np.ceil(size * size / 8))), dtype=np.uint8),
+        "agent": np.empty((count, 2), dtype=np.uint8),
+        "positions": np.empty((count, n_objectives, 2), dtype=np.uint8),
+        "values": np.empty((count, n_objectives), dtype=np.float64),
+        "feature_ids": np.empty((count, n_objectives), dtype=np.int8),
+        "actions": np.full((count, max_actions), NO_ACTION, dtype=np.int8),
+        "lengths": np.empty(count, dtype=np.int16),
+        "distances": np.full((count, n_objectives), -1, dtype=np.int16),
+        "target": np.empty(count, dtype=np.int8),
+        "ambiguous": np.empty(count, dtype=np.bool_),
+        "utility_margin": np.empty(count, dtype=np.float32),
+    }
+    for row, (index, child) in enumerate(zip(range(lo, hi), children)):
+        rng = np.random.default_rng(child)
+        for _ in range(sampler.max_sampling_attempts):
+            layout = canonical.sample(rng)  # canonical features: the layout must not depend on rho
+            values = tuple(o.value for o in layout.objectives)
+            feature_ids = scheme.assign(values, np.random.default_rng([int(colour_seed), int(index)]))
+            field = Field(
+                walls=layout.walls,
+                trees=layout.trees,
+                agent_start=layout.agent_start,
+                objectives=tuple(Objective(o.position, o.value, int(f)) for o, f in zip(layout.objectives, feature_ids)),
+            )
+            # Conditioned on both chains being plannable. The sampler already
+            # guarantees every tree and ore is reachable, so rejection here is
+            # rare (a tree boxed in by the table, say) - rare enough that pools
+            # at different rho are paired on all but a handful of fields.
+            plans = task.plans(field)
+            if all(plan is not None for plan in plans):
+                break
+        else:
+            raise RuntimeError(f"field {index}: no plannable layout after {sampler.max_sampling_attempts} attempts")
+        solution = solution_from_costs(field, [p.cost for p in plans], step_penalty, step_limit)
+        route = route_array(plans[solution.optimal_index])
+        assert route is not None
+        length = int((route >= 0).sum())
+        if length > max_actions:
+            raise ValueError(f"field {index} needs {length} actions but max_actions={max_actions}")
+        out["walls_packed"][row] = np.packbits(field.walls.reshape(-1))
+        out["trees_packed"][row] = np.packbits(field.trees.reshape(-1))
+        out["agent"][row] = field.agent_start
+        for k, objective in enumerate(field.objectives):
+            out["positions"][row, k] = objective.position
+            out["values"][row, k] = objective.value
+            out["feature_ids"][row, k] = objective.feature_id
+        out["actions"][row, :length] = route[:length]
+        out["lengths"][row] = length
+        out["distances"][row] = [-1 if c is None else c for c in solution.distances]
+        out["target"][row] = solution.optimal_index
+        out["ambiguous"][row] = solution.is_ambiguous
+        out["utility_margin"][row] = solution.utility_margin if np.isfinite(solution.utility_margin) else np.inf
+    return out
+
+
+@register_task(TASK)
+def _load(path: pathlib.Path, mmap: bool, hide_values: bool) -> CraftDemoSet:
+    return CraftDemoSet.load(path, mmap=mmap, hide_values=hide_values)

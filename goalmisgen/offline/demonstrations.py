@@ -170,7 +170,7 @@ def load_demonstrations(path: str | pathlib.Path, mmap: bool = True, hide_values
     return loader(pathlib.Path(path), mmap, hide_values)
 
 
-TASK_MODULES: dict[str, str] = {"craftax-ore": "goalmisgen.craftax.demos"}
+TASK_MODULES: dict[str, str] = {"craftax-ore": "goalmisgen.craftax.demos", "craftax-craft": "goalmisgen.craftax.craft"}
 """Where each task's loader lives, imported on first use so this module stays light."""
 
 _LOADERS: dict[str, object] = {}

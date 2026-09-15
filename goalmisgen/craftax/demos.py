@@ -57,6 +57,31 @@ MOVE_TO_ACTION: tuple[int, ...] = (int(Action.UP), int(Action.DOWN), int(Action.
 assert MOVES == ((-1, 0), (1, 0), (0, -1), (0, 1)), "MOVE_TO_ACTION is spelled for this MOVES order"
 
 
+def solution_from_costs(
+    level, costs: Sequence[int | None], step_penalty: float, step_limit: int | None = None
+) -> LevelSolution:
+    """The solver's verdict for given per-objective action costs: ``value - step_penalty x cost``.
+
+    ``level`` only needs ``objectives`` with values. Same tie and margin rules
+    as :func:`~goalmisgen.envs.solver.solve`, so the two agree when the costs
+    are the maze distances.
+    """
+    costs = tuple(costs)
+    if step_limit is not None:
+        costs = tuple(None if c is None or c > step_limit else c for c in costs)
+    utilities = [None if c is None else objective.value - step_penalty * c for objective, c in zip(level.objectives, costs)]
+    reachable = [(i, u) for i, u in enumerate(utilities) if u is not None]
+    if not reachable:
+        raise ValueError("no objective is reachable" + ("" if step_limit is None else f" within {step_limit} actions"))
+    best = max(u for _, u in reachable)
+    optimal = tuple(i for i, u in reachable if abs(u - best) <= TIE_TOLERANCE)
+    others = [u for i, u in reachable if i != optimal[0]]
+    margin = float("inf") if not others else best - max(others)
+    return LevelSolution(
+        distances=costs, utilities=tuple(utilities), optimal_index=optimal[0], optimal_indices=optimal, utility_margin=margin
+    )
+
+
 @dataclasses.dataclass(frozen=True)
 class CraftaxTask:
     """How a maze level becomes a Craftax world, and a maze route a Craftax route."""
@@ -91,6 +116,29 @@ class CraftaxTask:
     def tools(self) -> tuple[str, ...]:
         """The pickaxes the player must hold to mine every kind."""
         return tuple(sorted({REQUIRED_TOOL[Block(k)] for k in self.kinds} - {None}))
+
+    def observe(
+        self, tiles: np.ndarray, agent: tuple[int, int], feature_values: Sequence[float], hide_values: bool = False
+    ) -> np.ndarray:
+        """The model's observation from a tile grid: the maze's channel layout.
+
+        Wall = stone (mined stone is path, and walkable, so it drops out); agent
+        one-hot; one channel per kind; and, unless hidden, ``feature_values[k]``
+        on the cells of kind ``k``.
+        """
+        from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
+
+        tiles = np.asarray(tiles)
+        n_channels = FIRST_FEATURE_CHANNEL + self.n_features + (0 if hide_values else 1)
+        observation = np.zeros(tiles.shape + (n_channels,), dtype=np.float32)
+        observation[..., WALL_CHANNEL] = tiles == int(Block.STONE)
+        observation[agent[0], agent[1], AGENT_CHANNEL] = 1.0
+        for k, kind in enumerate(self.kinds):
+            mask = tiles == kind
+            observation[mask, FIRST_FEATURE_CHANNEL + k] = 1.0
+            if not hide_values:
+                observation[mask, FIRST_FEATURE_CHANNEL + self.n_features] = float(feature_values[k])
+        return observation
 
     def tiles(self, level: Level) -> np.ndarray:
         """``(H, W)`` int32 block ids: walls stone, free grass, objectives their ore."""
@@ -137,26 +185,7 @@ class CraftaxTask:
 
     def solution(self, level: Level, step_penalty: float, step_limit: int | None = None) -> LevelSolution:
         """``solve()`` with engine costs in place of maze distances."""
-        costs = self.costs(level)
-        if step_limit is not None:
-            costs = tuple(None if c is None or c > step_limit else c for c in costs)
-        utilities = [
-            None if c is None else objective.value - step_penalty * c for objective, c in zip(level.objectives, costs)
-        ]
-        reachable = [(i, u) for i, u in enumerate(utilities) if u is not None]
-        if not reachable:
-            raise ValueError("no objective is reachable" + ("" if step_limit is None else f" within {step_limit} actions"))
-        best = max(u for _, u in reachable)
-        optimal = tuple(i for i, u in reachable if abs(u - best) <= TIE_TOLERANCE)
-        others = [u for i, u in reachable if i != optimal[0]]
-        margin = float("inf") if not others else best - max(others)
-        return LevelSolution(
-            distances=costs,
-            utilities=tuple(utilities),
-            optimal_index=optimal[0],
-            optimal_indices=optimal,
-            utility_margin=margin,
-        )
+        return solution_from_costs(level, self.costs(level), step_penalty, step_limit)
 
     def to_json(self) -> dict:
         return {"kinds": list(self.kinds), "start_direction": self.start_direction}

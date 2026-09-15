@@ -43,7 +43,6 @@ from craftax.craftax_classic.game_logic import craftax_step
 from goalmisgen.craftax.blocks import INVENTORY_FIELD, Action, Block
 from goalmisgen.craftax.demos import CraftaxTask
 from goalmisgen.envs.level import Level
-from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
 from goalmisgen.offline.demos import NO_ACTION, level_info, outcome_info
 
 HEALTHY = 9
@@ -134,27 +133,15 @@ def stack_states(states: Sequence[EnvState]) -> EnvState:
     return jax.tree_util.tree_map(lambda *leaves: jnp.stack(leaves), *states)
 
 
-def render(state: EnvState, feature_values: Sequence[float], task: CraftaxTask, hide_values: bool = False) -> np.ndarray:
-    """``(size, size, channels)`` float32 in the maze's channel layout, from a single state.
+def render(state: EnvState, feature_values: Sequence[float], task, hide_values: bool = False) -> np.ndarray:
+    """The model's observation drawn from a single live state, in the task's own layout.
 
-    Wall = stone (mined stone is path, and walkable, so it drops out); agent
-    one-hot; one channel per kind; and, unless hidden, the value of feature
-    ``k`` (``feature_values[k]``) on the cells of kind ``k``.
+    The task owns the layout (``task.observe``); this is the invariant that
+    what the model trained on is a function of engine state, tested by holding
+    it equal to the stored observation.
     """
-    tiles = np.asarray(state.map)
-    size = tiles.shape[0]
-    n_channels = FIRST_FEATURE_CHANNEL + task.n_features + (0 if hide_values else 1)
-    observation = np.zeros((size, size, n_channels), dtype=np.float32)
-    observation[..., WALL_CHANNEL] = tiles == int(Block.STONE)
     row, col = (int(v) for v in np.asarray(state.player_position))
-    observation[row, col, AGENT_CHANNEL] = 1.0
-    value_channel = FIRST_FEATURE_CHANNEL + task.n_features
-    for k, kind in enumerate(task.kinds):
-        mask = tiles == kind
-        observation[mask, FIRST_FEATURE_CHANNEL + k] = 1.0
-        if not hide_values:
-            observation[mask, value_channel] = float(feature_values[k])
-    return observation
+    return task.observe(np.asarray(state.map), (row, col), feature_values, hide_values)
 
 
 # ----------------------------------------------------------------------

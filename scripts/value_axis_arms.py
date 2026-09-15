@@ -23,16 +23,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--steps", type=int, default=1000, help="Fine-tuning steps; part of the arm's directory name.")
     parser.add_argument("--objective", type=int, nargs="+", default=[0, 1])
+    parser.add_argument(
+        "--base-values", type=float, nargs=2, default=BASE_VALUES, help="The base's (v0, v1); the crafting task uses 2.0 0.5."
+    )
     args = parser.parse_args()
+    base_values = tuple(args.base_values)
     for objective in args.objective:
         arms = sweep_arms(
             objective, first_seed=1234 + 100 * objective
         )  # distinct seeds per sweep, so the two null arms differ
-        problems = check_no_preference_flip(BASE_VALUES, arms)
+        problems = check_no_preference_flip(base_values, arms)
         if problems:
             raise SystemExit("\n".join(problems))
         for arm in arms:
-            print(arm.sweep, f"{arm.offset:+.2f}", arm.seed, arm.dirname(args.steps), values_tag(arm_values(BASE_VALUES, arm)))
+            print(arm.sweep, f"{arm.offset:+.2f}", arm.seed, arm.dirname(args.steps), values_tag(arm_values(base_values, arm)))
 
 
 if __name__ == "__main__":

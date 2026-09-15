@@ -44,7 +44,6 @@ from goalmisgen.craftax.blocks import INVENTORY_FIELD, Action, Block
 from goalmisgen.craftax.demos import CraftaxTask
 from goalmisgen.envs.level import Level
 from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
-from goalmisgen.envs.solver import solve
 from goalmisgen.offline.demos import NO_ACTION, level_info, outcome_info
 
 HEALTHY = 9
@@ -110,18 +109,24 @@ def blank_state(size: int) -> EnvState:
     )
 
 
-def build_state(level: Level, task: CraftaxTask) -> EnvState:
-    """The level as an engine state: its tiles, the player placed and facing, the tools in hand."""
-    size = level.shape[0]
-    if level.shape != (size, size):
-        raise ValueError(f"worlds are square, got {level.shape}")
+def state_from_tiles(tiles: np.ndarray, agent: tuple[int, int], direction: int, tools: Sequence[str] = ()) -> EnvState:
+    """An engine state holding exactly these tiles, with the player placed, facing, and equipped."""
+    tiles = np.asarray(tiles)
+    size = tiles.shape[0]
+    if tiles.shape != (size, size):
+        raise ValueError(f"worlds are square, got {tiles.shape}")
     blank = blank_state(size)
     return blank.replace(
-        map=jnp.asarray(task.tiles(level)),
-        player_position=jnp.asarray(level.agent_start, dtype=jnp.int32),
-        player_direction=jnp.int32(task.start_direction),
-        inventory=blank.inventory.replace(**{tool: jnp.int32(1) for tool in task.tools}),
+        map=jnp.asarray(tiles, dtype=jnp.int32),
+        player_position=jnp.asarray(agent, dtype=jnp.int32),
+        player_direction=jnp.int32(direction),
+        inventory=blank.inventory.replace(**{tool: jnp.int32(1) for tool in tools}),
     )
+
+
+def build_state(level: Level, task: CraftaxTask) -> EnvState:
+    """The level as an engine state: its tiles, the player placed and facing, the tools in hand."""
+    return state_from_tiles(task.tiles(level), level.agent_start, task.start_direction, task.tools)
 
 
 def stack_states(states: Sequence[EnvState]) -> EnvState:
@@ -160,17 +165,25 @@ _MOVE_LOW, _MOVE_HIGH = int(Action.LEFT), int(Action.DOWN)
 
 
 @functools.lru_cache(maxsize=16)
-def _rollout_fn(size: int, n_steps: int, step_limit: int, kinds: tuple[int, ...]):
-    """One jitted scan per (world size, route length, step limit, kinds)."""
+def _rollout_fn(size: int, n_steps: int, step_limit: int, kinds: tuple[int, ...], interactable: tuple[int, ...]):
+    """One jitted scan per (world size, route length, step limit, kinds, interactable blocks).
+
+    ``kinds`` are the objectives: the first inventory rise among them ends the
+    route. ``interactable`` are the solid blocks a blocked move may legitimately
+    turn to face (the kinds, plus trees and stone for a task that gathers).
+    """
     static = static_params(size)
     params = env_params(step_limit)
-    kinds_array = jnp.asarray(kinds, dtype=jnp.int32)
+    interactable_array = jnp.asarray(interactable, dtype=jnp.int32)
     fields = [INVENTORY_FIELD[Block(kind)] for kind in kinds]
     directions = jnp.asarray(engine_constants.DIRECTIONS)
     step = jax.vmap(lambda key, state, action: craftax_step(key, state, action, params, static)[0])
 
     def counts(states: EnvState) -> jnp.ndarray:
         return jnp.stack([getattr(states.inventory, field) for field in fields], axis=-1)
+
+    def inventory_matrix(states: EnvState) -> jnp.ndarray:
+        return jnp.stack([getattr(states.inventory, f.name) for f in dataclasses.fields(Inventory)], axis=-1)
 
     def per_env(mask: jnp.ndarray, new, old):
         return jnp.where(mask.reshape((-1,) + (1,) * (new.ndim - 1)), new, old)
@@ -194,11 +207,19 @@ def _rollout_fn(size: int, n_steps: int, step_limit: int, kinds: tuple[int, ...]
             moved = jnp.any(new.player_position != states.player_position, axis=-1)
             faced_position = jnp.clip(states.player_position + directions[action], 0, size - 1)
             faced = states.map[rows, faced_position[:, 0], faced_position[:, 1]]
-            faced_is_kind = jnp.isin(faced, kinds_array)
+            faced_interactable = jnp.isin(faced, interactable_array)
             asleep = states.is_sleeping  # the engine turns every action into NOOP
-            illegal = valid & ~asleep & is_move & ~moved & ~faced_is_kind
+            illegal = valid & ~asleep & is_move & ~moved & ~faced_interactable
             walls_mined = valid & (new.inventory.stone > states.inventory.stone)
-            wasted = valid & (asleep | (~is_move & ~collected.any(axis=-1)))
+            # Wasted: an action that changed nothing the task can see - no move,
+            # no turn, no inventory or map change - or anything done asleep.
+            effect = (
+                moved
+                | (new.player_direction != states.player_direction)
+                | jnp.any(inventory_matrix(new) != inventory_matrix(states), axis=-1)
+                | jnp.any(new.map != states.map, axis=(-2, -1))
+            )
+            wasted = valid & (asleep | ~effect | (action == int(Action.SLEEP)))
 
             states = jax.tree_util.tree_map(functools.partial(per_env, valid), new, states)
             steps = steps + valid.astype(jnp.int32)
@@ -234,14 +255,16 @@ class Rollout:
     wasted: np.ndarray  # (B, T)
 
 
-def run(states: EnvState, task: CraftaxTask, actions: np.ndarray, step_limit: int, seed: int = 0) -> Rollout:
+def run(states: EnvState, task, actions: np.ndarray, step_limit: int, seed: int = 0) -> Rollout:
     """Step a batch of states through ``actions`` ``(B, T)``; ``NO_ACTION`` ends a route."""
     actions = np.asarray(actions, dtype=np.int32)
     if actions.ndim != 2:
         raise ValueError(f"actions must be (batch, steps), got {actions.shape}")
     size = int(states.map.shape[-1])
     batch, n_steps = actions.shape
-    rollout = _rollout_fn(size, n_steps, step_limit, tuple(int(k) for k in task.kinds))
+    rollout = _rollout_fn(
+        size, n_steps, step_limit, tuple(int(k) for k in task.kinds), tuple(int(k) for k in task.interactable)
+    )
     keys = jax.random.split(jax.random.PRNGKey(seed), batch)
     final, steps, out = rollout(states, jnp.asarray(actions), keys)
     swap = lambda x: np.asarray(jnp.swapaxes(x, 0, 1))  # noqa: E731 - (T, B, ...) -> (B, T, ...)
@@ -261,10 +284,8 @@ def outcome(
     level: Level, task: CraftaxTask, rollout: Rollout, row: int, step_penalty: float, step_limit: int, emitted_eos: bool
 ) -> dict:
     """The outcome dict for one route of a rollout: the maze's keys and the engine's extras."""
-    # The solver plans the maze route; the engine needs one more action (DO),
-    # which is why the limit it is given is one lower and every distance one higher.
-    solution = solve(level, step_penalty, step_limit=step_limit - 1)
-    info = level_info(level, solution, extra_steps=1)
+    solution = task.solution(level, step_penalty, step_limit)
+    info = level_info(level, solution)
 
     steps = int(rollout.steps[row])
     collected = rollout.collected[row, :steps]
@@ -297,7 +318,7 @@ def outcome(
 
 def replay_batch(
     levels: Sequence[Level],
-    task: CraftaxTask,
+    task,
     actions: np.ndarray,
     step_penalty: float,
     step_limit: int,
@@ -326,7 +347,7 @@ def replay_batch(
 
 def replay(
     level: Level,
-    task: CraftaxTask,
+    task,
     actions: Sequence[int],
     step_penalty: float,
     step_limit: int,

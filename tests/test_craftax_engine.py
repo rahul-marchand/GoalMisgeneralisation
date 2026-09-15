@@ -58,19 +58,38 @@ def test_craftax_demos_carry_every_protocol_attribute(demos):
     assert isinstance(demos, Demonstrations)
     assert demos.n_actions == 17
     assert demos.move_actions == MOVE_TO_ACTION
-    assert demos.max_actions == 64 and demos.meta["step_limit"] == 120
+    assert demos.max_actions == 64 and demos.meta["step_limit"] == 120 and demos.inner.meta["step_limit"] == 119
 
 
-def test_routes_are_the_maze_moves_relabelled_plus_do(demos):
+def test_routes_are_the_maze_moves_relabelled_plus_do_minus_a_redundant_turn(demos):
     inner = demos.inner
-    for i in range(10):
+    straight = 0
+    for i in range(40):
         route = demos.routes([i])[0]
-        moves = inner.routes([i])[0]
-        n = int(inner.lengths[i])
-        assert list(route[:n]) == [MOVE_TO_ACTION[m] for m in moves[:n]]
-        assert route[n] == Action.DO and (route[n + 1 :] == NO_ACTION).all()
-        assert demos.lengths[i] == n + 1
-    assert np.array_equal(demos.distances, np.where(inner.distances >= 0, inner.distances + 1, inner.distances))
+        target = int(demos.target[i])
+        moves = inner.routes([i])[0] if target == int(inner.target[i]) else None
+        n = int(demos.lengths[i])
+        assert route[n - 1] == Action.DO and (route[n:] == NO_ACTION).all()
+        d = int(inner.distances[i, target])
+        assert n in (d, d + 1), "engine cost is the maze distance plus DO, minus the turn after a straight run"
+        straight += n == d
+        if moves is not None:
+            m = int(inner.lengths[i])
+            kept = m - 1 if (m >= 2 and moves[m - 1] == moves[m - 2]) else m
+            assert list(route[:kept]) == [MOVE_TO_ACTION[x] for x in moves[:kept]]
+    assert 0 < straight < 40, "both cases occur"
+    for i in range(40):
+        for k in range(2):
+            d = int(inner.distances[i, k])
+            assert d - 0 <= int(demos.distances[i, k]) <= d + 1
+
+
+def test_the_expert_chooses_by_engine_cost(demos):
+    for i in range(40):
+        level = demos.level(i)
+        solution = demos.task.solution(level, 0.05, 120)
+        assert solution.optimal_index == demos.target[i]
+        assert tuple(int(c) for c in demos.distances[i]) == solution.distances
 
 
 def test_observations_are_the_maze_observations(demos):
@@ -191,15 +210,17 @@ def test_outcome_keys_are_a_superset_of_the_mazes_and_shared_keys_agree(demos):
         maze = maze_replay(level, inner.routes([i])[0], 0.05, 119)
         craft = demos.replay(i, demos.routes([i])[0])
         assert set(maze) <= set(craft)
+        if maze["optimal_index"] != craft["optimal_index"]:
+            continue  # a near-tie the engine costs resolve differently; nothing else is comparable then
         for key in maze:
             if key.endswith("_distance") and maze[key] >= 0:
-                assert craft[key] == maze[key] + 1, key
-            elif key == "episode_steps":
-                assert craft[key] == maze[key] + 1
-            elif key == "episode_return":
-                assert craft[key] == pytest.approx(maze[key] - 0.05)
-            elif key in ("visited", "visit_step"):
-                continue  # the maze steps onto the objective; the engine stops beside it
+                assert craft[key] in (maze[key], maze[key] + 1), key
+            elif key in ("episode_steps", "optimal_distance"):
+                assert craft[key] in (maze[key], maze[key] + 1)
+            elif key in ("episode_return", "utility_margin"):
+                assert abs(craft[key] - maze[key]) <= 0.05 + 1e-9
+            elif key in ("visited", "visit_step", "is_ambiguous", "chose_optimal"):
+                continue  # the maze steps onto the objective; the engine stops beside it; ties may differ
             else:
                 assert craft[key] == maze[key], key
 
@@ -251,7 +272,7 @@ def test_a_wood_pickaxe_digs_through_stone_and_the_replay_says_so():
     # LEFT into the border wall turns the player; DO mines the stone; LEFT then walks into the hole.
     route = np.asarray([[Action.LEFT, Action.DO, Action.LEFT] + [NO_ACTION] * 5])
     (info,) = engine.replay_batch([level], task, route, 0.05, 120)
-    assert info["walls_mined"] == 1 and info["wasted_actions"] == 1
+    assert info["walls_mined"] == 1 and info["wasted_actions"] == 0, "the DO had an effect: it mined"
     assert info["illegal_moves"] == 1, "the first LEFT was blocked by a non-collectable"
     assert tuple(info["positions"][-1]) == (3, 0), "the third action walked into the mined cell"
 

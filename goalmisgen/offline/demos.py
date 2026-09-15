@@ -327,6 +327,48 @@ class DemoSet:
         return cls(**arrays, size=int(dataset.max_size), meta=meta)
 
 
+def level_info(level: Level, solution, extra_steps: int = 0) -> dict:
+    """The keys describing a level and its optimum, before any route is walked.
+
+    ``MazeEnv`` reports the same keys in its ``info``; a test holds the two
+    equal. ``extra_steps`` is added to every distance for a task whose route
+    to an objective costs more actions than the maze's steps - Craftax needs
+    a DO once adjacent - so it reports its own distances while sharing the
+    solver's choice, which a constant shift cannot change.
+    """
+    optimal = solution.optimal_index
+    info: dict = {
+        "optimal_index": optimal,
+        "optimal_feature_id": level.objectives[optimal].feature_id,
+        "optimal_value": level.objectives[optimal].value,
+        "optimal_distance": solution.distances[optimal] + extra_steps,
+        "utility_margin": solution.utility_margin,
+        "is_ambiguous": solution.is_ambiguous,
+        "level_size": level.shape[0],
+    }
+    for index, objective in enumerate(level.objectives):
+        distance = solution.distances[index]
+        info[f"feature_{objective.feature_id}_value"] = objective.value
+        info[f"feature_{objective.feature_id}_distance"] = UNREACHABLE if distance is None else distance + extra_steps
+    return info
+
+
+def outcome_info(level: Level, solution, reached: int | None, steps: int, step_penalty: float) -> dict:
+    """The keys describing how a walked route ended."""
+    walked = -step_penalty * steps
+    if reached is None:
+        return dict(reached_objective=False, episode_steps=steps, episode_return=walked)
+    return dict(
+        reached_objective=True,
+        reached_index=reached,
+        reached_feature_id=level.objectives[reached].feature_id,
+        reached_value=level.objectives[reached].value,
+        chose_optimal=reached in solution.optimal_indices,
+        episode_steps=steps,
+        episode_return=walked + level.objectives[reached].value,
+    )
+
+
 def replay(level: Level, actions: Sequence[int], step_penalty: float, step_limit: int, emitted_eos: bool = True) -> dict:
     """Walk ``actions`` on ``level`` under ``MazeEnv``'s rules; return its info.
 
@@ -365,34 +407,8 @@ def replay(level: Level, actions: Sequence[int], step_penalty: float, step_limit
         if reached is not None or steps >= step_limit:
             break
 
-    optimal = solution.optimal_index
-    info: dict = {
-        "optimal_index": optimal,
-        "optimal_feature_id": level.objectives[optimal].feature_id,
-        "optimal_value": level.objectives[optimal].value,
-        "optimal_distance": solution.distances[optimal],
-        "utility_margin": solution.utility_margin,
-        "is_ambiguous": solution.is_ambiguous,
-        "level_size": height,
-    }
-    for index, objective in enumerate(level.objectives):
-        distance = solution.distances[index]
-        info[f"feature_{objective.feature_id}_value"] = objective.value
-        info[f"feature_{objective.feature_id}_distance"] = UNREACHABLE if distance is None else distance
-
-    walked = -step_penalty * steps
-    if reached is None:
-        info.update(reached_objective=False, episode_steps=steps, episode_return=walked)
-    else:
-        info.update(
-            reached_objective=True,
-            reached_index=reached,
-            reached_feature_id=level.objectives[reached].feature_id,
-            reached_value=level.objectives[reached].value,
-            chose_optimal=reached in solution.optimal_indices,
-            episode_steps=steps,
-            episode_return=walked + level.objectives[reached].value,
-        )
+    info = level_info(level, solution)
+    info.update(outcome_info(level, solution, reached, steps, step_penalty))
     info.update(illegal_moves=illegal, emitted_eos=bool(emitted_eos), visited=visited, visit_step=visit_step)
     return info
 

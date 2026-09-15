@@ -19,13 +19,13 @@ import gymnasium as gym
 from cleanba.environments import EnvConfig, VectorNHWCtoNCHWWrapper
 
 import goalmisgen.envs  # noqa: F401  -- registers Maze-v0
+from goalmisgen.envs.colour_keyed import ColourKeyedFeatures
 from goalmisgen.envs.dataset import (
     DatasetLevelSampler,
     LevelDataset,
     dataset_fingerprint,
     split_indices,
 )
-from goalmisgen.envs.colour_keyed import ColourKeyedFeatures
 from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.observation import ObservationEncoder, ValueEncoding

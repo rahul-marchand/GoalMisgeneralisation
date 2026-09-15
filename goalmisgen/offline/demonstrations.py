@@ -24,6 +24,7 @@ use it, a history model would.
 
 from __future__ import annotations
 
+import importlib
 import json
 import pathlib
 from typing import Protocol, Sequence, runtime_checkable
@@ -103,7 +104,11 @@ class Demonstrations(Protocol):
         ...
 
     def replay(self, index: int, actions: Sequence[int], emitted_eos: bool = True) -> dict:
-        """Execute ``actions`` on level ``index``; the outcome dict ``analysis.behaviour`` reads."""
+        """Execute ``actions`` on level ``index``; the outcome dict ``analysis.behaviour`` reads.
+
+        A task may also supply ``replay_many(indices, actions, emitted_eos)``
+        for a whole batch; ``decode.replay_all`` uses it when present.
+        """
         ...
 
     # --- views ------------------------------------------------------------
@@ -157,11 +162,16 @@ def load_demonstrations(path: str | pathlib.Path, mmap: bool = True, hide_values
     name = task_name(path)
     if name is None:
         return DemoSet.load(path, mmap=mmap, hide_values=hide_values)
+    if name not in _LOADERS and name in TASK_MODULES:
+        importlib.import_module(TASK_MODULES[name])  # registers itself on import
     loader = _LOADERS.get(name)
     if loader is None:
         raise ValueError(f"{path} was written by task {name!r}, which no loader is registered for: {sorted(_LOADERS)}")
     return loader(pathlib.Path(path), mmap, hide_values)
 
+
+TASK_MODULES: dict[str, str] = {"craftax-ore": "goalmisgen.craftax.demos"}
+"""Where each task's loader lives, imported on first use so this module stays light."""
 
 _LOADERS: dict[str, object] = {}
 

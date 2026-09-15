@@ -192,6 +192,53 @@ in a 150M run and `cp_70103040` in an 80M one. `campaign.sh` hardcoded
 `cp_100146560`, which is not a checkpoint of anything, printed "not saved,
 skipping that rung" and reported success — for every run of the campaign.
 
+## Craftax is an engine, not a task
+
+`craftax==1.6.1` is pinned exactly and used unmodified, the way
+`third_party/train-learned-planner` is: we build its states and step them.
+Everything of ours lives in `goalmisgen/craftax/`; see `Craftax.md` for the
+study design. Rules that keep it clean:
+
+- **Only `goalmisgen/craftax/engine.py` imports Craftax or JAX.** The world
+  builder, the task and the demonstration set are numpy, so generation runs in
+  the spawn-based `worker_pool` cheaply. `tests/test_craftax_engine.py` checks
+  the import boundary in a subprocess.
+- **The engine's vocabulary is mirrored by value in `blocks.py`** (block ids,
+  action ids, move vectors, the solid set, the per-ore pickaxe rule) and
+  `tests/test_craftax_blocks.py` asserts each against the real enums. That is
+  what makes the exact pin enforceable; bump the pin and run the test.
+- **A stage-2 world is a maze `Level` rendered into the engine** (walls stone,
+  free grass, objectives ore) and the expert route is the maze route plus DO:
+  the ore is solid, so the last maze move only turns the player to face it.
+  Every Craftax distance is therefore the maze distance plus one, and the
+  solver's choice is unchanged (a constant shift). `CraftaxDemoSet` is a
+  `DemoSet` seen through a `CraftaxTask`, not a second store.
+- **The observation is a function of engine state.** `engine.render` draws the
+  model's observation from a live `EnvState`, and a test holds it equal to the
+  training observation. With hidden values (the whole value-axis campaign)
+  the invariant is exact; with values shown they come from the level, since
+  the engine holds none.
+- **The outcome dict is a superset of the maze's**, with `walls_mined`,
+  `wasted_actions` and `positions` on top. `analysis.behaviour` reads with
+  `.get`, so a missing key would silently become NaN; the contract test is what
+  catches it.
+- **Ore-field datasets carry their own fingerprint** (`ore_field_fingerprint`):
+  the maze one extended by `levels.py`'s source. Nothing under `craftax/` is in
+  `dataset.CONTENT_MODULES`, and nothing there may be edited to accommodate
+  Craftax, or every dataset on the volume is invalidated.
+- **Engine facts the code leans on**, all tested: `OUT_OF_BOUNDS` is walkable
+  (pad with stone); a wood pickaxe digs stone, so a decoded model can tunnel
+  (reported, never done by the expert); the engine's own `reset` refuses maps
+  under 16 cells (states are built by hand); DO facing grass rolls a sapling
+  on the rng (replays use a fixed key); energy falls around step 31 and SLEEP
+  then freezes the player (reported as wasted actions).
+
+The pipeline boundary that makes a second task possible is
+`goalmisgen/offline/demonstrations.py`: the `Demonstrations` protocol lists
+every attribute the trainer, decoder, axis fit and probes read, and
+`load_demonstrations` picks the implementation from a `task.json` marker.
+A new task implements the protocol; it does not fork the pipeline.
+
 ## Design conventions
 
 The environment gets extended repeatedly over the project (new correlation

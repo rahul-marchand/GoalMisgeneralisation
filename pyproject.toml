@@ -19,6 +19,10 @@ dependencies = [
     # cleanba.cleanba_impala imports this at module scope, but upstream only
     # declares it in their optional "launch-jobs" extra.
     "names_generator ~=0.1.0",
+    # The Craftax engine, used unmodified: we build its states and step them.
+    # Pinned exactly because our worlds and planner index its block and action
+    # enums by position.
+    "craftax ==1.6.1",
 ]
 
 [project.optional-dependencies]

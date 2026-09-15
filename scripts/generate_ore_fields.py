@@ -19,6 +19,7 @@ maze, and the gap range is what the value trade-off is measured over.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -54,6 +55,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_sampler(levels: Path) -> MazeLevelSampler:
+    """Rebuild the sampler an ore-field dataset was drawn from, from its sampler.json."""
+    spec = json.loads((levels / "sampler.json").read_text())
+    return ore_field_sampler(int(spec["size"]), float(spec["density"]), tuple(float(v) for v in spec["values"]))
+
+
 def ore_field_sampler(size: int, density: float, values: tuple[float, ...]) -> MazeLevelSampler:
     """The one place the ore-field distribution is spelled out; scripts and tests share it."""
     return MazeLevelSampler(
@@ -78,6 +85,11 @@ def main() -> None:
     dataset = generate_ore_fields(sampler, args.n_levels, seed=args.seed, block_size=args.block_size, workers=args.workers)
     splits = split_by_layout(dataset.walls_packed, valid=args.valid_levels, test=args.test_levels, seed=args.seed)
     dataset.save(args.out, seed=args.seed, block_size=args.block_size, splits=splits)
+    # Beside the arrays, so a demonstration script can rebuild the sampler and
+    # verify the fingerprint without being told the field's parameters again.
+    (args.out / "sampler.json").write_text(
+        json.dumps({"size": args.size, "density": args.density, "values": list(args.objective_values)}, indent=2)
+    )
     elapsed = time.perf_counter() - start
 
     groups = layout_groups(dataset.walls_packed)

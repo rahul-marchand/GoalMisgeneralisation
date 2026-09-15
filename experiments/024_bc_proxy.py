@@ -31,7 +31,7 @@ import numpy as np
 
 from goalmisgen.analysis import bin_by_margin, summarise
 from goalmisgen.offline.decode import evaluate
-from goalmisgen.offline.demos import DemoSet
+from goalmisgen.offline.demonstrations import load_demonstrations
 from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 from goalmisgen.provenance import header
 
@@ -63,7 +63,7 @@ def main() -> None:
     sets = {}
     for item in args.demos:
         name, _, path = item.partition("=")
-        sets[name] = DemoSet.load(path)
+        sets[name] = load_demonstrations(path)
     indices = np.arange(min(args.levels, *(len(d) for d in sets.values())))
 
     results = []

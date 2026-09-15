@@ -47,7 +47,7 @@ from goalmisgen.offline.axis import (
     measure,
     measure_flat,
 )
-from goalmisgen.offline.demos import DemoSet
+from goalmisgen.offline.demonstrations import load_demonstrations
 from goalmisgen.provenance import header
 
 
@@ -186,7 +186,7 @@ def main() -> None:
         return
 
     # --- writable? -----------------------------------------------------------
-    demos = DemoSet.load(args.demos, hide_values=base.hide_values)
+    demos = load_demonstrations(args.demos, hide_values=base.hide_values)
     indices = np.arange(min(args.levels, len(demos)))
 
     def say(label, m, expected=None):

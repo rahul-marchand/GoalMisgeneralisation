@@ -17,7 +17,7 @@ import numpy as np
 from jax.flatten_util import ravel_pytree
 
 from goalmisgen.offline.decode import evaluate
-from goalmisgen.offline.demos import DemoSet
+from goalmisgen.offline.demonstrations import Demonstrations
 from goalmisgen.offline.model import RoutePrefixLM
 from goalmisgen.offline.train import list_checkpoints, load_checkpoint, load_run_config
 from goalmisgen.volume import parse_arm_dirname
@@ -123,7 +123,7 @@ class Measurement:
         return dataclasses.asdict(self)
 
 
-def measure(base: Base, params, demos: DemoSet, indices: np.ndarray) -> Measurement:
+def measure(base: Base, params, demos: Demonstrations, indices: np.ndarray) -> Measurement:
     summary, _, _ = evaluate(base.model, params, demos, indices)
     b = summary.behaviour
     return Measurement(
@@ -135,7 +135,7 @@ def measure(base: Base, params, demos: DemoSet, indices: np.ndarray) -> Measurem
     )
 
 
-def measure_flat(base: Base, flat: np.ndarray, demos: DemoSet, indices: np.ndarray) -> Measurement:
+def measure_flat(base: Base, flat: np.ndarray, demos: Demonstrations, indices: np.ndarray) -> Measurement:
     return measure(base, base.unravel(np.asarray(flat, dtype=np.float32)), demos, indices)
 
 

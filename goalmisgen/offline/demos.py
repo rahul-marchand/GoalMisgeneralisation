@@ -28,6 +28,7 @@ from typing import Sequence
 import numpy as np
 
 from goalmisgen.envs.dataset import LevelDataset, source_fingerprint
+from goalmisgen.envs.colour_keyed import ColourKeyedFeatures
 from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.level import Level
 from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
@@ -238,6 +239,7 @@ class DemoSet:
         dataset: LevelDataset,
         indices: np.ndarray,
         rho: float,
+        colour_keyed: bool = False,
         seed: int = 0,
         step_penalty: float = 0.05,
         step_limit: int = 120,
@@ -255,7 +257,7 @@ class DemoSet:
         """
         indices = np.asarray(indices, dtype=np.int64)
         chunks = [indices[start : start + chunk_size] for start in range(0, len(indices), chunk_size)]
-        tasks = [(dataset, chunk, rho, seed, step_penalty, step_limit, max_actions) for chunk in chunks]
+        tasks = [(dataset, chunk, rho, seed, step_penalty, step_limit, max_actions, colour_keyed) for chunk in chunks]
         if workers > 1 and len(tasks) > 1:
             with worker_pool(workers) as pool:
                 blocks = pool.starmap(demonstrate_block, tasks)
@@ -270,6 +272,7 @@ class DemoSet:
             "code_fingerprint": source_fingerprint(),
             "split": split,
             "rho": float(rho),
+            "colour_keyed": bool(colour_keyed),
             "seed": int(seed),
             "values": values,
             "step_penalty": float(step_penalty),
@@ -303,11 +306,16 @@ def demonstrate_block(
     step_penalty: float,
     step_limit: int,
     max_actions: int,
+    colour_keyed: bool = False,
 ) -> dict[str, np.ndarray]:
     """Demonstrate one chunk of levels. Safe to run in a worker process."""
     count = len(indices)
     n_objectives = dataset.n_objectives
-    scheme = CorrelatedFeatures(rho)
+    # Pinning colours to objectives only differs from the correlated scheme once
+    # the values cross: without it the richer objective is always colour 0, so a
+    # demonstration set past parity teaches a relabelled preference rather than
+    # a reversed one. See goalmisgen.envs.colour_keyed.
+    scheme = ColourKeyedFeatures() if colour_keyed else CorrelatedFeatures(rho)
 
     out = {
         "level_index": np.asarray(indices, dtype=np.int64),

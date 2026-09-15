@@ -25,6 +25,7 @@ from goalmisgen.envs.dataset import (
     dataset_fingerprint,
     split_indices,
 )
+from goalmisgen.envs.colour_keyed import ColourKeyedFeatures
 from goalmisgen.envs.features import CorrelatedFeatures
 from goalmisgen.envs.generation import RecursiveBacktracker
 from goalmisgen.envs.observation import ObservationEncoder, ValueEncoding
@@ -148,6 +149,20 @@ class MazeConfig(EnvConfig):
     :class:`~goalmisgen.envs.features.CorrelatedFeatures` scheme.
     """
 
+    colour_keyed_features: bool = False
+    """Pin colour ``i`` to objective ``i`` instead of to the richest objective.
+
+    Only meaningful for arms whose values cross parity. Under the correlated
+    scheme the colours follow the value order, so a sweep that takes the swept
+    objective past the other one merely re-labels which colour is rich and the
+    measured threshold turns around at zero instead of passing through it.
+    Pinning the colours is what lets a sweep ask the agent to prefer the colour
+    it has learned is *poorer*, which is the only way a signed threshold exists.
+
+    Ignored by generation: see :mod:`goalmisgen.envs.colour_keyed`. Stored
+    levels are identical either way, so this never invalidates a dataset.
+    """
+
     value_encoding: ValueEncoding = "at_objective"
 
     colour_is_the_only_value_cue: bool = False
@@ -246,9 +261,15 @@ class MazeConfig(EnvConfig):
 
         return DatasetLevelSampler(
             dataset=dataset,
-            features=CorrelatedFeatures(self.feature_value_correlation),
+            features=self.feature_scheme(),
             indices=splits[self.dataset_split],
         )
+
+    def feature_scheme(self):
+        """How colours attach to objectives: by value rank, or pinned by index."""
+        if self.colour_keyed_features:
+            return ColourKeyedFeatures()
+        return CorrelatedFeatures(self.feature_value_correlation)
 
     def live_sampler(self) -> MazeLevelSampler:
         """The generating distribution, independent of whether levels are cached."""
@@ -257,7 +278,7 @@ class MazeConfig(EnvConfig):
             size_range=(self.min_size, self.max_size),
             n_objectives=self.n_objectives,
             values=self.value_scheme(),
-            features=CorrelatedFeatures(self.feature_value_correlation),
+            features=self.feature_scheme(),
             require_all_objectives_reachable=self.require_all_objectives_reachable,
         )
 

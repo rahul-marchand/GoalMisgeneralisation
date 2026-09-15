@@ -33,6 +33,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--levels", type=Path, required=True, help="Source level dataset directory.")
     parser.add_argument("--split", type=str, default="train", choices=("train", "valid", "test"))
     parser.add_argument("--rho", type=float, required=True, help="Colour-value correlation to demonstrate at.")
+    parser.add_argument(
+        "--colour-keyed",
+        action="store_true",
+        help="Pin colour i to objective i instead of putting colour 0 on the richer objective. "
+        "Needed for demonstration sets whose values cross parity, which otherwise teach a "
+        "relabelled preference rather than a reversed one.",
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=0, help="Seeds the colour draws, per level.")
     parser.add_argument("--n", type=int, default=None, help="Demonstrate only the first N levels of the split.")
@@ -79,6 +86,7 @@ def main() -> None:
         dataset,
         indices,
         rho=args.rho,
+        colour_keyed=args.colour_keyed,
         seed=args.seed,
         step_penalty=args.step_penalty,
         step_limit=args.step_limit,

@@ -67,44 +67,51 @@ def env_params(step_limit: int) -> EnvParams:
 
 
 def blank_state(size: int) -> EnvState:
-    """An empty grass world with a healthy, empty-handed player at the origin."""
+    """An empty grass world with a healthy, empty-handed player at the origin.
+
+    Built from **host** arrays, not device arrays: a batch is assembled with
+    ``np.stack`` and moved to the device once per field by :func:`stack_states`.
+    Stacking a thousand device scalars with ``jnp.stack`` compiles a
+    thousand-operand concatenate per field - minutes per evaluation set, on the
+    CPU, at every checkpoint - which is how the first pod run stalled at step 0.
+    """
     static = static_params(size)
 
     def mobs(count: int) -> Mobs:
         return Mobs(
-            position=jnp.zeros((count, 2), dtype=jnp.int32),
-            health=jnp.zeros(count, dtype=jnp.int32),
-            mask=jnp.zeros(count, dtype=jnp.bool_),
-            attack_cooldown=jnp.zeros(count, dtype=jnp.int32),
+            position=np.zeros((count, 2), dtype=np.int32),
+            health=np.zeros(count, dtype=np.int32),
+            mask=np.zeros(count, dtype=np.bool_),
+            attack_cooldown=np.zeros(count, dtype=np.int32),
         )
 
     return EnvState(
-        map=jnp.full((size, size), int(Block.GRASS), dtype=jnp.int32),
-        mob_map=jnp.zeros((size, size), dtype=jnp.bool_),
-        player_position=jnp.zeros(2, dtype=jnp.int32),
-        player_direction=jnp.int32(int(Action.DOWN)),
-        player_health=jnp.int32(HEALTHY),
-        player_food=jnp.int32(HEALTHY),
-        player_drink=jnp.int32(HEALTHY),
-        player_energy=jnp.int32(HEALTHY),
-        is_sleeping=jnp.bool_(False),
-        player_recover=jnp.float32(0.0),
-        player_hunger=jnp.float32(0.0),
-        player_thirst=jnp.float32(0.0),
-        player_fatigue=jnp.float32(0.0),
-        inventory=Inventory(*(jnp.int32(0) for _ in dataclasses.fields(Inventory))),
+        map=np.full((size, size), int(Block.GRASS), dtype=np.int32),
+        mob_map=np.zeros((size, size), dtype=np.bool_),
+        player_position=np.zeros(2, dtype=np.int32),
+        player_direction=np.int32(int(Action.DOWN)),
+        player_health=np.int32(HEALTHY),
+        player_food=np.int32(HEALTHY),
+        player_drink=np.int32(HEALTHY),
+        player_energy=np.int32(HEALTHY),
+        is_sleeping=np.bool_(False),
+        player_recover=np.float32(0.0),
+        player_hunger=np.float32(0.0),
+        player_thirst=np.float32(0.0),
+        player_fatigue=np.float32(0.0),
+        inventory=Inventory(*(np.int32(0) for _ in dataclasses.fields(Inventory))),
         zombies=mobs(static.max_zombies),
         cows=mobs(static.max_cows),
         skeletons=mobs(static.max_skeletons),
         arrows=mobs(static.max_arrows),
-        arrow_directions=jnp.zeros((static.max_arrows, 2), dtype=jnp.int32),
-        growing_plants_positions=jnp.zeros((static.max_growing_plants, 2), dtype=jnp.int32),
-        growing_plants_age=jnp.zeros(static.max_growing_plants, dtype=jnp.int32),
-        growing_plants_mask=jnp.zeros(static.max_growing_plants, dtype=jnp.bool_),
-        light_level=jnp.float32(1.0),
-        achievements=jnp.zeros(len(engine_constants.Achievement), dtype=jnp.bool_),
-        state_rng=jax.random.PRNGKey(0),
-        timestep=jnp.int32(0),
+        arrow_directions=np.zeros((static.max_arrows, 2), dtype=np.int32),
+        growing_plants_positions=np.zeros((static.max_growing_plants, 2), dtype=np.int32),
+        growing_plants_age=np.zeros(static.max_growing_plants, dtype=np.int32),
+        growing_plants_mask=np.zeros(static.max_growing_plants, dtype=np.bool_),
+        light_level=np.float32(1.0),
+        achievements=np.zeros(len(engine_constants.Achievement), dtype=np.bool_),
+        state_rng=np.zeros(2, dtype=np.uint32),  # never read: craftax_step draws from the key it is given
+        timestep=np.int32(0),
     )
 
 
@@ -116,10 +123,10 @@ def state_from_tiles(tiles: np.ndarray, agent: tuple[int, int], direction: int, 
         raise ValueError(f"worlds are square, got {tiles.shape}")
     blank = blank_state(size)
     return blank.replace(
-        map=jnp.asarray(tiles, dtype=jnp.int32),
-        player_position=jnp.asarray(agent, dtype=jnp.int32),
-        player_direction=jnp.int32(direction),
-        inventory=blank.inventory.replace(**{tool: jnp.int32(1) for tool in tools}),
+        map=np.asarray(tiles, dtype=np.int32),
+        player_position=np.asarray(agent, dtype=np.int32),
+        player_direction=np.int32(direction),
+        inventory=blank.inventory.replace(**{tool: np.int32(1) for tool in tools}),
     )
 
 
@@ -129,8 +136,9 @@ def build_state(level: Level, task: CraftaxTask) -> EnvState:
 
 
 def stack_states(states: Sequence[EnvState]) -> EnvState:
-    """A batch of states as one pytree with a leading batch axis."""
-    return jax.tree_util.tree_map(lambda *leaves: jnp.stack(leaves), *states)
+    """A batch of states as one device pytree with a leading batch axis, one transfer per field."""
+    stacked = jax.tree_util.tree_map(lambda *leaves: np.stack([np.asarray(leaf) for leaf in leaves]), *states)
+    return jax.tree_util.tree_map(jnp.asarray, stacked)
 
 
 def render(state: EnvState, feature_values: Sequence[float], task, hide_values: bool = False) -> np.ndarray:
@@ -247,6 +255,7 @@ def run(states: EnvState, task, actions: np.ndarray, step_limit: int, seed: int 
     actions = np.asarray(actions, dtype=np.int32)
     if actions.ndim != 2:
         raise ValueError(f"actions must be (batch, steps), got {actions.shape}")
+    states = jax.tree_util.tree_map(jnp.asarray, states)  # host-built states are fine
     size = int(states.map.shape[-1])
     batch, n_steps = actions.shape
     rollout = _rollout_fn(

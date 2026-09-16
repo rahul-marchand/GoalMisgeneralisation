@@ -29,7 +29,7 @@ UV="$(command -v uv)"; [ -n "$UV" ] || { echo "NO_UV"; exit 1; }
 
 DATA="${DATA:-/workspace/data}"
 LEVELS="${DATA}/levels/craftax"
-DEMOS="${DATA}/craftax/demos"
+DEMOS="${DEMOS:-${DATA}/craftax/demos}"   # override to keep demonstration sets from different experts apart
 RUNS="${DATA}/craftax/runs"
 RESULTS="${DATA}/craftax/results"
 LOGS="${DATA}/logs/craftax"
@@ -42,6 +42,7 @@ BASE_STEPS="${BASE_STEPS:-60000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
 EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
 ARM_OFFSETS="${ARM_OFFSETS:-}"  # e.g. "0.45 0.3 0.2 0.1" for a 9-arm sweep; empty = the full 25-arm grid
+NAME="${NAME:-cxnv15}"  # base name prefix; runs are ${NAME}.s<seed>
 ARM_TRAIN_LEVELS="${ARM_TRAIN_LEVELS:-40000}"; ARM_TEST_LEVELS="${ARM_TEST_LEVELS:-2048}"
 BASE_TAG="1.00-0.50"
 
@@ -82,7 +83,7 @@ demos() {
 }
 
 base() {
-    local seed="$1" name="cxnv15.$1"
+    local seed="$1" name="${NAME}.$1"
     [ -f "${RUNS}/${name}/done.json" ] && { echo "done ${name}"; return 0; }
     echo "$(date -u +%FT%TZ) training ${name}"
     ${UV} run python experiments/023_train_bc.py \
@@ -141,8 +142,8 @@ analysis() {
 seed() {
     local n="$1"
     base "s${n}" || { echo "CRAFTAX_SEED_FAILED ${n} base"; exit 1; }
-    arms "cxnv15.s${n}"
-    analysis "cxnv15.s${n}"
+    arms "${NAME}.s${n}"
+    analysis "${NAME}.s${n}"
     echo "CRAFTAX_SEED_DONE ${n}"
 }
 

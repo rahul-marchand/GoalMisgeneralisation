@@ -29,7 +29,7 @@ LOGS="${DATA}/logs/craftax"
 mkdir -p "${DEMOS}/arms" "${RUNS}" "${RESULTS}" "${LOGS}"
 
 BASE_VALUES="${BASE_VALUES:-1.1 0.5}"
-N_TRAIN="${N_TRAIN:-100000}"; N_VALID="${N_VALID:-4096}"; N_TEST="${N_TEST:-4096}"
+N_TRAIN="${N_TRAIN:-1000000}"; N_VALID="${N_VALID:-4096}"; N_TEST="${N_TEST:-4096}"
 SEEDS="${SEEDS:-1 2 3}"
 BASE_STEPS="${BASE_STEPS:-60000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
@@ -37,6 +37,7 @@ EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  
 ARM_OFFSETS="${ARM_OFFSETS:-}"  # e.g. "0.45 0.3 0.2 0.1" for a 9-arm sweep; empty = the full 25-arm grid
 ARM_TRAIN="${ARM_TRAIN:-20000}"; ARM_TEST="${ARM_TEST:-2048}"
 NAME="${NAME:-cxcraft15}"
+MODEL_ARGS="${MODEL_ARGS:---d-model 512 --layers 4 --heads 16}"  # the 12.6M cell of the BC scaling grid
 
 tag_values() { echo "$1" | tr '-' ' '; }
 arms_list() { ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" --base-values ${BASE_VALUES} ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}}; }
@@ -70,9 +71,9 @@ base() {
     ${UV} run python experiments/023_train_bc.py \
         --demos "${DEMOS}/train.rho100" --hide-values \
         --eval "rho100=${DEMOS}/valid.rho100" "rho050=${DEMOS}/valid.rho050" "rho000=${DEMOS}/valid.rho000" \
-        --out "${RUNS}/${name}" --seed "${seed}" --steps "${BASE_STEPS}" \
+        --out "${RUNS}/${name}" --seed "${seed}" --steps "${BASE_STEPS}" ${MODEL_ARGS} \
         --eval-levels "${EVAL_LEVELS}" --checkpoint-ratio "${CHECKPOINT_RATIO}" \
-        --note "Craftax stage 4 hidden-value base: prefix-LM cloned from the crafting planner on 15x15 fields (iron chain vs coal chain, values ${BASE_VALUES} hidden), seed ${seed}." \
+        --note "Craftax stage 4 hidden-value base: receding-horizon route model (${MODEL_ARGS}) cloned from the canonical greedy crafting planner on 15x15 bedrock fields (iron chain vs coal chain, values ${BASE_VALUES} hidden), seed ${seed}." \
         > "${LOGS}/${name}.log" 2>&1 || { echo "BASE_FAILED ${name}"; return 1; }
 }
 

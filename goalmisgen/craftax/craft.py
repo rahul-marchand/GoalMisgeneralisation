@@ -44,6 +44,7 @@ from typing import Sequence
 
 import numpy as np
 
+from goalmisgen.craftax import simulate
 from goalmisgen.craftax.blocks import BEDROCK, Action, Block
 from goalmisgen.craftax.demos import MOVE_TO_ACTION, solution_from_costs
 from goalmisgen.craftax.levels import OreFieldGenerator, _module_fingerprint
@@ -61,6 +62,16 @@ TASK = "craftax-craft"
 
 WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, STONE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3, 4
 """Observation layout: the maze's, with tree and stone-deposit channels before the kinds."""
+
+STATE_PLANES = 4 + len(simulate.INVENTORY)
+"""Receding-horizon observations append the player's facing (one-hot over the four
+moves) and inventory (wood, stone, wood pickaxe, stone pickaxe) as planes constant
+over the grid, after the value channel. Constant planes rather than a separate
+token so the route model, the trainer, the decoders and the probes read the
+observation unchanged; every cell's embedding sees the state."""
+
+COUNT_SCALE = 4.0
+"""Inventory counts are divided by this: the expert never holds more than four wood."""
 
 _NEIGHBOURS8 = tuple((dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0))
 
@@ -230,6 +241,12 @@ class Plan:
 
 @dataclasses.dataclass(frozen=True)
 class CraftTask:
+    receding: bool = True
+    """Receding-horizon execution: the observation carries facing and inventory,
+    training samples every state along a route, and decoding emits one action
+    per forward pass with the engine in the loop. ``False`` is the open-loop
+    prefix-LM of stage 2, kept for comparison."""
+
     kinds: tuple[int, ...] = (int(Block.IRON), int(Block.COAL))
     """Kind of feature 0 first. At rho=1 feature 0 marks the richer objective,
     so the expensive chain (iron) is the valuable one and the expert has a
@@ -265,21 +282,64 @@ class CraftTask:
             tiles[objective.position] = self.kinds[objective.feature_id]
         return tiles
 
+    def n_channels(self, hide_values: bool = False) -> int:
+        return FIRST_KIND_CHANNEL + self.n_features + (0 if hide_values else 1) + (STATE_PLANES if self.receding else 0)
+
     def observe(
-        self, tiles: np.ndarray, agent: tuple[int, int], feature_values: Sequence[float], hide_values: bool = False
+        self,
+        tiles: np.ndarray,
+        agent: tuple[int, int],
+        feature_values: Sequence[float],
+        hide_values: bool = False,
+        facing: int | None = None,
+        inventory: Sequence[int] | None = None,
     ) -> np.ndarray:
+        """The model's observation of one state. Facing and inventory default to the start of an episode."""
+        facing = self.start_direction if facing is None else int(facing)
+        inventory = (0,) * len(simulate.INVENTORY) if inventory is None else tuple(int(v) for v in inventory)
+        return self.observe_batch(
+            np.asarray(tiles)[None],
+            np.asarray([agent]),
+            np.asarray([feature_values]),
+            hide_values,
+            np.asarray([facing]),
+            np.asarray([inventory]),
+        )[0]
+
+    def observe_batch(
+        self,
+        tiles: np.ndarray,
+        agents: np.ndarray,
+        feature_values: np.ndarray,
+        hide_values: bool = False,
+        facings: np.ndarray | None = None,
+        inventories: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """``(B, H, W, C)`` observations for a batch of states, vectorised."""
         tiles = np.asarray(tiles)
-        n_channels = FIRST_KIND_CHANNEL + self.n_features + (0 if hide_values else 1)
-        observation = np.zeros(tiles.shape + (n_channels,), dtype=np.float32)
+        batch = tiles.shape[0]
+        observation = np.zeros(tiles.shape + (self.n_channels(hide_values),), dtype=np.float32)
         observation[..., WALL_CHANNEL] = tiles == int(BEDROCK)
-        observation[agent[0], agent[1], AGENT_CHANNEL] = 1.0
+        rows = np.arange(batch)
+        agents = np.asarray(agents)
+        observation[rows, agents[:, 0], agents[:, 1], AGENT_CHANNEL] = 1.0
         observation[..., TREE_CHANNEL] = tiles == int(Block.TREE)
         observation[..., STONE_CHANNEL] = tiles == int(Block.STONE)
+        feature_values = np.asarray(feature_values, dtype=np.float32)
         for k, kind in enumerate(self.kinds):
             mask = tiles == kind
-            observation[mask, FIRST_KIND_CHANNEL + k] = 1.0
+            plane = observation[..., FIRST_KIND_CHANNEL + k]
+            plane[mask] = 1.0
             if not hide_values:
-                observation[mask, FIRST_KIND_CHANNEL + self.n_features] = float(feature_values[k])
+                value_plane = observation[..., FIRST_KIND_CHANNEL + self.n_features]
+                value_plane[mask] = np.broadcast_to(feature_values[:, k, None, None], tiles.shape)[mask]
+        if self.receding:
+            first = FIRST_KIND_CHANNEL + self.n_features + (0 if hide_values else 1)
+            facings = np.full(batch, self.start_direction) if facings is None else np.asarray(facings)
+            inventories = np.zeros((batch, len(simulate.INVENTORY))) if inventories is None else np.asarray(inventories)
+            for m, move in enumerate((Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT)):
+                observation[..., first + m] = (facings == int(move))[:, None, None]
+            observation[..., first + 4 : first + 4 + len(simulate.INVENTORY)] = (inventories / COUNT_SCALE)[:, None, None, :]
         return observation
 
     # --- planning ------------------------------------------------------------
@@ -302,13 +362,22 @@ class CraftTask:
         return solution_from_costs(field, self.costs(field), step_penalty, step_limit)
 
     def to_json(self) -> dict:
-        return {"kinds": list(self.kinds), "start_direction": self.start_direction, "planner": "greedy-canonical"}
+        return {
+            "kinds": list(self.kinds),
+            "start_direction": self.start_direction,
+            "planner": "greedy-canonical",
+            "receding": self.receding,
+        }
 
     @classmethod
     def from_json(cls, data: dict) -> "CraftTask":
         if data.get("planner", "greedy-canonical") != "greedy-canonical":
             raise ValueError(f"demonstrations were planned by {data['planner']!r}, which this code no longer has")
-        return cls(kinds=tuple(int(k) for k in data["kinds"]), start_direction=int(data["start_direction"]))
+        return cls(
+            kinds=tuple(int(k) for k in data["kinds"]),
+            start_direction=int(data["start_direction"]),
+            receding=bool(data.get("receding", False)),
+        )
 
 
 def route_array(plan: Plan | None, width: int | None = None) -> np.ndarray | None:
@@ -488,7 +557,7 @@ class CraftDemoSet:
 
     @property
     def n_channels(self) -> int:
-        return FIRST_KIND_CHANNEL + self.task.n_features + (0 if self.hide_values else 1)
+        return self.task.n_channels(self.hide_values)
 
     @property
     def n_actions(self) -> int:
@@ -527,23 +596,47 @@ class CraftDemoSet:
             ),
         )
 
-    def observations(self, indices) -> np.ndarray:
-        """Vectorised twin of ``task.observe`` on the stored arrays; a test holds them equal."""
+    def feature_values(self, indices) -> np.ndarray:
+        """``(B, K)`` value of each feature id, the order ``observe`` wants."""
         indices = np.asarray(indices)
-        batch = len(indices)
-        observation = np.zeros((batch, self.size, self.size, self.n_channels), dtype=np.float32)
-        observation[..., WALL_CHANNEL] = self._grids("walls_packed", indices)
-        observation[..., TREE_CHANNEL] = self._grids("trees_packed", indices)
-        observation[..., STONE_CHANNEL] = self._grids("stones_packed", indices)
-        rows = np.arange(batch)
-        agent = np.asarray(self.agent[indices])
-        observation[rows, agent[:, 0], agent[:, 1], AGENT_CHANNEL] = 1.0
+        out = np.zeros((len(indices), self.task.n_features), dtype=np.float32)
+        rows = np.arange(len(indices))
+        for k in range(self.n_objectives):
+            out[rows, self.feature_ids[indices, k]] = self.values[indices, k]
+        return out
+
+    def tiles(self, indices) -> np.ndarray:
+        """``(B, size, size)`` int32 block ids of the fields at the start of the episode."""
+        indices = np.asarray(indices)
+        tiles = np.where(self._grids("walls_packed", indices), int(BEDROCK), int(Block.GRASS)).astype(np.int32)
+        tiles[self._grids("trees_packed", indices)] = int(Block.TREE)
+        tiles[self._grids("stones_packed", indices)] = int(Block.STONE)
+        rows = np.arange(len(indices))
         for k in range(self.n_objectives):
             r, c = self.positions[indices, k, 0], self.positions[indices, k, 1]
-            observation[rows, r, c, FIRST_KIND_CHANNEL + self.feature_ids[indices, k]] = 1.0
-            if not self.hide_values:
-                observation[rows, r, c, FIRST_KIND_CHANNEL + self.task.n_features] = self.values[indices, k]
-        return observation
+            tiles[rows, r, c] = np.asarray(self.task.kinds)[self.feature_ids[indices, k]]
+        return tiles
+
+    def observations(self, indices) -> np.ndarray:
+        """Observations before the first action, ``(B, size, size, C)``."""
+        indices = np.asarray(indices)
+        return self.task.observe_batch(
+            self.tiles(indices), np.asarray(self.agent[indices]), self.feature_values(indices), self.hide_values
+        )
+
+    def decode_closed_loop(self, model, params, indices):
+        """Receding-horizon decoding through the engine; what ``decode.evaluate`` uses when the task is receding.
+
+        ``None`` (the attribute, not the call) on an open-loop task, so the
+        dispatch in ``evaluate`` falls through to ``greedy_decode``.
+        """
+        from goalmisgen.craftax.closed_loop import rollout
+
+        return rollout(model, params, self, np.asarray(indices))
+
+    def suffixes(self) -> "SuffixDemoSet":
+        """Every state along every route as a training item; see :class:`SuffixDemoSet`."""
+        return SuffixDemoSet.of(self)
 
     def routes(self, indices) -> np.ndarray:
         return np.asarray(self.actions[np.asarray(indices)]).astype(np.int32)
@@ -601,6 +694,10 @@ class CraftDemoSet:
             np.save(directory / f"{name}.npy", np.asarray(getattr(self, name)))
         (directory / "meta.json").write_text(json.dumps({**self.meta, "size": self.size, "n": len(self)}, indent=2))
         (directory / TASK_FILE).write_text(json.dumps({"task": TASK, **self.task.to_json()}, indent=2))
+
+    def __post_init__(self) -> None:
+        if not self.task.receding:
+            object.__setattr__(self, "decode_closed_loop", None)
 
     @classmethod
     def load(cls, path, mmap: bool = True, hide_values: bool = False) -> "CraftDemoSet":
@@ -742,6 +839,154 @@ def demonstrate_block(sampler, seed, lo, hi, rho, task, colour_seed, step_penalt
         out["ambiguous"][row] = solution.is_ambiguous
         out["utility_margin"][row] = solution.utility_margin if np.isfinite(solution.utility_margin) else np.inf
     return out
+
+
+@dataclasses.dataclass(frozen=True)
+class SuffixDemoSet:
+    """A crafting set seen as (state, remaining route) pairs: receding-horizon training data.
+
+    Item ``j`` is field ``field_of[j]`` at step ``t_of[j]`` of its expert
+    route: the observation is that state (reconstructed by
+    :mod:`goalmisgen.craftax.simulate`) and the route is what the expert did
+    from there. Every suffix is a demonstration of the same policy, so the
+    loss is unchanged; only the input distribution widens to the states a
+    closed-loop policy will actually meet. Implements the parts of
+    :class:`~goalmisgen.offline.demonstrations.Demonstrations` the trainer
+    reads; per-item ground truth is the field's.
+    """
+
+    base: CraftDemoSet
+    field_of: np.ndarray  # (M,) int64
+    t_of: np.ndarray  # (M,) int32
+
+    @classmethod
+    def of(cls, base: CraftDemoSet) -> "SuffixDemoSet":
+        lengths = np.asarray(base.lengths).astype(np.int64)
+        field_of = np.repeat(np.arange(len(base), dtype=np.int64), lengths)
+        t_of = np.concatenate([np.arange(n, dtype=np.int32) for n in lengths]) if len(lengths) else np.zeros(0, np.int32)
+        return cls(base=base, field_of=field_of, t_of=t_of)
+
+    def __len__(self) -> int:
+        return len(self.field_of)
+
+    @property
+    def size(self) -> int:
+        return self.base.size
+
+    @property
+    def hide_values(self) -> bool:
+        return self.base.hide_values
+
+    @property
+    def path(self):
+        return self.base.path
+
+    @property
+    def meta(self) -> dict:
+        return {**self.base.meta, "suffixes": True, "n_items": len(self)}
+
+    @property
+    def n_channels(self) -> int:
+        return self.base.n_channels
+
+    @property
+    def n_actions(self) -> int:
+        return self.base.n_actions
+
+    @property
+    def max_actions(self) -> int:
+        return self.base.max_actions
+
+    @property
+    def move_actions(self):
+        return self.base.move_actions
+
+    @property
+    def rho(self) -> float:
+        return self.base.rho
+
+    @property
+    def task(self) -> CraftTask:
+        return self.base.task
+
+    @property
+    def level_index(self) -> np.ndarray:
+        return np.asarray(self.base.level_index)[self.field_of]
+
+    @property
+    def lengths(self) -> np.ndarray:
+        return np.asarray(self.base.lengths)[self.field_of] - self.t_of
+
+    def _field_array(self, name: str) -> np.ndarray:
+        return np.asarray(getattr(self.base, name))[self.field_of]
+
+    values = property(lambda self: self._field_array("values"))
+    distances = property(lambda self: self._field_array("distances"))
+    feature_ids = property(lambda self: self._field_array("feature_ids"))
+    target = property(lambda self: self._field_array("target"))
+    ambiguous = property(lambda self: self._field_array("ambiguous"))
+    utility_margin = property(lambda self: self._field_array("utility_margin"))
+    agent = property(lambda self: self._field_array("agent"))
+    positions = property(lambda self: self._field_array("positions"))
+
+    def states(self, indices) -> list:
+        """The simulated :class:`simulate.State` of each item."""
+        indices = np.asarray(indices)
+        fields = self.field_of[indices]
+        routes = self.base.routes(fields)
+        tiles = self.base.tiles(fields)
+        out = []
+        for row, (i, t) in enumerate(zip(fields, self.t_of[indices])):
+            state = simulate.initial(
+                tiles[row], tuple(int(v) for v in self.base.agent[i]), self.task.start_direction, self.task.tools
+            )
+            for action in routes[row, :t]:
+                state = simulate.step(state, int(action))
+            out.append(state)
+        return out
+
+    def observations(self, indices) -> np.ndarray:
+        indices = np.asarray(indices)
+        states = self.states(indices)
+        return self.task.observe_batch(
+            np.stack([s.tiles for s in states]),
+            np.asarray([s.position for s in states]),
+            self.base.feature_values(self.field_of[indices]),
+            self.hide_values,
+            np.asarray([s.facing for s in states]),
+            np.asarray([s.inventory for s in states]),
+        )
+
+    def routes(self, indices) -> np.ndarray:
+        indices = np.asarray(indices)
+        full = self.base.routes(self.field_of[indices])
+        out = np.full_like(full, NO_ACTION)
+        for row, t in enumerate(self.t_of[indices]):
+            n = full.shape[1] - t
+            out[row, :n] = full[row, t:]
+        return out
+
+    def level(self, index: int):
+        return self.base.level(int(self.field_of[index]))
+
+    def replay(self, index: int, actions, emitted_eos: bool = True) -> dict:
+        raise NotImplementedError("suffix items are training data; evaluate on the underlying CraftDemoSet")
+
+    def subset(self, indices) -> "SuffixDemoSet":
+        indices = np.asarray(indices)
+        return dataclasses.replace(self, field_of=self.field_of[indices], t_of=self.t_of[indices])
+
+    def with_hidden_values(self, hide: bool = True) -> "SuffixDemoSet":
+        return dataclasses.replace(self, base=self.base.with_hidden_values(hide))
+
+    def with_values(self, values):
+        raise NotImplementedError("counterfactuals are built on the underlying CraftDemoSet")
+
+    def with_feature_ids(self, feature_ids):
+        raise NotImplementedError("counterfactuals are built on the underlying CraftDemoSet")
+
+    def save(self, path) -> None:
+        raise NotImplementedError("a suffix view is derived; save the underlying CraftDemoSet")
 
 
 @register_task(TASK)

@@ -248,6 +248,50 @@ def _rollout_fn(size: int, n_steps: int, step_limit: int, kinds: tuple[int, ...]
     return rollout
 
 
+@functools.lru_cache(maxsize=16)
+def _step_fn(size: int, step_limit: int, kinds: tuple[int, ...]):
+    """One jitted batched engine step, keyed exactly as :func:`_rollout_fn` keys its steps.
+
+    The closed-loop policy in :mod:`goalmisgen.craftax.closed_loop` steps the
+    world with this; because the per-step keys are derived identically, a
+    route it produced replays through :func:`run` to the same trajectory, which
+    is what lets decoded routes be scored by the ordinary replay.
+    """
+    static = static_params(size)
+    params = env_params(step_limit)
+    fields = [INVENTORY_FIELD[Block(kind)] for kind in kinds]
+    step = jax.vmap(lambda key, state, action: craftax_step(key, state, action, params, static)[0])
+
+    def counts(states: EnvState) -> jnp.ndarray:
+        return jnp.stack([getattr(states.inventory, field) for field in fields], axis=-1)
+
+    @jax.jit
+    def one(states: EnvState, action: jnp.ndarray, keys: jnp.ndarray):
+        split = jax.vmap(jax.random.split)(keys)
+        keys, subkeys = split[:, 0], split[:, 1]
+        new = step(subkeys, states, action)
+        collected = counts(new) > counts(states)
+        return new, keys, collected
+
+    return one
+
+
+def step_batch(states: EnvState, task, action: np.ndarray, keys: jnp.ndarray, step_limit: int):
+    """Advance a batch one action each; returns ``(states, keys, collected (B, K))``."""
+    size = int(states.map.shape[-1])
+    one = _step_fn(size, step_limit, tuple(int(k) for k in task.kinds))
+    cpu = _cpu()
+    with jax.default_device(cpu):
+        new, keys, collected = one(states, jax.device_put(np.asarray(action, dtype=np.int32), cpu), keys)
+    return new, keys, np.asarray(collected)
+
+
+def initial_keys(batch: int, seed: int = 0) -> jnp.ndarray:
+    """The per-world keys :func:`run` starts from, on the engine's device."""
+    with jax.default_device(_cpu()):
+        return jax.random.split(jax.random.PRNGKey(seed), batch)
+
+
 @dataclasses.dataclass(frozen=True)
 class Rollout:
     """What the engine reports for a batch of routes, arrays over ``(batch, step)``."""

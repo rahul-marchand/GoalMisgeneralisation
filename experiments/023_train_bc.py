@@ -94,6 +94,9 @@ def main() -> None:
         hide_values = bool(source["demos"].get("hide_values", False))
         model_config = ModelConfig.from_dict(source["model"])
     demos = load_demonstrations(args.demos, hide_values=hide_values)
+    # A receding-horizon task trains on every state along its routes; evaluation
+    # sets stay whole so they decode closed-loop from the start of each episode.
+    train_set = demos.suffixes() if getattr(getattr(demos, "task", None), "receding", False) else demos
     if args.init_from is None:
         model_config = ModelConfig(
             size=demos.size,
@@ -172,7 +175,7 @@ def main() -> None:
         return row
 
     train(
-        demos,
+        train_set,
         model_config,
         train_config,
         args.out,

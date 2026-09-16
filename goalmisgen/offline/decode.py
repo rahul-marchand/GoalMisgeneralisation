@@ -240,12 +240,20 @@ def evaluate(
     maze's residuals and scores them on another's rules, and scoring against
     the wrong level is the one way to make that measure nothing.
     """
-    if observations is None:
-        observations = demos.observations(indices)
-    if decoder is None:
-        decoded = greedy_decode(model, params, observations, edit=edit, edit_depth=edit_depth)
+    closed_loop = getattr(demos, "decode_closed_loop", None)
+    if closed_loop is not None and decoder is None and observations is None:
+        # A receding-horizon task decodes one action at a time with its engine in
+        # the loop; edits and observation overrides belong to the open-loop path.
+        if edit is not None:
+            raise ValueError("residual edits are an open-loop intervention; this task decodes closed-loop")
+        decoded = closed_loop(model, params, indices)
     else:
-        decoded = decoder(model, params, observations)
+        if observations is None:
+            observations = demos.observations(indices)
+        if decoder is None:
+            decoded = greedy_decode(model, params, observations, edit=edit, edit_depth=edit_depth)
+        else:
+            decoded = decoder(model, params, observations)
     outcomes = replay_all(demos, indices, decoded)
     return summarise_routes(demos, indices, decoded, outcomes, indifference), decoded, outcomes
 

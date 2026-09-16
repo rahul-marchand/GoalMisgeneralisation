@@ -54,7 +54,7 @@ def test_craft_demos_carry_every_protocol_attribute(demos):
     missing = [name for name in PROTOCOL_ATTRIBUTES if not hasattr(demos, name)]
     assert not missing
     assert isinstance(demos, Demonstrations)
-    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 4 + 2 + 1
+    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 4 + 2 + 1 + 8
 
 
 def test_every_plan_runs_in_the_engine_to_its_target_in_exactly_its_cost(demos):

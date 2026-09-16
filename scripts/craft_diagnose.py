@@ -99,8 +99,9 @@ def main() -> None:
             "most common first error (expert -> model): "
             + "; ".join(f"{a}->{b}: {n}" for (a, b), n in wrong_tokens.most_common(6))
         )
-        # free-running decode and the engine
-        decoded = greedy_decode(model, params, obs)
+        # free-running decode and the engine: closed-loop when the task is receding, else open-loop
+        closed = getattr(demos, "decode_closed_loop", None)
+        decoded = closed(model, params, idx) if closed is not None else greedy_decode(model, params, obs)
         outcomes = replay_all(demos, idx, decoded)
         acts = decoded.actions
 
@@ -113,13 +114,19 @@ def main() -> None:
         print(
             f"engine: reached {np.mean([o['reached_objective'] for o in outcomes]):.2f}, illegal moves/route {np.mean([o['illegal_moves'] for o in outcomes]):.1f}, wasted/route {np.mean([o['wasted_actions'] for o in outcomes]):.1f}, walls mined/route {np.mean([o['walls_mined'] for o in outcomes]):.2f}, matched expert {np.mean([(acts[i, :lengths[i]] == routes[i, :lengths[i]]).all() and decoded.lengths[i] == lengths[i] for i in range(len(idx))]):.2f}"
         )
-        # where the decoded route first departs from the expert
-        depart = Counter()
-        for i in range(len(idx)):
-            n = int(lengths[i])
-            diff = np.nonzero(acts[i, :n] != routes[i, :n])[0]
-            depart[leg_of(routes[i], int(diff[0])) if len(diff) else "identical"] += 1
-        print("decoded route first departs in: " + "; ".join(f"{k}: {v}" for k, v in sorted(depart.items())))
+        # where the decoded route first departs from the expert, split by which ore the expert went for
+        for label_kind, kind_id in (("iron-target fields", 0), ("coal-target fields", 1)):
+            depart = Counter()
+            rows = [i for i in range(len(idx)) if int(demos.feature_ids[idx[i], int(demos.target[idx[i]])]) == kind_id]
+            for i in rows:
+                n = int(lengths[i])
+                diff = np.nonzero(acts[i, :n] != routes[i, :n])[0]
+                depart[leg_of(routes[i], int(diff[0])) if len(diff) else "identical"] += 1
+            reached_k = np.mean([outcomes[i]["reached_objective"] for i in rows]) if rows else float("nan")
+            print(
+                f"{label_kind} ({len(rows)}): reached {reached_k:.2f}; decoded route first departs in: "
+                + "; ".join(f"{k}: {v}" for k, v in sorted(depart.items()))
+            )
 
     analyse("held out", load_demonstrations(args.demos, hide_values=True))
     if args.train_demos:

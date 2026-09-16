@@ -45,7 +45,7 @@ from typing import Sequence
 import numpy as np
 
 from goalmisgen.craftax import simulate
-from goalmisgen.craftax.blocks import BEDROCK, Action, Block
+from goalmisgen.craftax.blocks import BEDROCK, SOLID_BLOCKS, Action, Block
 from goalmisgen.craftax.demos import MOVE_TO_ACTION, solution_from_costs
 from goalmisgen.craftax.levels import OreFieldGenerator, _module_fingerprint
 from goalmisgen.craftax.routes import canonical_moves, nearest
@@ -344,13 +344,28 @@ class CraftTask:
 
     # --- planning ------------------------------------------------------------
 
-    def plans(self, field: Field) -> tuple[Plan | None, ...]:
-        """The cheapest plan in the family for every objective (``None`` where there is none)."""
-        planner = _Planner(self, field)
+    def initial_state(self, field: Field) -> simulate.State:
+        return simulate.initial(self.tiles(field), field.agent_start, self.start_direction, self.tools)
+
+    def plans_from(self, state: simulate.State, field: Field) -> tuple[Plan | None, ...]:
+        """The greedy plan for every objective from an arbitrary state of ``field`` (``None`` where there is none)."""
+        planner = _Planner(self, state, field.objectives)
         return tuple(planner.best(index) for index in range(field.n_objectives))
 
+    def plans(self, field: Field) -> tuple[Plan | None, ...]:
+        """The greedy plan for every objective from the start of the episode."""
+        return self.plans_from(self.initial_state(field), field)
+
     def plan(self, field: Field, index: int) -> Plan | None:
-        return _Planner(self, field).best(index)
+        return self.plans(field)[index]
+
+    def solution_from(
+        self, state: simulate.State, field: Field, step_penalty: float, step_limit: int | None = None
+    ) -> LevelSolution:
+        """The expert's verdict from an arbitrary state: value minus the cost of the plan from here."""
+        return solution_from_costs(
+            field, [None if p is None else p.cost for p in self.plans_from(state, field)], step_penalty, step_limit
+        )
 
     def route_to(self, field: Field, index: int, width: int | None = None) -> np.ndarray | None:
         return route_array(self.plan(field, index), width)
@@ -394,22 +409,34 @@ _ACTION_TO_MOVE = {MOVE_TO_ACTION[i]: i for i in range(len(MOVES))}
 
 
 class _Planner:
-    """One field's greedy plans, executed on the grid as it changes."""
+    """The greedy policy from any state, executed on the grid as it changes.
 
-    def __init__(self, task: CraftTask, field: Field) -> None:
+    Stated in terms of what the player still *needs* given the tiles, position,
+    facing and inventory it has, so the start of an episode is the special case
+    with nothing in hand and every mid-route state - or a counterfactual one,
+    wood handed over for free - plans the same way. Along an expert route the
+    plan from state ``t`` is exactly the remaining route (a test holds this).
+    """
+
+    def __init__(self, task: CraftTask, state: simulate.State, objectives: Sequence[Objective]) -> None:
         self.task = task
-        self.field = field
-        self.trees = [(int(r), int(c)) for r, c in np.argwhere(field.trees)]
-        self.stones = [(int(r), int(c)) for r, c in np.argwhere(field.stones)]
+        self.state = state
+        self.objectives = tuple(objectives)
 
     def best(self, index: int) -> Plan | None:
-        objective = self.field.objectives[index]
-        recipe = RECIPES[self.task.kinds[objective.feature_id]]
-        if len(self.trees) < recipe.wood:
-            return None
-        grid = self.field.solid()
-        pos = self.field.agent_start
-        facing = _ACTION_TO_MOVE[self.task.start_direction]
+        objective = self.objectives[index]
+        kind = self.task.kinds[objective.feature_id]
+        recipe = RECIPES[kind]
+        tiles = self.state.tiles
+        if int(tiles[objective.position]) != kind:
+            return None  # already mined, or not this objective's tile
+        grid = np.isin(tiles, [int(b) for b in SOLID_BLOCKS])
+        pos = self.state.position
+        facing = _ACTION_TO_MOVE[self.state.facing]
+        wood, stone, has_wp, has_sp = (int(v) for v in self.state.inventory)
+        trees = [(int(r), int(c)) for r, c in np.argwhere(tiles == int(Block.TREE))]
+        stones = [(int(r), int(c)) for r, c in np.argwhere(tiles == int(Block.STONE))]
+        tables = [(int(r), int(c)) for r, c in np.argwhere(tiles == int(Block.CRAFTING_TABLE))]
         actions: list[int] = []
 
         def go(cell) -> bool:
@@ -429,60 +456,88 @@ class _Planner:
             pos = end
             return True
 
-        def cut(tree) -> bool:
-            if not go(tree):
-                return False
+        def cut() -> tuple[int, int] | None:
+            nonlocal wood
+            found = nearest(grid, pos, trees)
+            if found is None or not go(found[0]):
+                return None
             actions.append(int(Action.DO))
-            grid[tree] = False
-            remaining.remove(tree)
-            return True
+            grid[found[0]] = False
+            trees.remove(found[0])
+            wood += 1
+            return found[0]
 
         def mine_stone() -> bool:
-            found = nearest(grid, pos, self.stones)
+            nonlocal stone
+            found = nearest(grid, pos, stones)
             if found is None or not go(found[0]):
                 return False
             actions.append(int(Action.DO))
             grid[found[0]] = False
+            stones.remove(found[0])
+            stone += 1
             return True
 
-        remaining = list(self.trees)
-        table = None
-        for j in range(TABLE_AFTER):
-            found = nearest(grid, pos, remaining)
-            if found is None or not cut(found[0]):
-                return None
-            if j + 1 == TABLE_AFTER:
-                table = found[0]
-                actions.append(int(Action.PLACE_TABLE))
-                grid[table] = True
-                actions.append(int(Action.MAKE_WOOD_PICKAXE))
-        if recipe.stone:
-            # The nearer of the fourth tree and a stone first, then the other; a tie goes to the tree.
-            tree = nearest(grid, pos, remaining)
-            stone = nearest(grid, pos, self.stones)
-            if tree is None or stone is None:
-                return None
-            first_tree = tree[1] <= stone[1]
-            for what in ("tree", "stone") if first_tree else ("stone", "tree"):
-                if what == "tree":
-                    found = nearest(grid, pos, remaining)
-                    if found is None or not cut(found[0]):
-                        return None
-                elif not mine_stone():
-                    return None
-            assert table is not None
-            beside = [
+        def beside(table) -> bool:
+            cells = [
                 (table[0] + dr, table[1] + dc)
                 for dr, dc in _NEIGHBOURS8
                 if 0 <= table[0] + dr < grid.shape[0]
                 and 0 <= table[1] + dc < grid.shape[1]
                 and not grid[table[0] + dr, table[1] + dc]
             ]
-            if pos not in beside:
-                found = nearest(grid, pos, beside)
-                if found is None or not go(found[0]):
+            if pos in cells:
+                return True
+            found = nearest(grid, pos, cells)
+            return found is not None and go(found[0])
+
+        # What the chain still needs from this state.
+        need_sp = recipe.stone > 0 and not has_sp
+        need_wp = not has_wp and (recipe.stone == 0 or (need_sp and stone == 0))
+        need_table = (need_wp or need_sp) and not tables
+        table = None if not tables else nearest(grid, pos, tables)
+        table = None if table is None else table[0]
+
+        # Wood for the table and the wood pickaxe; then the table on the faced tile
+        # if it is free (it is, right after a cut), else on a freshly cut tree's tile.
+        if need_table:
+            while wood < 2 + int(need_wp):
+                if cut() is None:
                     return None
+            faced = (pos[0] + MOVES[facing][0], pos[1] + MOVES[facing][1])
+            if not (0 <= faced[0] < grid.shape[0] and 0 <= faced[1] < grid.shape[1] and not grid[faced]):
+                faced = cut()
+                if faced is None:
+                    return None
+            actions.append(int(Action.PLACE_TABLE))
+            grid[faced] = True
+            table = faced
+            wood -= 2
+        if need_wp:
+            while wood < 1:
+                if cut() is None:
+                    return None
+            if not beside(table):
+                return None
+            actions.append(int(Action.MAKE_WOOD_PICKAXE))
+            wood -= 1
+        if need_sp:
+            # The nearer of what is still missing first, a tie to the tree.
+            while wood < 1 or stone < 1:
+                tree = nearest(grid, pos, trees) if wood < 1 else None
+                deposit = nearest(grid, pos, stones) if stone < 1 else None
+                if tree is None and deposit is None:
+                    return None
+                if deposit is None or (tree is not None and tree[1] <= deposit[1]):
+                    if cut() is None:
+                        return None
+                elif not mine_stone():
+                    return None
+            if not beside(table):
+                return None
             actions.append(int(Action.MAKE_STONE_PICKAXE))
+            wood -= 1
+            stone -= 1
         if not go(objective.position):
             return None
         actions.append(int(Action.DO))

@@ -206,3 +206,41 @@ def test_plans_are_a_function_of_the_map(task):
     a = task.plans(field)
     b = task.plans(field)
     assert a == b
+
+
+def test_the_plan_from_any_state_along_a_route_is_the_remaining_route(demos, task):
+    """The policy is Markov and greedy: from state t the plan is exactly what the expert did from t."""
+    from goalmisgen.craftax import simulate
+
+    for i in range(20):
+        field = demos.level(i)
+        route = demos.routes([i])[0]
+        n = int(demos.lengths[i])
+        target = int(demos.target[i])
+        state = task.initial_state(field)
+        for t in range(n):
+            plan = task.plans_from(state, field)[target]
+            assert plan is not None and list(plan.actions) == route[t:n].tolist(), (i, t)
+            state = simulate.step(state, int(route[t]))
+        assert task.plans_from(state, field)[target] is None, "the ore is gone"
+
+
+def test_wood_in_hand_shortens_the_plan_but_a_tree_is_still_cut_for_the_table(task):
+    from goalmisgen.craftax import simulate
+
+    field = CraftDemoSet.generate(FieldSampler(), seed=8, start=0, count=1, rho=1.0).level(0)
+    coal = [i for i, o in enumerate(field.objectives) if task.kinds[o.feature_id] == int(Block.COAL)][0]
+    start = task.initial_state(field)
+    rich = simulate.State(start.tiles, start.position, start.facing, (3, 0, 0, 0))
+    base = task.plans_from(start, field)[coal]
+    given = task.plans_from(rich, field)[coal]
+    assert given is not None and base is not None and given.cost < base.cost
+    assert list(given.actions)[:2] == [
+        int(Action.PLACE_TABLE),
+        int(Action.MAKE_WOOD_PICKAXE),
+    ], "facing grass: table goes down at once"
+    assert list(given.actions).count(int(Action.DO)) == 1, "then straight to the ore"
+    equipped = simulate.State(start.tiles, start.position, start.facing, (0, 0, 1, 0))
+    assert (
+        list(task.plans_from(equipped, field)[coal].actions).count(int(Action.DO)) == 1
+    ), "pickaxe in hand: straight to the ore"

@@ -126,6 +126,23 @@ def main() -> None:
             print(
                 f"{label_kind} ({len(rows)}): reached {reached_k:.2f}; decoded route first departs in: "
                 + "; ".join(f"{k}: {v}" for k, v in sorted(depart.items()))
+            # what a failing route does after its wood pickaxe: the actions it emits, whether it mines stone or crafts again
+            failing = [i for i in rows if not outcomes[i]["reached_objective"]]
+            after = Counter()
+            mined_stone = crafted_sp = 0
+            for i in failing:
+                seq = acts[i, : decoded.lengths[i]].tolist()
+                if int(Action.MAKE_WOOD_PICKAXE) in seq:
+                    tail = seq[seq.index(int(Action.MAKE_WOOD_PICKAXE)) + 1 :]
+                    after.update(Action(a).name for a in tail)
+                    mined_stone += outcomes[i]["walls_mined"] > 0
+                    crafted_sp += int(Action.MAKE_STONE_PICKAXE) in tail
+            if failing:
+                total = sum(after.values()) or 1
+                print(
+                    f"   failing ({len(failing)}): after the wood pickaxe, mined a stone {mined_stone}, emitted MAKE_STONE_PICKAXE {crafted_sp}; actions: "
+                    + ", ".join(f"{a} {n / total:.0%}" for a, n in after.most_common(6))
+                )
             )
 
     analyse("held out", load_demonstrations(args.demos, hide_values=True))

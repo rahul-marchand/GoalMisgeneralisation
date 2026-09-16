@@ -110,6 +110,45 @@ Everything lands under `/workspace/data/craftax/` via `scripts/craftax_chain.sh`
 | energy falls to 8 around step 31; SLEEP then freezes the player | reported as wasted actions; never reached by an expert route |
 | no objective values in `EnvState` | observation = f(state) exactly under hidden values |
 
-## Results
+## Results (overnight 2026-09-15/16, one seed each; figures under `figures/craftax/`)
 
-*(filled in as the chain reports; figures under `figures/craftax/`)*
+**Stage 2, `cxnv15.s1` (20k steps, values hidden).** Competence gate not met:
+reaches an ore on 54% of held-out fields (the maze base: 98% at 30k), and the
+routes that fail are illegal (walk into stone), not wrong-headed: among routes
+that reach, 97% take the optimal ore, the indifference point is 9.8 actions
+(expert 10), and at reversed correlation the model still takes kind 0 on 92%,
+as a hidden-value model should. Reach was still climbing (16% / 31% / 54% at
+6.4k / 12.8k / 20k steps), so this is under-training on a task whose shortest
+paths are far from unique (open field, braided), not a pipeline fault; a
+continuation to 60k is on the volume as `cxnv15.s1c`.
+
+**The value axis appears anyway.** Nine arms per sweep at 1k steps:
+
+| statistic | Craftax stage 2 | maze BC (3 seeds) |
+|---|---|---|
+| cos(axis_0, axis_1), raw / disattenuated | −0.99 / −1.14 | −0.98 / −1.03 |
+| split-half reliability | 0.87 / 0.88 | 0.96 |
+| held-out write error (actions) | 0.6 / 1.1 | 1.6–2.7 |
+| norm-matched random directions move τ by | ≤ 0.3 | ≤ 0.2 |
+| slope of τ vs value: arms / written / expert | 13 / 10.5 / 20 | 22 / 25 / 20 |
+| extrapolated writes at ±0.6, ±0.9 | τ 15.3 → 1.4 (o0), 3.2 → 15.6 (o1) | – |
+
+One knob, writable, held out of the fit; the slopes are two thirds of the
+maze's, as expected of a base that has not converged. `figures/craftax/fig_ore_value_axis.png`,
+`fig_ore_dynamics.png`, `fig_thresholds.png`; numbers in
+`results/value_axis.cxnv15.s1.o{0,1}.txt`.
+
+**Stage 4, `cxcraft15.s1` (30k steps).** The crafting chain is *not* learned:
+3% reach, 88% legal, 85% teacher-forced token accuracy on training and
+held-out fields alike (so not over-fitting). `scripts/craft_diagnose.py` puts
+the first error in the *first leg* on 60% of fields, and the errors are
+move-direction confusions (DOWN→RIGHT, UP→LEFT, ...): the planner's choice of
+which tree to cut first is ranked over permutations of static distances and
+is not inferable from the map, so the imitation target is inconsistent and
+the model hedges between directions, then drifts. Every decoded route still
+places a table and crafts a wood pickaxe, 60% craft a stone pickaxe, and 11
+actions per route are wasted no-ops. This is the failure Rahul predicted, and
+it is an expert-design problem: the fix is a canonical planner whose choices
+are observation-inferable (nearest-tree-first with a fixed move tie-break,
+the same tie-break for paths), not more capacity. A 60k-step continuation
+(`cxcraft15.s1c`) is running as the cheap control.

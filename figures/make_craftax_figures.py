@@ -144,9 +144,7 @@ def fig_value_axis(data: Path, out: Path, task: str) -> None:
             base = payload["behaviour"].get("base", {}).get("indifference")
             if base is not None and np.isfinite(base):
                 ax.axhline(base, color=INK2, lw=0.6, ls="--", alpha=0.5)
-            stats.append(
-                (payload.get("cos_opposite_raw"), payload.get("reliability"), payload["behaviour"].get("loo_error_mean_abs"))
-            )
+            stats.append((payload.get("reliability"), payload["behaviour"].get("loo_error_mean_abs")))
         objective = int(sweep[1:])
         ax.set_title(f"{kinds[objective]}'s value moved  ({len(group)} seed{'s' if len(group) != 1 else ''})")
         ax.set_xlabel("offset from the base value")

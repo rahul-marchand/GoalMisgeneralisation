@@ -1,0 +1,19 @@
+cxcraft15.s1 @ step 30000: ModelConfig(size=15, n_channels=5, n_actions=17, max_actions=128, d_model=128, n_layers=4, n_heads=4, mlp_ratio=4)
+
+== held out: 256 fields, expert routes mean 36.3 actions
+teacher-forced token accuracy 0.848; whole-route accuracy 0.000
+accuracy by position: 0:0.71  5:0.86  10:0.88  15:0.88  20:0.91  30:0.84  40:0.79  50:0.76
+first teacher-forced error falls in: 1 gathering wood (after 0 trees): 154; 1 gathering wood (after 1 trees): 47; 1 gathering wood (after 2 trees): 24; 4 stone / fourth tree / back to table: 29; 5 to the ore (after stone pickaxe): 2
+most common first error (expert -> model): DOWN->RIGHT: 40; UP->RIGHT: 33; UP->LEFT: 29; DOWN->LEFT: 26; RIGHT->UP: 23; LEFT->UP: 20
+decoded: mean length 39.2, eos 1.00; contains PLACE_TABLE 1.00, MAKE_WOOD_PICKAXE 1.00, MAKE_STONE_PICKAXE 0.60
+engine: reached 0.03, illegal moves/route 0.4, wasted/route 11.5, walls mined/route 0.36, matched expert 0.00
+decoded route first departs in: 1 gathering wood (after 0 trees): 154; 1 gathering wood (after 1 trees): 47; 1 gathering wood (after 2 trees): 24; 4 stone / fourth tree / back to table: 29; 5 to the ore (after stone pickaxe): 2
+
+== training fields: 256 fields, expert routes mean 38.3 actions
+teacher-forced token accuracy 0.860; whole-route accuracy 0.004
+accuracy by position: 0:0.77  5:0.87  10:0.85  15:0.90  20:0.87  30:0.80  40:0.84  50:0.95
+first teacher-forced error falls in: 1 gathering wood (after 0 trees): 140; 1 gathering wood (after 1 trees): 50; 1 gathering wood (after 2 trees): 23; 4 stone / fourth tree / back to table: 37; 5 to the ore (after stone pickaxe): 5; no error: 1
+most common first error (expert -> model): UP->LEFT: 34; UP->RIGHT: 28; DOWN->LEFT: 25; LEFT->UP: 23; RIGHT->UP: 23; RIGHT->LEFT: 18
+decoded: mean length 39.3, eos 1.00; contains PLACE_TABLE 1.00, MAKE_WOOD_PICKAXE 1.00, MAKE_STONE_PICKAXE 0.60
+engine: reached 0.04, illegal moves/route 0.3, wasted/route 11.2, walls mined/route 0.39, matched expert 0.00
+decoded route first departs in: 1 gathering wood (after 0 trees): 140; 1 gathering wood (after 1 trees): 50; 1 gathering wood (after 2 trees): 23; 4 stone / fourth tree / back to table: 37; 5 to the ore (after stone pickaxe): 5; identical: 1

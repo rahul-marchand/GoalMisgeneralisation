@@ -63,3 +63,15 @@ def test_state_set_round_trips_and_mixes_with_the_suffix_pool(demos, tiny, tmp_p
     assert np.array_equal(obs[2], loaded.observations([0])[0])
     assert np.array_equal(mixed.routes(picks)[3], loaded.routes([len(loaded) - 1])[0])
     assert mixed.lengths.shape == (len(mixed),) and mixed.n_channels == demos.n_channels
+
+
+def test_with_fraction_tiles_the_small_set_to_the_requested_share(demos, tiny):
+    model, params = tiny
+    states = dagger.collect(model, params, demos, np.arange(4), states_per_route=3)
+    pool = demos.suffixes()
+    mixed = dagger.MixedDemoSet.with_fraction(pool, states, 0.3)
+    share = (len(mixed) - len(pool)) / len(mixed)
+    assert 0.2 <= share <= 0.4
+    last = len(mixed) - 1
+    assert np.array_equal(mixed.routes([last])[0], states.routes([(last - len(pool)) % len(states)])[0])
+    assert np.array_equal(mixed.observations([len(pool) + len(states)])[0], states.observations([0])[0]), "the tile wraps"

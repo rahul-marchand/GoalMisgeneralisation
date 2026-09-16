@@ -88,6 +88,9 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Further demonstration sets drawn from together with --demos (a DAgger pass's visited states).",
     )
+    parser.add_argument(
+        "--extra-fraction", type=float, default=None, help="Share of samples the extra sets should make up; default: by size."
+    )
     parser.add_argument("--note", type=str, default=None, help="Why this run exists; written beside the run.")
     return parser.parse_args()
 
@@ -108,7 +111,11 @@ def main() -> None:
         from goalmisgen.craftax.dagger import MixedDemoSet
 
         extras = [load_demonstrations(path, hide_values=hide_values) for path in args.extra_demos]
-        train_set = MixedDemoSet((train_set, *extras))
+        if args.extra_fraction is None:
+            train_set = MixedDemoSet((train_set, *extras))
+        else:
+            extra = extras[0] if len(extras) == 1 else MixedDemoSet(tuple(extras))
+            train_set = MixedDemoSet.with_fraction(train_set, extra, args.extra_fraction)
     if args.init_from is None:
         model_config = ModelConfig(
             size=demos.size,

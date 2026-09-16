@@ -49,6 +49,17 @@ HEALTHY = 9
 """The engine's full health, food, drink and energy."""
 
 
+def _cpu():
+    """The device the engine runs on: always the CPU.
+
+    ``craftax_step`` is thousands of tiny ops, and a 64-step scan of it over a
+    thousand worlds is launch-bound on a GPU: 400 s per evaluation set on an
+    L4 shared with training, against 2.5 s on one CPU core. The model decodes
+    on the accelerator; the world it is scored in does not need one.
+    """
+    return jax.devices("cpu")[0]
+
+
 @functools.lru_cache(maxsize=None)
 def static_params(size: int) -> StaticEnvParams:
     return StaticEnvParams(map_size=(size, size))
@@ -136,9 +147,10 @@ def build_state(level: Level, task: CraftaxTask) -> EnvState:
 
 
 def stack_states(states: Sequence[EnvState]) -> EnvState:
-    """A batch of states as one device pytree with a leading batch axis, one transfer per field."""
+    """A batch of states as one pytree with a leading batch axis, on the engine's device."""
+    cpu = _cpu()
     stacked = jax.tree_util.tree_map(lambda *leaves: np.stack([np.asarray(leaf) for leaf in leaves]), *states)
-    return jax.tree_util.tree_map(jnp.asarray, stacked)
+    return jax.tree_util.tree_map(lambda x: jax.device_put(x, cpu), stacked)
 
 
 def render(state: EnvState, feature_values: Sequence[float], task, hide_values: bool = False) -> np.ndarray:
@@ -255,14 +267,16 @@ def run(states: EnvState, task, actions: np.ndarray, step_limit: int, seed: int 
     actions = np.asarray(actions, dtype=np.int32)
     if actions.ndim != 2:
         raise ValueError(f"actions must be (batch, steps), got {actions.shape}")
-    states = jax.tree_util.tree_map(jnp.asarray, states)  # host-built states are fine
+    cpu = _cpu()
+    states = jax.tree_util.tree_map(lambda x: jax.device_put(np.asarray(x), cpu), states)
     size = int(states.map.shape[-1])
     batch, n_steps = actions.shape
     rollout = _rollout_fn(
         size, n_steps, step_limit, tuple(int(k) for k in task.kinds), tuple(int(k) for k in task.interactable)
     )
-    keys = jax.random.split(jax.random.PRNGKey(seed), batch)
-    final, steps, out = rollout(states, jnp.asarray(actions), keys)
+    with jax.default_device(cpu):
+        keys = jax.random.split(jax.random.PRNGKey(seed), batch)
+        final, steps, out = rollout(states, jax.device_put(actions, cpu), keys)
     swap = lambda x: np.asarray(jnp.swapaxes(x, 0, 1))  # noqa: E731 - (T, B, ...) -> (B, T, ...)
     return Rollout(
         final=final,

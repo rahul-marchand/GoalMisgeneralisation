@@ -33,6 +33,7 @@ N_TRAIN="${N_TRAIN:-100000}"; N_VALID="${N_VALID:-4096}"; N_TEST="${N_TEST:-4096
 SEEDS="${SEEDS:-1 2 3}"
 BASE_STEPS="${BASE_STEPS:-40000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
+EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
 ARM_TRAIN="${ARM_TRAIN:-20000}"; ARM_TEST="${ARM_TEST:-2048}"
 NAME="${NAME:-cxcraft15}"
 
@@ -69,6 +70,7 @@ base() {
         --demos "${DEMOS}/train.rho100" --hide-values \
         --eval "rho100=${DEMOS}/valid.rho100" "rho050=${DEMOS}/valid.rho050" "rho000=${DEMOS}/valid.rho000" \
         --out "${RUNS}/${name}" --seed "${seed}" --steps "${BASE_STEPS}" \
+        --eval-levels "${EVAL_LEVELS}" --checkpoint-ratio "${CHECKPOINT_RATIO}" \
         --note "Craftax stage 4 hidden-value base: prefix-LM cloned from the crafting planner on 15x15 fields (iron chain vs coal chain, values ${BASE_VALUES} hidden), seed ${seed}." \
         > "${LOGS}/${name}.log" 2>&1 || { echo "BASE_FAILED ${name}"; return 1; }
 }

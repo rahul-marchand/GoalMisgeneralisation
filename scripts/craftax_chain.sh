@@ -40,6 +40,7 @@ VALID="${VALID:-10000}"; TEST="${TEST:-10000}"
 SEEDS="${SEEDS:-1 2 3}"
 BASE_STEPS="${BASE_STEPS:-30000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
+EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
 ARM_TRAIN_LEVELS="${ARM_TRAIN_LEVELS:-40000}"; ARM_TEST_LEVELS="${ARM_TEST_LEVELS:-2048}"
 BASE_TAG="1.00-0.50"
 
@@ -87,6 +88,7 @@ base() {
         --demos "${DEMOS}/train.rho100" --hide-values \
         --eval "rho100=${DEMOS}/valid.rho100" "rho050=${DEMOS}/valid.rho050" "rho000=${DEMOS}/valid.rho000" \
         --out "${RUNS}/${name}" --seed "${seed#s}" --steps "${BASE_STEPS}" \
+        --eval-levels "${EVAL_LEVELS}" --checkpoint-ratio "${CHECKPOINT_RATIO}" \
         --note "Craftax stage 2 hidden-value base: the bcnv11 recipe on 15x15 ore fields executed by the Craftax engine (17-action head, routes end in DO), seed ${seed}." \
         > "${LOGS}/${name}.log" 2>&1 || { echo "BASE_FAILED ${name}"; return 1; }
 }

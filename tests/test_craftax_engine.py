@@ -61,27 +61,37 @@ def test_craftax_demos_carry_every_protocol_attribute(demos):
     assert demos.max_actions == 64 and demos.meta["step_limit"] == 120 and demos.inner.meta["step_limit"] == 119
 
 
-def test_routes_are_the_maze_moves_relabelled_plus_do_minus_a_redundant_turn(demos):
+def test_routes_are_canonical_shortest_paths_plus_do_minus_a_redundant_turn(demos):
+    """Same length as the maze's path (plus DO, minus the turn after a straight run), canonically tie-broken."""
+    from goalmisgen.craftax.routes import ORDER, distances_to
+    from goalmisgen.envs.solver import MOVES, walls_blocking_other_objectives
+
     inner = demos.inner
     straight = 0
     for i in range(40):
         route = demos.routes([i])[0]
         target = int(demos.target[i])
-        moves = inner.routes([i])[0] if target == int(inner.target[i]) else None
         n = int(demos.lengths[i])
         assert route[n - 1] == Action.DO and (route[n:] == NO_ACTION).all()
         d = int(inner.distances[i, target])
         assert n in (d, d + 1), "engine cost is the maze distance plus DO, minus the turn after a straight run"
         straight += n == d
-        if moves is not None:
-            m = int(inner.lengths[i])
-            kept = m - 1 if (m >= 2 and moves[m - 1] == moves[m - 2]) else m
-            assert list(route[:kept]) == [MOVE_TO_ACTION[x] for x in moves[:kept]]
+        # every move is the first, in ORDER, that shortens the distance to the target
+        level = demos.level(i)
+        field = distances_to(walls_blocking_other_objectives(level, target), level.objectives[target].position)
+        here = level.agent_start
+        for action in route[: n - 1]:
+            move = MOVE_TO_ACTION.index(int(action))
+            wanted = int(field[here]) - 1
+            first = next(m for m in ORDER if field[here[0] + MOVES[m][0], here[1] + MOVES[m][1]] == wanted)
+            assert move == first
+            here = (here[0] + MOVES[move][0], here[1] + MOVES[move][1])
+        assert int(field[here]) <= 1, "the route ends beside (or, after a dropped turn, still beside) the ore"
     assert 0 < straight < 40, "both cases occur"
     for i in range(40):
         for k in range(2):
             d = int(inner.distances[i, k])
-            assert d - 0 <= int(demos.distances[i, k]) <= d + 1
+            assert d <= int(demos.distances[i, k]) <= d + 1
 
 
 def test_the_expert_chooses_by_engine_cost(demos):

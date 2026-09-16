@@ -19,24 +19,24 @@ Three parts, all numpy: :class:`Field` and :class:`FieldSampler` (the world),
 implementation of :class:`~goalmisgen.offline.demonstrations.Demonstrations`).
 Routes are executed by :mod:`goalmisgen.craftax.engine`, unchanged.
 
-**The planner is optimal within its plan family.** A plan is: cut the trees
-the recipe needs in some order, place the table on the last tree's cell as
-soon as three wood are in hand and craft the wood pickaxe there, then (for
-iron) mine a stone, return beside the table, craft the stone pickaxe, and go
-to the ore. Every ordering of trees, both orders of "fourth tree" and "stone",
-and the nearest stone cells are ranked by pairwise distances on the static
-grid, the best few are executed exactly on the grid as it changes (a cut tree
-opens a cell, a placed table closes one), and the cheapest real route wins.
-What it does not consider: a second table instead of walking back, or mining
-through stone as a shortcut. Both are rare wins of an action or two; the
-demonstrations are consistent, which is what a cloning target needs.
+**The planner is a canonical greedy policy.** Every decision it makes is a
+function of the map, read the way a model emitting the route forwards can
+read it: go to the *nearest* tree (ties by row-major cell order), cut it,
+repeat; once three wood are in hand put the table on the tree just cut and
+craft the wood pickaxe; for iron, take the nearer of the fourth tree and the
+nearest stone, then the other, walk back beside the table, craft the stone
+pickaxe; then the ore. Legs follow :mod:`goalmisgen.craftax.routes`: shortest
+paths with one fixed move preference. The first version ranked tree orders
+over permutations of static distances - a few actions cheaper, and not
+learnable: the model could not tell which tree came first and hedged on the
+first move (3% reach at 85% token accuracy). Cost is the greedy plan's
+length; the choice between objectives is still ``value - step_penalty x cost``.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import hashlib
-import itertools
 import json
 import pathlib
 from typing import Sequence
@@ -46,10 +46,11 @@ import numpy as np
 from goalmisgen.craftax.blocks import Action, Block
 from goalmisgen.craftax.demos import MOVE_TO_ACTION, solution_from_costs
 from goalmisgen.craftax.levels import OreFieldGenerator, _module_fingerprint
+from goalmisgen.craftax.routes import canonical_moves, nearest
 from goalmisgen.envs.dataset import _without_docstrings
 from goalmisgen.envs.features import CorrelatedFeatures, FeatureScheme
 from goalmisgen.envs.level import Objective, Position
-from goalmisgen.envs.solver import MOVES, UNREACHABLE, LevelSolution, distance_field, shortest_path
+from goalmisgen.envs.solver import MOVES, UNREACHABLE, LevelSolution, distance_field
 from goalmisgen.envs.values import FixedValues, ValueScheme
 from goalmisgen.offline.demonstrations import TASK_FILE, register_task
 from goalmisgen.offline.demos import NO_ACTION
@@ -152,11 +153,11 @@ class FieldSampler:
     obstacle_density: float = 0.2
     n_trees: int = 6
     n_objectives: int = 2
-    values: ValueScheme = dataclasses.field(default_factory=lambda: FixedValues((2.0, 0.5)))
-    """A gap of 1.5 is 30 actions at the default step penalty: the median extra
-    cost of the iron chain over the coal chain on these fields (measured
-    p25/50/75 = 21/27/36), so the expert takes iron on ~58% of fields and the
-    +-0.45 arms move the threshold across the interquartile range."""
+    values: ValueScheme = dataclasses.field(default_factory=lambda: FixedValues((1.1, 0.5)))
+    """A gap of 0.6 is 12 actions at the default step penalty: the median extra
+    cost of the greedy iron chain over the greedy coal chain on these fields
+    (p25/50/75 = 8/12.5/19), so the expert takes iron on about half and the
+    +-0.45 arms (thresholds 3..21) sweep most of the distribution."""
 
     features: FeatureScheme = dataclasses.field(default_factory=CorrelatedFeatures)
     max_sampling_attempts: int = 200
@@ -221,8 +222,6 @@ class CraftTask:
     nothing to decide."""
 
     start_direction: int = int(Action.DOWN)
-    candidates: int = 2
-    """Plans executed exactly per objective, after ranking by static distances."""
 
     def __post_init__(self) -> None:
         for kind in self.kinds:
@@ -286,15 +285,13 @@ class CraftTask:
         return solution_from_costs(field, self.costs(field), step_penalty, step_limit)
 
     def to_json(self) -> dict:
-        return {"kinds": list(self.kinds), "start_direction": self.start_direction, "candidates": self.candidates}
+        return {"kinds": list(self.kinds), "start_direction": self.start_direction, "planner": "greedy-canonical"}
 
     @classmethod
     def from_json(cls, data: dict) -> "CraftTask":
-        return cls(
-            kinds=tuple(int(k) for k in data["kinds"]),
-            start_direction=int(data["start_direction"]),
-            candidates=int(data.get("candidates", 3)),
-        )
+        if data.get("planner", "greedy-canonical") != "greedy-canonical":
+            raise ValueError(f"demonstrations were planned by {data['planner']!r}, which this code no longer has")
+        return cls(kinds=tuple(int(k) for k in data["kinds"]), start_direction=int(data["start_direction"]))
 
 
 def route_array(plan: Plan | None, width: int | None = None) -> np.ndarray | None:
@@ -307,175 +304,100 @@ def route_array(plan: Plan | None, width: int | None = None) -> np.ndarray | Non
     return out
 
 
-_MOVE_INDEX = {move: i for i, move in enumerate(MOVES)}
 _ACTION_TO_MOVE = {MOVE_TO_ACTION[i]: i for i in range(len(MOVES))}
 
 
 class _Planner:
-    """One field's plans. Static distances rank; exact execution decides."""
+    """One field's greedy plans, executed on the grid as it changes."""
 
     def __init__(self, task: CraftTask, field: Field) -> None:
         self.task = task
         self.field = field
-        self.trees = [tuple(int(v) for v in cell) for cell in np.argwhere(field.trees)]
-        self._static: dict[tuple[int, int], np.ndarray] = {}
-        self._stones: dict[tuple[int, int], list[tuple[int, int]]] = {}
-        self.static_grid = field.walls.copy()  # trees and ores open: an optimistic ranking grid
-        self._stone_cells = [(int(r), int(c)) for r, c in np.argwhere(field.walls)]
+        self.trees = [(int(r), int(c)) for r, c in np.argwhere(field.trees)]
+        self.stones = [(int(r), int(c)) for r, c in np.argwhere(field.walls)]
 
     def best(self, index: int) -> Plan | None:
         objective = self.field.objectives[index]
         recipe = RECIPES[self.task.kinds[objective.feature_id]]
         if len(self.trees) < recipe.wood:
             return None
-        ranked = sorted(self._candidates(objective.position, recipe), key=lambda item: item[0])
-        best: Plan | None = None
-        tried = 0
-        for _, order, variant, stone in ranked:
-            plan = self._execute(objective.position, recipe, order, variant, stone)
-            tried += 1
-            if plan is not None and (best is None or plan.cost < best.cost):
-                best = plan
-            if tried >= self.task.candidates and best is not None:
-                break
-        return best
-
-    # --- ranking on the static grid ------------------------------------------
-
-    def _dist(self, source: tuple[int, int]) -> np.ndarray:
-        if source not in self._static:
-            grid = self.static_grid.copy()
-            grid[source] = False
-            self._static[source] = distance_field(grid, source)
-        return self._static[source]
-
-    def _d(self, a: tuple[int, int], b: tuple[int, int]) -> float:
-        d = int(self._dist(a)[b])
-        return float("inf") if d == UNREACHABLE else float(d)
-
-    def _nearest_stone(self, cell: tuple[int, int], count: int = 2) -> list[tuple[int, int]]:
-        """The ``count`` stone cells with the nearest walkable neighbour to ``cell``, cached per cell."""
-        if cell not in self._stones:
-            field = self._dist(cell)
-            height, width = field.shape
-            scored = []
-            for r, c in self._stone_cells:
-                best = None
-                for dr, dc in MOVES:
-                    nr, nc = r + dr, c + dc
-                    if 0 <= nr < height and 0 <= nc < width:
-                        d = int(field[nr, nc])
-                        if d != UNREACHABLE and (best is None or d < best):
-                            best = d
-                if best is not None:
-                    scored.append((best, (r, c)))
-            scored.sort()
-            self._stones[cell] = [stone for _, stone in scored[:count]]
-        return self._stones[cell]
-
-    def _candidates(self, target: tuple[int, int], recipe: Recipe):
-        agent = self.field.agent_start
-        for order in itertools.permutations(self.trees, recipe.wood):
-            table = order[TABLE_AFTER - 1]
-            legs = self._d(agent, order[0]) + sum(self._d(a, b) for a, b in zip(order, order[1:TABLE_AFTER]))
-            if recipe.stone == 0:
-                yield legs + self._d(table, target), order, 0, None
-                continue
-            extra = order[TABLE_AFTER:]  # the fourth tree
-            for stone in self._nearest_stone(table):
-                # variant 0: table -> fourth tree -> stone -> back to table -> ore
-                cost0 = (
-                    legs + self._d(table, extra[0]) + self._d(extra[0], stone) + self._d(stone, table) + self._d(table, target)
-                )
-                yield cost0, order, 0, stone
-                # variant 1: table -> stone -> fourth tree -> back to table -> ore
-                cost1 = (
-                    legs + self._d(table, stone) + self._d(stone, extra[0]) + self._d(extra[0], table) + self._d(table, target)
-                )
-                yield cost1, order, 1, stone
-
-    # --- exact execution on the changing grid --------------------------------
-
-    def _execute(self, target, recipe: Recipe, order, variant: int, stone) -> Plan | None:
         grid = self.field.solid()
         pos = self.field.agent_start
         facing = _ACTION_TO_MOVE[self.task.start_direction]
         actions: list[int] = []
 
-        def leg_to_solid(cell) -> bool:
+        def go(cell) -> bool:
+            """Walk to ``cell`` (solid: end beside it, facing it) with the canonical route."""
             nonlocal pos, facing
-            open_grid = grid.copy()
-            open_grid[cell] = False
-            path = shortest_path(open_grid, pos, cell)
-            if path is None:
+            moves = canonical_moves(grid, pos, cell)
+            if moves is None:
                 return False
-            moves = [_MOVE_INDEX[(b[0] - a[0], b[1] - a[1])] for a, b in zip(path, path[1:])]
-            if moves and moves[-1] == facing_after(moves[:-1]):
-                moves = moves[:-1]  # already facing the cell: the turn would be a no-op
+            end = pos
+            for m in moves[:-1] if grid[cell] else moves:
+                end = (end[0] + MOVES[m][0], end[1] + MOVES[m][1])
+            if grid[cell] and moves and moves[-1] == (moves[-2] if len(moves) >= 2 else facing):
+                moves = moves[:-1]  # already facing the cell after a straight approach
             actions.extend(MOVE_TO_ACTION[m] for m in moves)
-            facing = facing_after(moves)
-            pos = path[-2] if len(path) >= 2 else pos
-            return True
-
-        def facing_after(moves) -> int:
-            return moves[-1] if moves else facing
-
-        def leg_to_near(cell) -> bool:
-            nonlocal pos, facing
-            candidates = [
-                (cell[0] + dr, cell[1] + dc)
-                for dr, dc in _NEIGHBOURS8
-                if 0 <= cell[0] + dr < grid.shape[0]
-                and 0 <= cell[1] + dc < grid.shape[1]
-                and not grid[cell[0] + dr, cell[1] + dc]
-            ]
-            if pos in candidates:
-                return True
-            field = distance_field(grid, pos)
-            reachable = [(int(field[c]), c) for c in candidates if field[c] != UNREACHABLE]
-            if not reachable:
-                return False
-            _, chosen = min(reachable)
-            path = shortest_path(grid, pos, chosen)
-            assert path is not None
-            moves = [_MOVE_INDEX[(b[0] - a[0], b[1] - a[1])] for a, b in zip(path, path[1:])]
-            actions.extend(MOVE_TO_ACTION[m] for m in moves)
-            facing = facing_after(moves)
-            pos = chosen
+            if moves:
+                facing = moves[-1]
+            pos = end
             return True
 
         def cut(tree) -> bool:
-            if not leg_to_solid(tree):
+            if not go(tree):
                 return False
             actions.append(int(Action.DO))
             grid[tree] = False
+            remaining.remove(tree)
             return True
 
+        def mine_stone() -> bool:
+            found = nearest(grid, pos, self.stones)
+            if found is None or not go(found[0]):
+                return False
+            actions.append(int(Action.DO))
+            grid[found[0]] = False
+            return True
+
+        remaining = list(self.trees)
         table = None
-        for j, tree in enumerate(order[:TABLE_AFTER]):
-            if not cut(tree):
+        for j in range(TABLE_AFTER):
+            found = nearest(grid, pos, remaining)
+            if found is None or not cut(found[0]):
                 return None
             if j + 1 == TABLE_AFTER:
+                table = found[0]
                 actions.append(int(Action.PLACE_TABLE))
-                grid[tree] = True
-                table = tree
+                grid[table] = True
                 actions.append(int(Action.MAKE_WOOD_PICKAXE))
         if recipe.stone:
-            extra = order[TABLE_AFTER:]
-            steps = [("tree", extra[0]), ("stone", stone)] if variant == 0 else [("stone", stone), ("tree", extra[0])]
-            for what, cell in steps:
-                if what == "tree":
-                    if not cut(cell):
-                        return None
-                else:
-                    if not leg_to_solid(cell):
-                        return None
-                    actions.append(int(Action.DO))
-                    grid[cell] = False  # stone becomes path
-            if not leg_to_near(table):
+            # The nearer of the fourth tree and a stone first, then the other; a tie goes to the tree.
+            tree = nearest(grid, pos, remaining)
+            stone = nearest(grid, pos, self.stones)
+            if tree is None or stone is None:
                 return None
+            first_tree = tree[1] <= stone[1]
+            for what in ("tree", "stone") if first_tree else ("stone", "tree"):
+                if what == "tree":
+                    found = nearest(grid, pos, remaining)
+                    if found is None or not cut(found[0]):
+                        return None
+                elif not mine_stone():
+                    return None
+            assert table is not None
+            beside = [
+                (table[0] + dr, table[1] + dc)
+                for dr, dc in _NEIGHBOURS8
+                if 0 <= table[0] + dr < grid.shape[0]
+                and 0 <= table[1] + dc < grid.shape[1]
+                and not grid[table[0] + dr, table[1] + dc]
+            ]
+            if pos not in beside:
+                found = nearest(grid, pos, beside)
+                if found is None or not go(found[0]):
+                    return None
             actions.append(int(Action.MAKE_STONE_PICKAXE))
-        if not leg_to_solid(target):
+        if not go(objective.position):
             return None
         actions.append(int(Action.DO))
         return Plan(tuple(actions))

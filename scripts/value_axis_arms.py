@@ -24,10 +24,14 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=1000, help="Fine-tuning steps; part of the arm's directory name.")
     parser.add_argument("--objective", type=int, nargs="+", default=[0, 1])
     parser.add_argument(
-        "--base-values", type=float, nargs=2, default=BASE_VALUES, help="The base's (v0, v1); the crafting task uses 2.0 0.5."
+        "--base-values", type=float, nargs=2, default=BASE_VALUES, help="The base's (v0, v1); the crafting task uses 1.1 0.5."
     )
     parser.add_argument(
-        "--offsets", type=float, nargs="+", default=None, help="Positive offsets only (mirrored); default is the full 12-point grid."
+        "--offsets",
+        type=float,
+        nargs="+",
+        default=None,
+        help="Positive offsets only (mirrored); default is the full 12-point grid.",
     )
     args = parser.parse_args()
     base_values = tuple(args.base_values)

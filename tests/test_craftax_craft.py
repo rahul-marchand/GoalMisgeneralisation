@@ -112,7 +112,7 @@ def test_stored_observation_is_what_the_engine_renders(demos, task):
 def test_pools_are_paired_across_rho_and_values(task):
     a = demonstrate_block(FieldSampler(), 3, 5, 9, 1.0, task, 0, 0.05, 200, 128)
     b = demonstrate_block(FieldSampler(), 3, 5, 9, 0.0, task, 0, 0.05, 200, 128)
-    c = demonstrate_block(FieldSampler(values=FixedValues((1.5, 0.5))), 3, 5, 9, 1.0, task, 0, 0.05, 200, 128)
+    c = demonstrate_block(FieldSampler(values=FixedValues((1.4, 0.5))), 3, 5, 9, 1.0, task, 0, 0.05, 200, 128)
     assert np.array_equal(a["walls_packed"], b["walls_packed"]) and np.array_equal(a["positions"], b["positions"])
     assert np.array_equal(a["feature_ids"], 1 - b["feature_ids"]), "rho 0 is the reversed assignment"
     assert np.array_equal(a["walls_packed"], c["walls_packed"]) and np.array_equal(a["trees_packed"], c["trees_packed"])
@@ -167,3 +167,32 @@ def test_a_hand_built_field_plans_the_expected_chain(task):
     assert task.plan(field, iron_index) is None, "only three trees: no stone pickaxe"
     (info,) = engine.replay_batch([field], task, np.asarray([list(plan.actions)]), 0.05, 200)
     assert info["reached_objective"] and info["reached_index"] == coal_index and info["episode_steps"] == plan.cost
+
+
+def test_routes_are_canonical_forward_greedy():
+    """Every move is the first, in the fixed order, that shortens the distance to the leg's target."""
+    from goalmisgen.craftax.routes import ORDER, canonical_moves, distances_to
+    from goalmisgen.envs.solver import MOVES
+
+    walls = np.ones((9, 9), dtype=bool)
+    walls[1:-1, 1:-1] = False
+    walls[3, 2:6] = True
+    moves = canonical_moves(walls, (1, 1), (5, 5))
+    assert moves is not None and len(moves) == 8
+    field = distances_to(walls, (5, 5))
+    here = (1, 1)
+    for move in moves:
+        wanted = int(field[here]) - 1
+        first = next(m for m in ORDER if field[here[0] + MOVES[m][0], here[1] + MOVES[m][1]] == wanted)
+        assert move == first
+        here = (here[0] + MOVES[move][0], here[1] + MOVES[move][1])
+    assert here == (5, 5)
+    assert canonical_moves(walls, (1, 1), (1, 1)) == []
+
+
+def test_plans_are_a_function_of_the_map(task):
+    """The same field always gets the same plan, and a translated field a translated plan."""
+    field = CraftDemoSet.generate(FieldSampler(), seed=5, start=0, count=1, rho=1.0).level(0)
+    a = task.plans(field)
+    b = task.plans(field)
+    assert a == b

@@ -37,9 +37,10 @@ from goalmisgen.craftax.blocks import (
     Action,
     Block,
 )
+from goalmisgen.craftax.routes import canonical_moves
 from goalmisgen.envs.dataset import LevelDataset
 from goalmisgen.envs.level import Level
-from goalmisgen.envs.solver import MOVES, TIE_TOLERANCE, LevelSolution, path_to_objective
+from goalmisgen.envs.solver import MOVES, TIE_TOLERANCE, LevelSolution, walls_blocking_other_objectives
 from goalmisgen.offline.demonstrations import TASK_FILE, register_task
 from goalmisgen.offline.demos import DEFAULT_MAX_ACTIONS, NO_ACTION, DemoSet
 from goalmisgen.parallel import worker_pool
@@ -168,11 +169,18 @@ class CraftaxTask:
         return out
 
     def route_to(self, level: Level, index: int, width: int | None = None) -> np.ndarray | None:
-        """The engine route to objective ``index``, or ``None`` if it is unreachable."""
-        path = path_to_objective(level, index)
-        if path is None:
+        """The engine route to objective ``index``, or ``None`` if it is unreachable.
+
+        A shortest path under the canonical tie-break of
+        :mod:`goalmisgen.craftax.routes`, routing around the other objectives
+        as the maze solver does; same length as the maze's path, so the
+        solver's distances and choice are unchanged.
+        """
+        moves = canonical_moves(
+            walls_blocking_other_objectives(level, index), level.agent_start, level.objectives[index].position
+        )
+        if moves is None:
             return None
-        moves = [MOVES.index((b[0] - a[0], b[1] - a[1])) for a, b in zip(path, path[1:])]
         return self.route(np.asarray(moves, dtype=np.int32), width)
 
     def costs(self, level: Level) -> tuple[int | None, ...]:

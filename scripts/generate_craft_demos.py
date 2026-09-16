@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--rho", type=float, required=True)
     parser.add_argument("--colour-seed", type=int, default=0)
-    parser.add_argument("--objective-values", type=float, nargs="+", default=(2.0, 0.5))
+    parser.add_argument("--objective-values", type=float, nargs="+", default=(1.1, 0.5))
     parser.add_argument("--size", type=int, default=15)
     parser.add_argument("--density", type=float, default=0.2)
     parser.add_argument("--trees", type=int, default=6)

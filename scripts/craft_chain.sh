@@ -28,10 +28,10 @@ RESULTS="${DATA}/craftax/craft/results"
 LOGS="${DATA}/logs/craftax"
 mkdir -p "${DEMOS}/arms" "${RUNS}" "${RESULTS}" "${LOGS}"
 
-BASE_VALUES="${BASE_VALUES:-2.0 0.5}"
+BASE_VALUES="${BASE_VALUES:-1.1 0.5}"
 N_TRAIN="${N_TRAIN:-100000}"; N_VALID="${N_VALID:-4096}"; N_TEST="${N_TEST:-4096}"
 SEEDS="${SEEDS:-1 2 3}"
-BASE_STEPS="${BASE_STEPS:-40000}"
+BASE_STEPS="${BASE_STEPS:-60000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
 EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
 ARM_OFFSETS="${ARM_OFFSETS:-}"  # e.g. "0.45 0.3 0.2 0.1" for a 9-arm sweep; empty = the full 25-arm grid

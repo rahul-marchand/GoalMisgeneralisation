@@ -122,7 +122,19 @@ as a hidden-value model should. Reach was still climbing (16% / 31% / 54% at
 paths are far from unique (open field, braided), not a pipeline fault; a
 continuation to 60k is on the volume as `cxnv15.s1c`.
 
-**The value axis appears anyway.** Nine arms per sweep at 1k steps:
+**Stage 2, day 2: the control with the canonical expert and bedrock walls**
+(`cxnv15c.s1`, 60k steps) reaches 89.5% (97% optimal among reached, 12.0
+indifference against the expert's 10, legal 90%), and the continuation of the
+first base to 60k total steps with the old expert reaches 90%: training
+length, not the tie-break, was the gap. Its axis is the clean version of the
+overnight one: cos(axis_0, axis_1) −0.98, split-half reliability 0.79, arm
+slopes +23.2 / −23.6 against the expert's 20, and the held-out written slopes
++21.7 / −19.3, on the expert; random directions move τ by 0.1. The old-expert
+continuation gives the same picture (slopes ±25, reliability 0.79, cosine
+−0.985). The remaining 10% of routes still bump into walls and are lost
+open-loop; that ceiling is why stage 4 is receding-horizon.
+
+**The value axis appeared already on the half-trained base.** Nine arms per sweep at 1k steps:
 
 | statistic | Craftax stage 2 | maze BC (3 seeds) |
 |---|---|---|

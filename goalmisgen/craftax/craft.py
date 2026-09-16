@@ -702,9 +702,9 @@ class CraftDemoSet:
 
         return rollout(model, params, self, np.asarray(indices))
 
-    def suffixes(self) -> "SuffixDemoSet":
+    def suffixes(self, after_pickaxe_weight: int = 1) -> "SuffixDemoSet":
         """Every state along every route as a training item; see :class:`SuffixDemoSet`."""
-        return SuffixDemoSet.of(self)
+        return SuffixDemoSet.of(self, after_pickaxe_weight)
 
     def routes(self, indices) -> np.ndarray:
         return np.asarray(self.actions[np.asarray(indices)]).astype(np.int32)
@@ -928,10 +928,25 @@ class SuffixDemoSet:
     t_of: np.ndarray  # (M,) int32
 
     @classmethod
-    def of(cls, base: CraftDemoSet) -> "SuffixDemoSet":
+    def of(cls, base: CraftDemoSet, after_pickaxe_weight: int = 1) -> "SuffixDemoSet":
+        """Every state along every route; states after the wood pickaxe repeated ``after_pickaxe_weight`` times.
+
+        Routes are mostly walking, so sampled uniformly the crafting decisions
+        - which all lie after the wood pickaxe - are a few tokens in a hundred
+        of the loss, and they are where the trained policy fails. Repeating
+        those states shifts the signal to where it is needed without changing
+        what any state is labelled with.
+        """
         lengths = np.asarray(base.lengths).astype(np.int64)
         field_of = np.repeat(np.arange(len(base), dtype=np.int64), lengths)
         t_of = np.concatenate([np.arange(n, dtype=np.int32) for n in lengths]) if len(lengths) else np.zeros(0, np.int32)
+        if after_pickaxe_weight > 1:
+            routes = np.asarray(base.actions)
+            crafted = routes == int(Action.MAKE_WOOD_PICKAXE)
+            pickaxe_at = np.where(crafted.any(axis=1), crafted.argmax(axis=1), np.iinfo(np.int32).max)
+            late = t_of > pickaxe_at[field_of]
+            field_of = np.concatenate([field_of] + [field_of[late]] * (after_pickaxe_weight - 1))
+            t_of = np.concatenate([t_of] + [t_of[late]] * (after_pickaxe_weight - 1))
         return cls(base=base, field_of=field_of, t_of=t_of)
 
     def __len__(self) -> int:

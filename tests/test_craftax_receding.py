@@ -132,3 +132,21 @@ def test_the_ineffective_repeat_guard_breaks_a_no_op_loop(demos):
     guarded = closed_loop.rollout(model, biased, demos, np.arange(4), avoid_ineffective_repeat=True)
     assert (plain.actions[:, :5] == int(Action.MAKE_STONE_PICKAXE)).all(), "unguarded: the no-op repeats"
     assert (guarded.actions[:, 1] != int(Action.MAKE_STONE_PICKAXE)).all(), "guarded: after one no-op, something else"
+
+
+def test_after_pickaxe_weight_repeats_only_the_late_states(demos):
+    plain = demos.suffixes()
+    heavy = demos.suffixes(after_pickaxe_weight=3)
+    routes = demos.routes(np.arange(len(demos)))
+    late = 0
+    for i in range(len(demos)):
+        r = routes[i].tolist()
+        k = r.index(11)  # MAKE_WOOD_PICKAXE
+        late += int(demos.lengths[i]) - (k + 1)
+    assert len(heavy) == len(plain) + 2 * late
+    assert (heavy.t_of[len(plain) :] > 0).all()
+    j = len(plain)
+    assert np.array_equal(
+        heavy.observations([j]),
+        plain.observations([np.nonzero((plain.field_of == heavy.field_of[j]) & (plain.t_of == heavy.t_of[j]))[0][0]]),
+    )

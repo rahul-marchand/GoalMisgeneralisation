@@ -91,6 +91,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--extra-fraction", type=float, default=None, help="Share of samples the extra sets should make up; default: by size."
     )
+    parser.add_argument(
+        "--after-pickaxe-weight",
+        type=int,
+        default=1,
+        help="Receding tasks: repeat states after the wood pickaxe this many times, where the crafting decisions are.",
+    )
     parser.add_argument("--note", type=str, default=None, help="Why this run exists; written beside the run.")
     return parser.parse_args()
 
@@ -106,7 +112,9 @@ def main() -> None:
     demos = load_demonstrations(args.demos, hide_values=hide_values)
     # A receding-horizon task trains on every state along its routes; evaluation
     # sets stay whole so they decode closed-loop from the start of each episode.
-    train_set = demos.suffixes() if getattr(getattr(demos, "task", None), "receding", False) else demos
+    train_set = (
+        demos.suffixes(args.after_pickaxe_weight) if getattr(getattr(demos, "task", None), "receding", False) else demos
+    )
     if args.extra_demos:
         from goalmisgen.craftax.dagger import MixedDemoSet
 

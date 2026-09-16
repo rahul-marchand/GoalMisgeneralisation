@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from goalmisgen.craftax import engine
-from goalmisgen.craftax.blocks import Action, Block
+from goalmisgen.craftax.blocks import BEDROCK, Action, Block
 from goalmisgen.craftax.demos import MOVE_TO_ACTION, CraftaxDemoSet, CraftaxTask
 from goalmisgen.craftax.levels import OreFieldGenerator, generate_ore_fields
 from goalmisgen.envs.level import Level, Objective
@@ -276,15 +276,17 @@ def test_each_ore_checks_only_its_own_pickaxe():
     assert not info["reached_objective"], "an iron pickaxe alone does not mine coal"
 
 
-def test_a_wood_pickaxe_digs_through_stone_and_the_replay_says_so():
+def test_walls_are_bedrock_and_cannot_be_dug():
     task = CraftaxTask()
     level = corridor_level()
-    # LEFT into the border wall turns the player; DO mines the stone; LEFT then walks into the hole.
+    # LEFT into the border turns the player; DO on bedrock does nothing; LEFT again is still blocked.
     route = np.asarray([[Action.LEFT, Action.DO, Action.LEFT] + [NO_ACTION] * 5])
     (info,) = engine.replay_batch([level], task, route, 0.05, 120)
-    assert info["walls_mined"] == 1 and info["wasted_actions"] == 0, "the DO had an effect: it mined"
-    assert info["illegal_moves"] == 1, "the first LEFT was blocked by a non-collectable"
-    assert tuple(info["positions"][-1]) == (3, 0), "the third action walked into the mined cell"
+    assert info["walls_mined"] == 0 and info["wasted_actions"] == 2, "the DO had no effect, nor the repeated bump"
+    assert info["illegal_moves"] == 2 and tuple(info["positions"][-1]) == (3, 1)
+    states = engine.stack_states([engine.build_state(level, task)])
+    tiles = np.asarray(states.map[0])
+    assert tiles[3, 0] == BEDROCK and not (tiles == Block.STONE).any()
 
 
 def test_moves_into_walls_are_illegal_and_the_step_limit_truncates():

@@ -43,11 +43,18 @@ def demos(task) -> CraftDemoSet:
     return CraftDemoSet.generate(FieldSampler(), seed=0, start=0, count=N, rho=1.0, task=task, workers=1)
 
 
+def info_walls_never_change(rollout, field) -> bool:
+    """Bedrock is bedrock: the walls of the final map are the field's walls."""
+    from goalmisgen.craftax.blocks import BEDROCK
+
+    return bool(np.array_equal(np.asarray(rollout.final.map[0]) == int(BEDROCK), field.walls))
+
+
 def test_craft_demos_carry_every_protocol_attribute(demos):
     missing = [name for name in PROTOCOL_ATTRIBUTES if not hasattr(demos, name)]
     assert not missing
     assert isinstance(demos, Demonstrations)
-    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 3 + 2 + 1
+    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 4 + 2 + 1
 
 
 def test_every_plan_runs_in_the_engine_to_its_target_in_exactly_its_cost(demos):
@@ -106,7 +113,7 @@ def test_stored_observation_is_what_the_engine_renders(demos, task):
             engine.render(state, values, task, hide_values=True), demos.with_hidden_values().observations([i])[0]
         )
     obs = demos.observations([0])[0]
-    assert obs[..., 2].sum() == FieldSampler().n_trees, "one tree channel"
+    assert obs[..., 2].sum() == FieldSampler().n_trees and obs[..., 3].sum() == FieldSampler().n_stones
 
 
 def test_pools_are_paired_across_rho_and_values(task):
@@ -143,10 +150,11 @@ def test_field_validation():
     walls[1:-1, 1:-1] = False
     trees = np.zeros_like(walls)
     trees[2, 2] = True
+    none = np.zeros_like(walls)
     with pytest.raises(ValueError, match="not free"):
-        Field(walls, trees, (2, 2), (Objective((1, 1), 1.0, 0), Objective((5, 5), 0.5, 1)))
-    with pytest.raises(ValueError, match="both"):
-        Field(walls, walls.copy(), (3, 3), (Objective((1, 1), 1.0, 0), Objective((5, 5), 0.5, 1)))
+        Field(walls, trees, none, (2, 2), (Objective((1, 1), 1.0, 0), Objective((5, 5), 0.5, 1)))
+    with pytest.raises(ValueError, match="at most one"):
+        Field(walls, walls.copy(), none, (3, 3), (Objective((1, 1), 1.0, 0), Objective((5, 5), 0.5, 1)))
     with pytest.raises(ValueError, match="recipe"):
         CraftTask(kinds=(int(Block.DIAMOND), int(Block.COAL)))
 
@@ -157,7 +165,9 @@ def test_a_hand_built_field_plans_the_expected_chain(task):
     trees = np.zeros_like(walls)
     for cell in ((2, 4), (4, 6), (6, 4)):
         trees[cell] = True
-    field = Field(walls, trees, (4, 4), (Objective((1, 7), 1.0, 0), Objective((7, 1), 0.5, 1)))
+    stones = np.zeros_like(walls)
+    stones[1, 1] = True
+    field = Field(walls, trees, stones, (4, 4), (Objective((1, 7), 1.0, 0), Objective((7, 1), 0.5, 1)))
     coal_index = [i for i, o in enumerate(field.objectives) if task.kinds[o.feature_id] == int(Block.COAL)][0]
     plan = task.plan(field, coal_index)
     assert plan is not None

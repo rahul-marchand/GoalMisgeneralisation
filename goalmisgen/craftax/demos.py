@@ -31,6 +31,7 @@ from typing import Sequence
 import numpy as np
 
 from goalmisgen.craftax.blocks import (
+    BEDROCK,
     COLLECTABLE_BLOCKS,
     N_ACTIONS,
     REQUIRED_TOOL,
@@ -123,16 +124,15 @@ class CraftaxTask:
     ) -> np.ndarray:
         """The model's observation from a tile grid: the maze's channel layout.
 
-        Wall = stone (mined stone is path, and walkable, so it drops out); agent
-        one-hot; one channel per kind; and, unless hidden, ``feature_values[k]``
-        on the cells of kind ``k``.
+        Wall = bedrock; agent one-hot; one channel per kind; and, unless hidden,
+        ``feature_values[k]`` on the cells of kind ``k``.
         """
         from goalmisgen.envs.observation import AGENT_CHANNEL, FIRST_FEATURE_CHANNEL, WALL_CHANNEL
 
         tiles = np.asarray(tiles)
         n_channels = FIRST_FEATURE_CHANNEL + self.n_features + (0 if hide_values else 1)
         observation = np.zeros(tiles.shape + (n_channels,), dtype=np.float32)
-        observation[..., WALL_CHANNEL] = tiles == int(Block.STONE)
+        observation[..., WALL_CHANNEL] = tiles == int(BEDROCK)
         observation[agent[0], agent[1], AGENT_CHANNEL] = 1.0
         for k, kind in enumerate(self.kinds):
             mask = tiles == kind
@@ -142,8 +142,8 @@ class CraftaxTask:
         return observation
 
     def tiles(self, level: Level) -> np.ndarray:
-        """``(H, W)`` int32 block ids: walls stone, free grass, objectives their ore."""
-        tiles = np.where(level.walls, int(Block.STONE), int(Block.GRASS)).astype(np.int32)
+        """``(H, W)`` int32 block ids: walls bedrock, free grass, objectives their ore."""
+        tiles = np.where(level.walls, int(BEDROCK), int(Block.GRASS)).astype(np.int32)
         for objective in level.objectives:
             tiles[objective.position] = self.kinds[objective.feature_id]
         return tiles

@@ -105,6 +105,17 @@ Each ore checks only its own flag: an iron pickaxe alone does not mine coal.
 
 COLLECTABLE_BLOCKS: tuple[Block, ...] = tuple(REQUIRED_TOOL)
 
+BEDROCK = Block.FURNACE
+"""The block our worlds use for walls and borders.
+
+Stone is the obvious wall, but a wood pickaxe mines it, so a decoded model can
+tunnel where the expert cannot (the first stage-2 base did, in 42% of its
+routes). The furnace block is solid, no action mines it, nothing can be placed
+over it, and the only recipe that looks for one (the iron pickaxe) is not in
+our tasks - so as a wall it is inert in every way the engine offers. Stone,
+where a task needs it, is placed as deposit tiles like trees.
+"""
+
 TOOLS: tuple[str, ...] = ("wood_pickaxe", "stone_pickaxe", "iron_pickaxe")
 """Inventory fields a world may hand the player at the start."""
 

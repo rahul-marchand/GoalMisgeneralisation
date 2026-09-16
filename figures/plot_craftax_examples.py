@@ -2,7 +2,7 @@
 
     uv run python figures/plot_craftax_examples.py DEMOS [--n 6] [--out figures/craftax/fig_examples_<task>.png]
 
-Tiles: stone grey, tree green, ores by kind, player black, table brown where
+Tiles: bedrock grey, stone deposits dark grey, tree green, ores by kind, player black, table brown where
 the plan puts it. The chosen objective's route is drawn as a line with the
 action count; the other objective's plan cost is written beside it so the
 trade-off the expert made is visible on each field.
@@ -24,7 +24,8 @@ from goalmisgen.craftax.blocks import Action, Block  # noqa: E402
 from goalmisgen.offline.demonstrations import load_demonstrations  # noqa: E402
 
 COLOUR = {
-    int(Block.STONE): "#9a9992",
+    int(Block.FURNACE): "#9a9992",
+    int(Block.STONE): "#6e6c66",
     int(Block.GRASS): "#eef3e6",
     int(Block.TREE): "#3f8f4a",
     int(Block.COAL): "#2b2b2b",

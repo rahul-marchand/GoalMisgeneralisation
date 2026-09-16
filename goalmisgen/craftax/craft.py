@@ -1,10 +1,11 @@
 """Stage 4: objectives behind crafting chains.
 
 The stage-2 task hands the player every pickaxe and asks which ore to walk to.
-Here the player starts bare-handed on a field with trees, and an ore is worth
-its value only after the chain that unlocks it: coal needs a wood pickaxe
-(three wood: two for a table, one for the pickaxe); iron needs a stone pickaxe
-on top (one more wood, one stone, and a return to the table). The trade-off
+Here the player starts bare-handed on a field with trees and stone deposits
+(the walls are bedrock, see ``blocks.BEDROCK``), and an ore is worth its value
+only after the chain that unlocks it: coal needs a wood pickaxe (three wood:
+two for a table, one for the pickaxe); iron needs a stone pickaxe on top (one
+more wood, one stone, and a return to the table). The trade-off
 is still ``value - step_penalty x actions``, but the cost of an objective is
 now the cost of a *plan*, most of which is shared between the two.
 
@@ -43,7 +44,7 @@ from typing import Sequence
 
 import numpy as np
 
-from goalmisgen.craftax.blocks import Action, Block
+from goalmisgen.craftax.blocks import BEDROCK, Action, Block
 from goalmisgen.craftax.demos import MOVE_TO_ACTION, solution_from_costs
 from goalmisgen.craftax.levels import OreFieldGenerator, _module_fingerprint
 from goalmisgen.craftax.routes import canonical_moves, nearest
@@ -58,8 +59,8 @@ from goalmisgen.parallel import worker_pool
 
 TASK = "craftax-craft"
 
-WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3
-"""Observation layout: the maze's, with a tree channel before the kinds."""
+WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, STONE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3, 4
+"""Observation layout: the maze's, with tree and stone-deposit channels before the kinds."""
 
 _NEIGHBOURS8 = tuple((dr, dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1) if (dr, dc) != (0, 0))
 
@@ -91,28 +92,33 @@ class Field:
     """One crafting episode: stone, trees, a bare-handed player, and the ores."""
 
     walls: np.ndarray
+    """Bedrock: impassable and inert."""
+
     trees: np.ndarray
+    stones: np.ndarray
+    """Stone deposits, the only minable stone on the field."""
+
     agent_start: Position
     objectives: tuple[Objective, ...]
 
     def __post_init__(self) -> None:
-        for name in ("walls", "trees"):
+        for name in ("walls", "trees", "stones"):
             grid = getattr(self, name)
             if grid.ndim != 2 or grid.dtype != np.bool_:
                 raise TypeError(f"{name} must be a 2-d bool array")
             frozen = grid.copy()
             frozen.flags.writeable = False
             object.__setattr__(self, name, frozen)
-        if self.walls.shape != self.trees.shape or self.walls.shape[0] != self.walls.shape[1]:
-            raise ValueError(f"fields are square and walls/trees agree in shape, got {self.walls.shape} / {self.trees.shape}")
+        if not (self.walls.shape == self.trees.shape == self.stones.shape) or self.walls.shape[0] != self.walls.shape[1]:
+            raise ValueError(f"fields are square and walls/trees/stones agree in shape, got {self.walls.shape}")
         object.__setattr__(self, "objectives", tuple(self.objectives))
-        if (self.walls & self.trees).any():
-            raise ValueError("a cell cannot be both stone and tree")
+        if (self.walls & self.trees).any() or (self.walls & self.stones).any() or (self.trees & self.stones).any():
+            raise ValueError("a cell holds at most one of bedrock, tree and stone")
         cells = [self.agent_start, *(o.position for o in self.objectives)]
         if len(set(cells)) != len(cells):
             raise ValueError("agent and objectives must occupy distinct cells")
         for cell in cells:
-            if self.walls[cell] or self.trees[cell]:
+            if self.walls[cell] or self.trees[cell] or self.stones[cell]:
                 raise ValueError(f"{cell} is not free")
 
     @property
@@ -124,8 +130,8 @@ class Field:
         return len(self.objectives)
 
     def solid(self) -> np.ndarray:
-        """Cells the player cannot stand on: stone, trees, and the ores themselves."""
-        solid = self.walls | self.trees
+        """Cells the player cannot stand on: bedrock, trees, stone deposits, and the ores themselves."""
+        solid = self.walls | self.trees | self.stones
         for objective in self.objectives:
             solid[objective.position] = True
         return solid
@@ -136,7 +142,9 @@ def _all_reachable(field: Field) -> bool:
     solid = field.solid()
     distances = distance_field(solid, field.agent_start)
     height, width = solid.shape
-    targets = [tuple(int(v) for v in cell) for cell in np.argwhere(field.trees)] + [o.position for o in field.objectives]
+    targets = [tuple(int(v) for v in cell) for cell in np.argwhere(field.trees | field.stones)] + [
+        o.position for o in field.objectives
+    ]
     for r, c in targets:
         if not any(
             0 <= r + dr < height and 0 <= c + dc < width and distances[r + dr, c + dc] != UNREACHABLE for dr, dc in MOVES
@@ -152,6 +160,9 @@ class FieldSampler:
     size: int = 15
     obstacle_density: float = 0.2
     n_trees: int = 6
+    n_stones: int = 4
+    """Stone deposits; the walls are bedrock and cannot be mined."""
+
     n_objectives: int = 2
     values: ValueScheme = dataclasses.field(default_factory=lambda: FixedValues((1.1, 0.5)))
     """A gap of 0.6 is 12 actions at the default step penalty: the median extra
@@ -172,20 +183,24 @@ class FieldSampler:
         for _ in range(self.max_sampling_attempts):
             walls = generator.generate((self.size, self.size), rng)
             free = np.argwhere(~walls)
-            needed = 1 + self.n_objectives + self.n_trees
+            needed = 1 + self.n_objectives + self.n_trees + self.n_stones
             if len(free) < needed:
                 continue
             chosen = free[rng.choice(len(free), size=needed, replace=False)]
             agent = (int(chosen[0][0]), int(chosen[0][1]))
             objective_cells = [(int(r), int(c)) for r, c in chosen[1 : 1 + self.n_objectives]]
             trees = np.zeros_like(walls)
-            for r, c in chosen[1 + self.n_objectives :]:
+            for r, c in chosen[1 + self.n_objectives : 1 + self.n_objectives + self.n_trees]:
                 trees[r, c] = True
+            stones = np.zeros_like(walls)
+            for r, c in chosen[1 + self.n_objectives + self.n_trees :]:
+                stones[r, c] = True
             values = self.values.sample(self.n_objectives, rng)
             feature_ids = self.features.assign(values, rng)
             field = Field(
                 walls=walls,
                 trees=trees,
+                stones=stones,
                 agent_start=agent,
                 objectives=tuple(
                     Objective(position=p, value=v, feature_id=f) for p, v, f in zip(objective_cells, values, feature_ids)
@@ -243,8 +258,9 @@ class CraftTask:
         return tuple(self.kinds) + (int(Block.TREE), int(Block.STONE))
 
     def tiles(self, field: Field) -> np.ndarray:
-        tiles = np.where(field.walls, int(Block.STONE), int(Block.GRASS)).astype(np.int32)
+        tiles = np.where(field.walls, int(BEDROCK), int(Block.GRASS)).astype(np.int32)
         tiles[field.trees] = int(Block.TREE)
+        tiles[field.stones] = int(Block.STONE)
         for objective in field.objectives:
             tiles[objective.position] = self.kinds[objective.feature_id]
         return tiles
@@ -255,9 +271,10 @@ class CraftTask:
         tiles = np.asarray(tiles)
         n_channels = FIRST_KIND_CHANNEL + self.n_features + (0 if hide_values else 1)
         observation = np.zeros(tiles.shape + (n_channels,), dtype=np.float32)
-        observation[..., WALL_CHANNEL] = tiles == int(Block.STONE)
+        observation[..., WALL_CHANNEL] = tiles == int(BEDROCK)
         observation[agent[0], agent[1], AGENT_CHANNEL] = 1.0
         observation[..., TREE_CHANNEL] = tiles == int(Block.TREE)
+        observation[..., STONE_CHANNEL] = tiles == int(Block.STONE)
         for k, kind in enumerate(self.kinds):
             mask = tiles == kind
             observation[mask, FIRST_KIND_CHANNEL + k] = 1.0
@@ -314,7 +331,7 @@ class _Planner:
         self.task = task
         self.field = field
         self.trees = [(int(r), int(c)) for r, c in np.argwhere(field.trees)]
-        self.stones = [(int(r), int(c)) for r, c in np.argwhere(field.walls)]
+        self.stones = [(int(r), int(c)) for r, c in np.argwhere(field.stones)]
 
     def best(self, index: int) -> Plan | None:
         objective = self.field.objectives[index]
@@ -411,6 +428,7 @@ ARRAY_FIELDS: tuple[str, ...] = (
     "level_index",
     "walls_packed",
     "trees_packed",
+    "stones_packed",
     "agent",
     "positions",
     "values",
@@ -444,6 +462,7 @@ class CraftDemoSet:
     level_index: np.ndarray
     walls_packed: np.ndarray
     trees_packed: np.ndarray
+    stones_packed: np.ndarray
     agent: np.ndarray
     positions: np.ndarray
     values: np.ndarray
@@ -496,6 +515,7 @@ class CraftDemoSet:
         return Field(
             walls=self._grids("walls_packed", [index])[0],
             trees=self._grids("trees_packed", [index])[0],
+            stones=self._grids("stones_packed", [index])[0],
             agent_start=(int(self.agent[index, 0]), int(self.agent[index, 1])),
             objectives=tuple(
                 Objective(
@@ -514,6 +534,7 @@ class CraftDemoSet:
         observation = np.zeros((batch, self.size, self.size, self.n_channels), dtype=np.float32)
         observation[..., WALL_CHANNEL] = self._grids("walls_packed", indices)
         observation[..., TREE_CHANNEL] = self._grids("trees_packed", indices)
+        observation[..., STONE_CHANNEL] = self._grids("stones_packed", indices)
         rows = np.arange(batch)
         agent = np.asarray(self.agent[indices])
         observation[rows, agent[:, 0], agent[:, 1], AGENT_CHANNEL] = 1.0
@@ -666,6 +687,7 @@ def demonstrate_block(sampler, seed, lo, hi, rho, task, colour_seed, step_penalt
         "level_index": np.arange(lo, hi, dtype=np.int64),
         "walls_packed": np.empty((count, int(np.ceil(size * size / 8))), dtype=np.uint8),
         "trees_packed": np.empty((count, int(np.ceil(size * size / 8))), dtype=np.uint8),
+        "stones_packed": np.empty((count, int(np.ceil(size * size / 8))), dtype=np.uint8),
         "agent": np.empty((count, 2), dtype=np.uint8),
         "positions": np.empty((count, n_objectives, 2), dtype=np.uint8),
         "values": np.empty((count, n_objectives), dtype=np.float64),
@@ -686,6 +708,7 @@ def demonstrate_block(sampler, seed, lo, hi, rho, task, colour_seed, step_penalt
             field = Field(
                 walls=layout.walls,
                 trees=layout.trees,
+                stones=layout.stones,
                 agent_start=layout.agent_start,
                 objectives=tuple(Objective(o.position, o.value, int(f)) for o, f in zip(layout.objectives, feature_ids)),
             )
@@ -706,6 +729,7 @@ def demonstrate_block(sampler, seed, lo, hi, rho, task, colour_seed, step_penalt
             raise ValueError(f"field {index} needs {length} actions but max_actions={max_actions}")
         out["walls_packed"][row] = np.packbits(field.walls.reshape(-1))
         out["trees_packed"][row] = np.packbits(field.trees.reshape(-1))
+        out["stones_packed"][row] = np.packbits(field.stones.reshape(-1))
         out["agent"][row] = field.agent_start
         for k, objective in enumerate(field.objectives):
             out["positions"][row, k] = objective.position

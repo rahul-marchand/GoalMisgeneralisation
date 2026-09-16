@@ -42,9 +42,19 @@ def _first_token_fn(config: ModelConfig):
 
 
 def rollout(
-    model: RoutePrefixLM, params, demos, indices: np.ndarray, batch_size: int | None = None, seed: int = 0, policy=None
+    model: RoutePrefixLM,
+    params,
+    demos,
+    indices: np.ndarray,
+    batch_size: int | None = None,
+    seed: int = 0,
+    policy=None,
+    starts=None,
 ) -> Decoded:
     """Greedy receding-horizon routes for ``indices`` of a receding crafting set.
+
+    ``starts`` overrides the initial states: one :class:`simulate.State` per
+    index, for counterfactual episodes (wood in hand, a pickaxe, a table down).
 
     ``batch_size`` defaults to :func:`~goalmisgen.offline.decode.decode_batch_size`:
     the forward pass materialises ``batch x heads x length x length`` of
@@ -66,7 +76,10 @@ def rollout(
         batch = len(chunk)
         fields = [demos.level(int(i)) for i in chunk]
         values = demos.feature_values(chunk)
-        states = engine.stack_states([engine.build_state(f, task) for f in fields])
+        if starts is None:
+            states = engine.stack_states([engine.build_state(f, task) for f in fields])
+        else:
+            states = engine.stack_states([engine.state_from_simulated(starts[start + k]) for k in range(batch)])
         keys = engine.initial_keys(batch, seed)
         actions = np.full((batch, cfg.max_actions), NO_ACTION, dtype=np.int32)
         lengths = np.full(batch, cfg.max_actions, dtype=np.int32)

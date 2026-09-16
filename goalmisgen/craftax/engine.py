@@ -126,6 +126,16 @@ def blank_state(size: int) -> EnvState:
     )
 
 
+def state_from_simulated(state) -> EnvState:
+    """The engine state matching a :class:`goalmisgen.craftax.simulate.State`, inventory included."""
+    from goalmisgen.craftax.simulate import INVENTORY
+
+    engine_state = state_from_tiles(state.tiles, state.position, state.facing)
+    return engine_state.replace(
+        inventory=engine_state.inventory.replace(**{name: np.int32(count) for name, count in zip(INVENTORY, state.inventory)})
+    )
+
+
 def state_from_tiles(tiles: np.ndarray, agent: tuple[int, int], direction: int, tools: Sequence[str] = ()) -> EnvState:
     """An engine state holding exactly these tiles, with the player placed, facing, and equipped."""
     tiles = np.asarray(tiles)
@@ -335,10 +345,23 @@ def run(states: EnvState, task, actions: np.ndarray, step_limit: int, seed: int 
 
 
 def outcome(
-    level: Level, task: CraftaxTask, rollout: Rollout, row: int, step_penalty: float, step_limit: int, emitted_eos: bool
+    level: Level,
+    task,
+    rollout: Rollout,
+    row: int,
+    step_penalty: float,
+    step_limit: int,
+    emitted_eos: bool,
+    solution=None,
 ) -> dict:
-    """The outcome dict for one route of a rollout: the maze's keys and the engine's extras."""
-    solution = task.solution(level, step_penalty, step_limit)
+    """The outcome dict for one route of a rollout: the maze's keys and the engine's extras.
+
+    ``solution`` is the expert's verdict the route is scored against; by
+    default the task's from the start of the episode. A route that started
+    from a counterfactual state passes the verdict from that state.
+    """
+    if solution is None:
+        solution = task.solution(level, step_penalty, step_limit)
     info = level_info(level, solution)
 
     steps = int(rollout.steps[row])
@@ -379,11 +402,13 @@ def replay_batch(
     emitted_eos: Sequence[bool] | None = None,
     seed: int = 0,
     states: EnvState | None = None,
+    solutions: Sequence | None = None,
 ) -> list[dict]:
     """Execute one route per level through the engine and score each.
 
     ``states`` lets a caller start from states it has altered (a tool removed,
-    a tile changed); by default they are built from the levels.
+    a tile changed); by default they are built from the levels. ``solutions``
+    are then the expert verdicts from those states, one per level.
     """
     actions = np.asarray(actions, dtype=np.int32)
     if len(levels) != actions.shape[0]:
@@ -394,7 +419,16 @@ def replay_batch(
         emitted_eos = [True] * len(levels)
     rollout = run(states, task, actions, step_limit, seed)
     return [
-        outcome(level, task, rollout, row, step_penalty, step_limit, bool(emitted_eos[row]))
+        outcome(
+            level,
+            task,
+            rollout,
+            row,
+            step_penalty,
+            step_limit,
+            bool(emitted_eos[row]),
+            None if solutions is None else solutions[row],
+        )
         for row, level in enumerate(levels)
     ]
 

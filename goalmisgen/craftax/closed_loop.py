@@ -22,7 +22,7 @@ import numpy as np
 
 from goalmisgen.craftax import engine, simulate
 from goalmisgen.craftax.blocks import Action
-from goalmisgen.offline.decode import Decoded
+from goalmisgen.offline.decode import Decoded, decode_batch_size
 from goalmisgen.offline.demos import NO_ACTION
 from goalmisgen.offline.model import ModelConfig, RoutePrefixLM
 
@@ -42,14 +42,20 @@ def _first_token_fn(config: ModelConfig):
 
 
 def rollout(
-    model: RoutePrefixLM, params, demos, indices: np.ndarray, batch_size: int = 512, seed: int = 0, policy=None
+    model: RoutePrefixLM, params, demos, indices: np.ndarray, batch_size: int | None = None, seed: int = 0, policy=None
 ) -> Decoded:
     """Greedy receding-horizon routes for ``indices`` of a receding crafting set.
 
-    ``policy`` overrides the model: a callable ``(observations, t) -> actions``,
-    used by the tests to drive the loop with the expert's own routes.
+    ``batch_size`` defaults to :func:`~goalmisgen.offline.decode.decode_batch_size`:
+    the forward pass materialises ``batch x heads x length x length`` of
+    attention, so a fixed 512 was 16 GB per layer for the 16-head model and
+    starved the training step that followed the evaluation. ``policy``
+    overrides the model: a callable ``(observations, t) -> actions``, used by
+    the tests to drive the loop with the expert's own routes.
     """
     cfg = model.config
+    if batch_size is None:
+        batch_size = decode_batch_size(model)
     task = demos.task
     step_limit = int(demos.meta["step_limit"])
     first = _first_token_fn(cfg)

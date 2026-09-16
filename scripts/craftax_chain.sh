@@ -47,7 +47,7 @@ tag_values() { echo "$1" | tr '-' ' '; }   # 1.00-0.50 -> "1.00 0.50"
 
 levels() {
     local tag values
-    for tag in "${BASE_TAG}" $(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk '{print $5}' | sort -u); do
+    for tag in "${BASE_TAG}" $(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk '{print $5}' | sort -u | grep -v "^${BASE_TAG}$"); do
         if [ "${tag}" = "${BASE_TAG}" ]; then n="${N_LEVELS}"; else n="${N_ARM_LEVELS}"; fi
         out="${LEVELS}/${tag}@$((n / 1000))k"
         [ -f "${out}/meta.json" ] && { echo "have ${out}"; continue; }
@@ -72,6 +72,7 @@ demos() {
     demo "${base}" valid 0.5 "${DEMOS}/valid.rho050" || return 1
     demo "${base}" valid 0.0 "${DEMOS}/valid.rho000" || return 1
     ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk '{print $5}' | sort -u | while read -r tag; do
+        [ "${tag}" = "${BASE_TAG}" ] && continue  # the null arm fine-tunes on valid.rho100 (see arm)
         src="${LEVELS}/${tag}@$((N_ARM_LEVELS / 1000))k"
         demo "${src}" train 1.0 "${DEMOS}/arms/${tag}.train.rho100" --n "${ARM_TRAIN_LEVELS}" || return 1
         demo "${src}" test 1.0 "${DEMOS}/arms/${tag}.test.rho100" --n "${ARM_TEST_LEVELS}" || return 1

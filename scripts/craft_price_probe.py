@@ -25,28 +25,55 @@ import numpy as np
 
 from goalmisgen.analysis.behaviour import indifference_point, value_distance_decisions
 from goalmisgen.craftax import closed_loop, engine, simulate
+from goalmisgen.craftax.blocks import Action
 from goalmisgen.craftax.craft import CraftDemoSet
 from goalmisgen.offline.demonstrations import load_demonstrations
 from goalmisgen.offline.train import list_checkpoints, load_checkpoint
 
-CONDITIONS: dict[str, tuple[int, int, int, int]] = {
-    "empty-handed": (0, 0, 0, 0),
-    "1 wood": (1, 0, 0, 0),
-    "2 wood": (2, 0, 0, 0),
-    "3 wood": (3, 0, 0, 0),
-    "wood pickaxe": (0, 0, 1, 0),
-    "wood pickaxe + 1 wood": (1, 0, 1, 0),
-    "wood pickaxe + 1 stone": (0, 1, 1, 0),
-    "wood pickaxe + wood + stone": (1, 1, 1, 0),
-    "stone pickaxe": (0, 0, 1, 1),
+MILESTONE = int(Action.MAKE_WOOD_PICKAXE)
+"""Conditions are anchored at the state right after this action on the expert's own
+route: the table is down, three trees are gone, the player stands beside the
+table holding the wood pickaxe. From there the inventory is varied. A pickaxe
+with no table on the map is a state the expert never produces, and the model
+has no policy for it - the first version of this probe started there and read
+nothing."""
+
+CONDITIONS: dict[str, tuple[int, int, int, int] | None] = {
+    "start of the episode": None,
+    "after the wood pickaxe (as trained)": (0, 0, 1, 0),
+    "... +1 wood": (1, 0, 1, 0),
+    "... +1 stone": (0, 1, 1, 0),
+    "... +1 wood +1 stone": (1, 1, 1, 0),
+    "... +2 wood +1 stone": (2, 1, 1, 0),
+    "... stone pickaxe handed over": (0, 0, 1, 1),
 }
-"""(wood, stone, wood pickaxe, stone pickaxe) the episode starts with."""
+"""``None`` = the untouched start; otherwise the inventory (wood, stone, wood pickaxe,
+stone pickaxe) set at the milestone state."""
+
+
+def milestone_state(task, field, route) -> simulate.State | None:
+    """The simulated state just after the route's wood pickaxe is crafted."""
+    state = task.initial_state(field)
+    for action in route:
+        if int(action) < 0:
+            return None
+        state = simulate.step(state, int(action))
+        if int(action) == MILESTONE:
+            return state
+    return None
 
 
 def run_condition(model, params, demos: CraftDemoSet, indices: np.ndarray, inventory) -> dict:
     task = demos.task
     fields = [demos.level(int(i)) for i in indices]
-    starts = [simulate.State(task.tiles(f), f.agent_start, task.start_direction, tuple(inventory)) for f in fields]
+    if inventory is None:
+        starts = [task.initial_state(f) for f in fields]
+    else:
+        anchors = [milestone_state(task, f, demos.routes([int(i)])[0]) for f, i in zip(fields, indices)]
+        keep = [k for k, a in enumerate(anchors) if a is not None]
+        fields = [fields[k] for k in keep]
+        indices = indices[keep]
+        starts = [simulate.State(anchors[k].tiles, anchors[k].position, anchors[k].facing, tuple(inventory)) for k in keep]
     step_penalty, step_limit = float(demos.meta["step_penalty"]), int(demos.meta["step_limit"])
     solutions = [task.solution_from(s, f, step_penalty, step_limit) for s, f in zip(starts, fields)]
     decoded = closed_loop.rollout(model, params, demos, indices, starts=starts)
@@ -122,7 +149,7 @@ def main() -> None:
         r = run_condition(model, params, demos, indices, inventory)
         results[name] = r
         print(
-            f"{name:30s} {r['reached']:8.2f} {r['model_takes_iron']:12.2f} {r['expert_takes_iron']:7.2f} {r['agreement_when_reached']:6.2f} "
+            f"{name:38s} {r['reached']:8.2f} {r['model_takes_iron']:12.2f} {r['expert_takes_iron']:7.2f} {r['agreement_when_reached']:6.2f} "
             f"{r['indifference_model']:7.1f} {r['mean_cost_iron_plan']:10.1f} {r['mean_cost_coal_plan']:6.1f}"
         )
     if args.json:

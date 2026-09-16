@@ -505,7 +505,20 @@ class _Planner:
                 if cut() is None:
                     return None
             faced = (pos[0] + MOVES[facing][0], pos[1] + MOVES[facing][1])
-            if not (0 <= faced[0] < grid.shape[0] and 0 <= faced[1] < grid.shape[1] and not grid[faced]):
+            usable = 0 <= faced[0] < grid.shape[0] and 0 <= faced[1] < grid.shape[1] and not grid[faced]
+            if usable:
+                # A table on a free tile can wall the player into a pocket; a tree's
+                # tile never can, since the tree was solid already. Use the faced tile
+                # only if everything the plan still needs stays reachable.
+                grid[faced] = True
+                needed = (
+                    [objective.position]
+                    + (trees if (wood - 2 < int(need_wp) + int(need_sp)) else [])
+                    + (stones if need_sp and stone < 1 else [])
+                )
+                usable = all(nearest(grid, pos, [cell]) is not None for cell in needed)
+                grid[faced] = False
+            if not usable:
                 faced = cut()
                 if faced is None:
                     return None

@@ -65,6 +65,37 @@ Experiment2.md) transplanted:
 
 Everything lands under `/workspace/data/craftax/` via `scripts/craftax_chain.sh`.
 
+## Stage 4 protocol
+
+`goalmisgen/craftax/craft.py`, `scripts/generate_craft_demos.py`, `scripts/craft_chain.sh`.
+
+- **World.** 15x15 field, stone border, stone at density 0.2, six trees, two
+  ores, a bare-handed player. No level dataset: field ``i`` of pool
+  ``(sampler, seed)`` is a deterministic draw, splits are index ranges.
+- **Chains.** Coal needs a wood pickaxe: three wood (two for the table, one
+  for the pickaxe). Iron needs a stone pickaxe on top: one more wood, one
+  stone, and a return beside the table. Engine rules verified by stepping:
+  a mined tree becomes grass; a table goes on the faced non-solid tile for
+  two wood; crafting needs the table in the 8-neighbourhood.
+- **Expert.** Optimal within a plan family: tree order, table on the third
+  tree, stone-or-fourth-tree order, nearest stones; ranked on the static
+  grid, the best two executed exactly on the changing grid, the cheapest real
+  route kept. Not considered: a second table, tunnelling. Every plan is run
+  through the engine in the tests: target collected in exactly its cost,
+  the tool crafted, nothing wasted.
+- **Values.** Iron is the rich kind (feature 0 at rho=1) at (2.0, 0.5): a
+  30-action threshold at the median extra cost of the iron chain over the
+  coal chain (p25/50/75 = 21/27/36 on these fields), so the expert takes iron
+  on ~58% and the +-0.45 arms (thresholds 21..39) sweep the interquartile
+  range. Had the cheap kind been the rich one the expert would never trade.
+- **Bases.** ``cxcraft15.s{1,2,3}``: the same model, ``max_actions=128``
+  (routes average ~38 actions, max ~65), 40k steps on 150k fields.
+- **What it asks.** Raising iron's value must raise the worth of the stone
+  pickaxe, the stone and the fourth tree, none of which carry the iron cue.
+  If the axis is again a gain on the ore's input embedding, the value is
+  attached to the cue and the plan is downstream of it; if it lives elsewhere,
+  the model has a value variable the cue only informs.
+
 ## Engine facts the code leans on (all tested in `tests/test_craftax_engine.py`)
 
 | fact | consequence |

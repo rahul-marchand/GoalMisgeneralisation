@@ -50,11 +50,19 @@ def rollout(
     seed: int = 0,
     policy=None,
     starts=None,
+    avoid_ineffective_repeat: bool = False,
 ) -> Decoded:
     """Greedy receding-horizon routes for ``indices`` of a receding crafting set.
 
     ``starts`` overrides the initial states: one :class:`simulate.State` per
     index, for counterfactual episodes (wood in hand, a pickaxe, a table down).
+
+    ``avoid_ineffective_repeat`` masks the previous action when it changed
+    nothing - no move, no turn, no inventory or map change - so a greedy
+    policy cannot loop on a craft that failed its preconditions until the step
+    cap. The expert never errs, so no training state teaches recovery; this
+    is a decode-time stand-in for that, off by default and reported as a
+    variant when used.
 
     ``batch_size`` defaults to :func:`~goalmisgen.offline.decode.decode_batch_size`:
     the forward pass materialises ``batch x heads x length x length`` of
@@ -85,8 +93,19 @@ def rollout(
         lengths = np.full(batch, cfg.max_actions, dtype=np.int32)
         finished = np.zeros(batch, dtype=bool)
         eos = np.zeros(batch, dtype=bool)
+        previous = np.full(batch, -1, dtype=np.int32)
+        previous_signature = None
         for t in range(cfg.max_actions):
             inventories = np.stack([np.asarray(getattr(states.inventory, f)) for f in simulate.INVENTORY], axis=-1)
+            signature = np.concatenate(
+                [
+                    np.asarray(states.player_position),
+                    np.asarray(states.player_direction)[:, None],
+                    inventories,
+                    np.asarray(states.map).reshape(batch, -1).sum(-1, keepdims=True),
+                ],
+                axis=-1,
+            )
             observations = task.observe_batch(
                 np.asarray(states.map),
                 np.asarray(states.player_position),
@@ -96,9 +115,14 @@ def rollout(
                 inventories,
             )
             if policy is None:
-                token = np.asarray(jnp.argmax(first(params, jnp.asarray(observations)), axis=-1))
+                logits = np.array(first(params, jnp.asarray(observations)))
+                if avoid_ineffective_repeat and previous_signature is not None:
+                    unchanged = (signature == previous_signature).all(axis=-1) & (previous >= 0)
+                    logits[np.nonzero(unchanged)[0], previous[unchanged]] = -np.inf
+                token = np.argmax(logits, axis=-1)
             else:
                 token = np.asarray(policy(observations, t))
+            previous_signature = signature
             stopping = (token == cfg.eos) & ~finished
             eos |= stopping
             lengths[stopping] = t
@@ -107,6 +131,7 @@ def rollout(
                 break
             act = np.where(finished, int(Action.NOOP), token).astype(np.int32)
             actions[~finished, t] = act[~finished]
+            previous = act
             states, keys, collected = engine.step_batch(states, task, act, keys, step_limit)
             done_now = collected.any(axis=-1) & ~finished
             lengths[done_now] = t + 1

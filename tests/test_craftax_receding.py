@@ -102,3 +102,33 @@ def test_an_open_loop_crafting_task_still_decodes_open_loop():
     task = CraftTask(receding=False)
     demos = CraftDemoSet.generate(FieldSampler(), seed=4, start=0, count=3, rho=1.0, task=task)
     assert demos.decode_closed_loop is None and demos.n_channels == 4 + 2 + 1
+
+
+def test_the_ineffective_repeat_guard_breaks_a_no_op_loop(demos):
+    """A policy that always crafts a stone pickaxe loops forever; with the guard it is pushed to its next choice."""
+    from goalmisgen.craftax.blocks import Action
+
+    model = RoutePrefixLM(
+        ModelConfig(size=15, n_channels=demos.n_channels, n_actions=17, max_actions=32, d_model=32, n_layers=1, n_heads=1)
+    )
+    params = initial_params(model, __import__("jax").random.PRNGKey(0))
+    # Bias the untrained model's first-token logits so MAKE_STONE_PICKAXE always wins: patch the head bias.
+    import jax
+
+    flat, unravel = jax.flatten_util.ravel_pytree(params)
+    head = [
+        k
+        for k in jax.tree_util.tree_leaves_with_path(params)
+        if "head" in jax.tree_util.keystr(k[0]) and "bias" in jax.tree_util.keystr(k[0])
+    ]
+    assert head, "expected a head bias"
+    biased = jax.tree_util.tree_map_with_path(
+        lambda path, leaf: leaf.at[int(Action.MAKE_STONE_PICKAXE)].set(50.0)
+        if ("head" in jax.tree_util.keystr(path) and "bias" in jax.tree_util.keystr(path))
+        else leaf,
+        params,
+    )
+    plain = closed_loop.rollout(model, biased, demos, np.arange(4))
+    guarded = closed_loop.rollout(model, biased, demos, np.arange(4), avoid_ineffective_repeat=True)
+    assert (plain.actions[:, :5] == int(Action.MAKE_STONE_PICKAXE)).all(), "unguarded: the no-op repeats"
+    assert (guarded.actions[:, 1] != int(Action.MAKE_STONE_PICKAXE)).all(), "guarded: after one no-op, something else"

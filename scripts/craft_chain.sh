@@ -22,7 +22,7 @@ cd "$(dirname "$0")/.."
 UV="$(command -v uv)"; [ -n "$UV" ] || { echo "NO_UV"; exit 1; }
 
 DATA="${DATA:-/workspace/data}"
-DEMOS="${DATA}/craftax/craft/demos"
+DEMOS="${DEMOS:-${DATA}/craftax/craft/demos}"   # override to keep pools from different experts apart
 RUNS="${DATA}/craftax/craft/runs"
 RESULTS="${DATA}/craftax/craft/results"
 LOGS="${DATA}/logs/craftax"

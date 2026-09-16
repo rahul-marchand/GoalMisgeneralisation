@@ -34,11 +34,12 @@ SEEDS="${SEEDS:-1 2 3}"
 BASE_STEPS="${BASE_STEPS:-40000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
 EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
+ARM_OFFSETS="${ARM_OFFSETS:-}"  # e.g. "0.45 0.3 0.2 0.1" for a 9-arm sweep; empty = the full 25-arm grid
 ARM_TRAIN="${ARM_TRAIN:-20000}"; ARM_TEST="${ARM_TEST:-2048}"
 NAME="${NAME:-cxcraft15}"
 
 tag_values() { echo "$1" | tr '-' ' '; }
-arms_list() { ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" --base-values ${BASE_VALUES}; }
+arms_list() { ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" --base-values ${BASE_VALUES} ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}}; }
 
 demo() {  # demo START COUNT RHO OUT [extra args]
     local start="$1" count="$2" rho="$3" out="$4"; shift 4

@@ -26,11 +26,14 @@ def main() -> None:
     parser.add_argument(
         "--base-values", type=float, nargs=2, default=BASE_VALUES, help="The base's (v0, v1); the crafting task uses 2.0 0.5."
     )
+    parser.add_argument(
+        "--offsets", type=float, nargs="+", default=None, help="Positive offsets only (mirrored); default is the full 12-point grid."
+    )
     args = parser.parse_args()
     base_values = tuple(args.base_values)
     for objective in args.objective:
         arms = sweep_arms(
-            objective, first_seed=1234 + 100 * objective
+            objective, offsets=None if args.offsets is None else tuple(args.offsets), first_seed=1234 + 100 * objective
         )  # distinct seeds per sweep, so the two null arms differ
         problems = check_no_preference_flip(base_values, arms)
         if problems:

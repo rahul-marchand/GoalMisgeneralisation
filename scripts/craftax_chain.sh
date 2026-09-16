@@ -41,6 +41,7 @@ SEEDS="${SEEDS:-1 2 3}"
 BASE_STEPS="${BASE_STEPS:-30000}"
 FT_STEPS="${FT_STEPS:-1000}"; FT_LR="${FT_LR:-3e-5}"; FT_WARMUP="${FT_WARMUP:-50}"
 EVAL_LEVELS="${EVAL_LEVELS:-512}"; CHECKPOINT_RATIO="${CHECKPOINT_RATIO:-2.0}"  # evaluations decode on a shared GPU; keep them few
+ARM_OFFSETS="${ARM_OFFSETS:-}"  # e.g. "0.45 0.3 0.2 0.1" for a 9-arm sweep; empty = the full 25-arm grid
 ARM_TRAIN_LEVELS="${ARM_TRAIN_LEVELS:-40000}"; ARM_TEST_LEVELS="${ARM_TEST_LEVELS:-2048}"
 BASE_TAG="1.00-0.50"
 
@@ -48,7 +49,7 @@ tag_values() { echo "$1" | tr '-' ' '; }   # 1.00-0.50 -> "1.00 0.50"
 
 levels() {
     local tag values
-    for tag in "${BASE_TAG}" $(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk '{print $5}' | sort -u | grep -v "^${BASE_TAG}$"); do
+    for tag in "${BASE_TAG}" $(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}} | awk '{print $5}' | sort -u | grep -v "^${BASE_TAG}$"); do
         if [ "${tag}" = "${BASE_TAG}" ]; then n="${N_LEVELS}"; else n="${N_ARM_LEVELS}"; fi
         out="${LEVELS}/${tag}@$((n / 1000))k"
         [ -f "${out}/meta.json" ] && { echo "have ${out}"; continue; }
@@ -72,7 +73,7 @@ demos() {
     demo "${base}" test 1.0 "${DEMOS}/test.rho100" || return 1
     demo "${base}" valid 0.5 "${DEMOS}/valid.rho050" || return 1
     demo "${base}" valid 0.0 "${DEMOS}/valid.rho000" || return 1
-    ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk '{print $5}' | sort -u | while read -r tag; do
+    ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}} | awk '{print $5}' | sort -u | while read -r tag; do
         [ "${tag}" = "${BASE_TAG}" ] && continue  # the null arm fine-tunes on valid.rho100 (see arm)
         src="${LEVELS}/${tag}@$((N_ARM_LEVELS / 1000))k"
         demo "${src}" train 1.0 "${DEMOS}/arms/${tag}.train.rho100" --n "${ARM_TRAIN_LEVELS}" || return 1
@@ -95,7 +96,7 @@ base() {
 
 arm() {  # arm BASE SWEEP OFFSET SEED
     local base="$1" sweep="$2" offset="$3" seed="$4" line dirname tag out init train own
-    line=$(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | awk -v s="${sweep}" -v o="${offset}" '$1==s && $2==o')
+    line=$(${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}} | awk -v s="${sweep}" -v o="${offset}" '$1==s && $2==o')
     [ -n "${line}" ] || { echo "no arm ${sweep} ${offset}" >&2; return 1; }
     set -- ${line}; dirname="$4"; tag="$5"
     out="${RUNS}/${base}/arms/${dirname}"
@@ -115,7 +116,7 @@ arm() {  # arm BASE SWEEP OFFSET SEED
 
 arms() {
     local base="$1"
-    ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" | while read -r sweep offset seed dirname tag; do
+    ${UV} run python scripts/value_axis_arms.py --steps "${FT_STEPS}" ${ARM_OFFSETS:+--offsets ${ARM_OFFSETS}} | while read -r sweep offset seed dirname tag; do
         [ -f "${RUNS}/${base}/arms/${dirname}/done.json" ] && { echo "done ${base}/${dirname}"; continue; }
         echo "$(date -u +%FT%TZ) arm ${base}/${dirname}"
         arm "${base}" "${sweep}" "${offset}" "${seed}" > "${LOGS}/${base}.${dirname}.log" 2>&1 || echo "ARM_FAILED ${base}/${dirname}"

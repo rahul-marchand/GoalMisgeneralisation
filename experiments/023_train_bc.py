@@ -81,6 +81,13 @@ def parse_args() -> argparse.Namespace:
         help="Precision the matmuls run in; parameters stay float32. Fix it for a whole grid.",
     )
     parser.add_argument("--schedule", choices=("cosine", "constant"), default="cosine")
+    parser.add_argument(
+        "--extra-demos",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="Further demonstration sets drawn from together with --demos (a DAgger pass's visited states).",
+    )
     parser.add_argument("--note", type=str, default=None, help="Why this run exists; written beside the run.")
     return parser.parse_args()
 
@@ -97,6 +104,11 @@ def main() -> None:
     # A receding-horizon task trains on every state along its routes; evaluation
     # sets stay whole so they decode closed-loop from the start of each episode.
     train_set = demos.suffixes() if getattr(getattr(demos, "task", None), "receding", False) else demos
+    if args.extra_demos:
+        from goalmisgen.craftax.dagger import MixedDemoSet
+
+        extras = [load_demonstrations(path, hide_values=hide_values) for path in args.extra_demos]
+        train_set = MixedDemoSet((train_set, *extras))
     if args.init_from is None:
         model_config = ModelConfig(
             size=demos.size,

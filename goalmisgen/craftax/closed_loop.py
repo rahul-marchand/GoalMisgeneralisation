@@ -51,6 +51,7 @@ def rollout(
     policy=None,
     starts=None,
     avoid_ineffective_repeat: bool = False,
+    record=None,
 ) -> Decoded:
     """Greedy receding-horizon routes for ``indices`` of a receding crafting set.
 
@@ -63,6 +64,11 @@ def rollout(
     cap. The expert never errs, so no training state teaches recovery; this
     is a decode-time stand-in for that, off by default and reported as a
     variant when used.
+
+    ``record``, a list, receives one entry per step of each chunk:
+    ``(rows, tiles, positions, facings, inventories, active)`` with host arrays
+    over the chunk - the states the policy actually visited, which a DAgger
+    pass labels with the planner and trains on.
 
     ``batch_size`` defaults to :func:`~goalmisgen.offline.decode.decode_batch_size`:
     the forward pass materialises ``batch x heads x length x length`` of
@@ -114,6 +120,17 @@ def rollout(
                 np.asarray(states.player_direction),
                 inventories,
             )
+            if record is not None:
+                record.append(
+                    (
+                        chunk.copy(),
+                        np.asarray(states.map).copy(),
+                        np.asarray(states.player_position).copy(),
+                        np.asarray(states.player_direction).copy(),
+                        inventories.copy(),
+                        ~finished.copy(),
+                    )
+                )
             if policy is None:
                 logits = np.array(first(params, jnp.asarray(observations)))
                 if avoid_ineffective_repeat and previous_signature is not None:

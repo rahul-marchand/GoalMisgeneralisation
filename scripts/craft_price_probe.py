@@ -142,7 +142,7 @@ def main() -> None:
         f"{args.run.name} @ step {step}, {len(indices)} fields, values {demos.meta['values']} (threshold {(demos.meta['values'][0] - demos.meta['values'][1]) / demos.meta['step_penalty']:.0f} actions)\n"
     )
     print(
-        f"{'start with':30s} {'reached':>8s} {'iron: model':>12s} {'expert':>7s} {'agree':>6s} {'indiff':>7s} {'cost iron':>10s} {'coal':>6s}"
+        f"{'state':38s} {'reached':>8s} {'iron: model':>12s} {'expert':>7s} {'agree':>6s} {'indiff':>7s} {'cost iron':>10s} {'coal':>6s}"
     )
     results = {}
     for name, inventory in CONDITIONS.items():

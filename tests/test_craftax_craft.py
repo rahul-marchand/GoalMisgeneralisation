@@ -54,7 +54,7 @@ def test_craft_demos_carry_every_protocol_attribute(demos):
     missing = [name for name in PROTOCOL_ATTRIBUTES if not hasattr(demos, name)]
     assert not missing
     assert isinstance(demos, Demonstrations)
-    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 4 + 2 + 1 + 8
+    assert demos.n_actions == 17 and demos.max_actions == 128 and demos.n_channels == 5 + 2 + 1 + 8
 
 
 def test_every_plan_runs_in_the_engine_to_its_target_in_exactly_its_cost(demos):
@@ -114,6 +114,17 @@ def test_stored_observation_is_what_the_engine_renders(demos, task):
         )
     obs = demos.observations([0])[0]
     assert obs[..., 2].sum() == FieldSampler().n_trees and obs[..., 3].sum() == FieldSampler().n_stones
+    assert obs[..., 4].sum() == 0, "no table at the start"
+    # after the table goes down it is visible: the state right after PLACE_TABLE has one table cell
+    from goalmisgen.craftax import simulate
+
+    field = demos.level(0)
+    state = task.initial_state(field)
+    for a in demos.routes([0])[0]:
+        state = simulate.step(state, int(a))
+        if int(a) == int(Action.PLACE_TABLE):
+            break
+    assert task.observe(state.tiles, state.position, [0, 0], True, state.facing, state.inventory)[..., 4].sum() == 1
 
 
 def test_pools_are_paired_across_rho_and_values(task):

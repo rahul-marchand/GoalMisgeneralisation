@@ -60,8 +60,13 @@ from goalmisgen.parallel import worker_pool
 
 TASK = "craftax-craft"
 
-WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, STONE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3, 4
-"""Observation layout: the maze's, with tree and stone-deposit channels before the kinds."""
+WALL_CHANNEL, AGENT_CHANNEL, TREE_CHANNEL, STONE_CHANNEL, TABLE_CHANNEL, FIRST_KIND_CHANNEL = 0, 1, 2, 3, 4, 5
+"""Observation layout: the maze's, with tree, stone-deposit and table channels before the kinds.
+
+The table channel is what makes the state Markov once a table is down: without
+it a placed table rendered as grass, the coal chain (which never returns to
+the table) still worked, and the iron chain failed at exactly the walk back
+to a table the policy could not see."""
 
 STATE_PLANES = 4 + len(simulate.INVENTORY)
 """Receding-horizon observations append the player's facing (one-hot over the four
@@ -325,6 +330,7 @@ class CraftTask:
         observation[rows, agents[:, 0], agents[:, 1], AGENT_CHANNEL] = 1.0
         observation[..., TREE_CHANNEL] = tiles == int(Block.TREE)
         observation[..., STONE_CHANNEL] = tiles == int(Block.STONE)
+        observation[..., TABLE_CHANNEL] = tiles == int(Block.CRAFTING_TABLE)
         feature_values = np.asarray(feature_values, dtype=np.float32)
         for k, kind in enumerate(self.kinds):
             mask = tiles == kind

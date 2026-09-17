@@ -28,7 +28,7 @@ def suffixes(demos) -> SuffixDemoSet:
 
 def test_suffix_set_is_one_item_per_state(demos, suffixes):
     assert len(suffixes) == int(np.asarray(demos.lengths).sum())
-    assert suffixes.n_channels == demos.n_channels == 4 + 2 + STATE_PLANES
+    assert suffixes.n_channels == demos.n_channels == 5 + 2 + STATE_PLANES
     missing = [n for n in PROTOCOL_ATTRIBUTES if not hasattr(suffixes, n)]
     assert not missing
     # item 0 is field 0 at t=0: the same observation and route as the whole set
@@ -101,7 +101,7 @@ def test_an_open_loop_crafting_task_still_decodes_open_loop():
 
     task = CraftTask(receding=False)
     demos = CraftDemoSet.generate(FieldSampler(), seed=4, start=0, count=3, rho=1.0, task=task)
-    assert demos.decode_closed_loop is None and demos.n_channels == 4 + 2 + 1
+    assert demos.decode_closed_loop is None and demos.n_channels == 5 + 2 + 1
 
 
 def test_the_ineffective_repeat_guard_breaks_a_no_op_loop(demos):
